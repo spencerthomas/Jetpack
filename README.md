@@ -76,7 +76,7 @@ pnpm install
 pnpm build
 ```
 
-### Basic Usage
+### CLI Usage
 
 ```bash
 # Start Jetpack with 3 agents
@@ -95,6 +95,26 @@ jetpack status
 # Run the demo
 jetpack demo --agents 5
 ```
+
+### Web UI Usage
+
+```bash
+# Start the orchestrator with agents
+jetpack start --agents 5
+
+# In another terminal, start the web UI
+cd apps/web
+pnpm dev
+
+# Visit http://localhost:3000
+```
+
+**Features:**
+- 📊 **Kanban Board** - Drag-and-drop task management across 6 status columns
+- 🤖 **Agent Panel** - Live agent status, current tasks, and skills
+- 📬 **MCP Mail Inbox** - Real-time inter-agent communication viewer
+- ✨ **Task Creation** - Intuitive modal for creating new tasks
+- 🔄 **Auto-refresh** - Updates every 2 seconds for real-time sync
 
 ## 📖 Usage Examples
 
@@ -218,7 +238,8 @@ jetpack/
 │   ├── cass-adapter/       # Persistent memory system
 │   └── orchestrator/       # Core coordination engine
 ├── apps/
-│   └── cli/               # Command-line interface
+│   ├── cli/               # Command-line interface
+│   └── web/               # Next.js Kanban UI
 └── .beads/                # Task storage (git-backed)
     .cass/                 # Memory database
     .jetpack/              # Agent communication
@@ -439,15 +460,17 @@ const jetpack = new JetpackOrchestrator({
 
 ## 🚀 Roadmap
 
+- [x] **Kanban Web UI** - Modern drag-and-drop interface ✅
+- [x] **MCP Mail Inbox Viewer** - Real-time message monitoring ✅
 - [ ] Integration with Named Tmux Manager for command orchestration
 - [ ] Ultimate Bug Scanner adapter for quality gates
-- [ ] Beads Viewer web dashboard
+- [ ] WebSocket support for instant UI updates
+- [ ] Task dependency graph visualization
 - [ ] Session Search for learning from history
 - [ ] Simultaneous Launch Button for safe multi-command execution
 - [ ] Cloud-hosted agent farm
 - [ ] GitHub Issues / Linear integration
-- [ ] Real-time collaboration features
-- [ ] Agent performance leaderboards
+- [ ] Agent performance metrics and leaderboards
 
 ## 📄 License
 
