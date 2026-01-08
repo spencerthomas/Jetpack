@@ -1,0 +1,30 @@
+{
+  "name": "jetpack",
+  "version": "0.1.0",
+  "description": "Multi-Agent Swarm Development Stack - Integrating Beads, CASS, MCP Mail, and the Agentic Flywheel",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "jetpack": "node apps/cli/dist/index.js"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.5",
+    "prettier": "^3.4.2",
+    "eslint": "^9.18.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

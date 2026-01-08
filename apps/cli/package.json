@@ -1,0 +1,26 @@
+{
+  "name": "@jetpack/cli",
+  "version": "0.1.0",
+  "description": "Jetpack CLI - Multi-Agent Swarm Development",
+  "main": "dist/index.js",
+  "bin": {
+    "jetpack": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@jetpack/orchestrator": "workspace:*",
+    "@jetpack/shared": "workspace:*",
+    "commander": "^12.1.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.2"
+  }
+}
