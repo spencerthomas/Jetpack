@@ -106,30 +106,51 @@ pnpm install
 pnpm build
 ```
 
-### CLI Usage
+### Getting Started (Single Command)
 
 ```bash
-# Start Jetpack with 3 agents
-jetpack start --agents 3
+# Start everything with one command
+jetpack start
+```
 
-# Create a task
-jetpack task \
-  --title "Implement user authentication" \
-  --priority high \
-  --skills typescript,backend \
-  --estimate 30
+This single command:
+1. 🚀 Starts the orchestrator
+2. 🤖 Launches 3 AI agents (configurable with `-a`)
+3. 📺 Opens the web UI at http://localhost:3002
+4. 🔄 Begins watching for tasks
 
-# Check status
+**Once running, create tasks any way you prefer:**
+- **Web UI** - Use the Kanban board at http://localhost:3002
+- **CLI** - Run `jetpack task -t "Your task"` in another terminal
+- **Claude Code** - Edit files in `.beads/tasks/` directly
+- **Drop files** - Place `.md` task files in `.beads/tasks/`
+
+### CLI Options
+
+```bash
+# Start with 5 agents instead of 3
+jetpack start -a 5
+
+# Start without auto-opening browser
+jetpack start --no-browser
+
+# Start on a different port
+jetpack start -p 3005
+
+# CLI-only mode (no web UI)
+jetpack start --no-ui
+
+# Create a task directly
+jetpack task -t "Fix the login bug" -p high
+
+# Check current status
 jetpack status
 
-# Run the demo
+# Run a guided demo
 jetpack demo --agents 5
 
-# Use LangGraph Supervisor for full orchestration
-jetpack supervise "Build a user authentication system" \
-  --llm claude \
-  --model claude-3-5-sonnet-20241022 \
-  --agents 5
+# Use AI supervisor for complex requests
+jetpack supervise "Build user authentication" --agents 5
 ```
 
 ### LangGraph Supervisor
@@ -159,39 +180,42 @@ export ANTHROPIC_API_KEY=your_key   # for Claude
 export OPENAI_API_KEY=your_key      # for OpenAI
 ```
 
-### Web UI Usage
+### Web UI (Included with `jetpack start`)
 
-```bash
-# Start the orchestrator with agents
-jetpack start --agents 5
-
-# In another terminal, start the web UI
-cd apps/web
-pnpm dev
-
-# Visit http://localhost:3000
-```
+The web UI launches automatically at http://localhost:3002 when you run `jetpack start`.
 
 **Features:**
 - 📊 **Kanban Board** - Drag-and-drop task management across 6 status columns
-- 🤖 **Agent Panel** - Live agent status, current tasks, and skills
-- 📬 **MCP Mail Inbox** - Real-time inter-agent communication viewer
-- ✨ **Task Creation** - Intuitive modal for creating new tasks
-- 🔄 **Auto-refresh** - Updates every 2 seconds for real-time sync
+- 📬 **Inbox** - Real-time inter-agent communication viewer (MCP Mail)
+- 🤖 **Agents** - Live agent status, current tasks, and skills
+- 📁 **Projects** - Project overview and roadmap planning
+- ⌨️ **Keyboard shortcuts** - Navigate with Cmd+K, G+I, G+B, etc.
+
+**Manual start (if needed):**
+```bash
+# If you need to start the web UI separately
+cd apps/web && pnpm dev -p 3002
+```
 
 ## 📖 Usage Examples
 
 ### Starting the System
 
 ```bash
-# Start with default settings (3 agents)
+# Start everything (orchestrator + 3 agents + web UI)
 jetpack start
 
-# Start with 5 specialized agents
-jetpack start --agents 5
+# Start with more agents
+jetpack start -a 5
 
-# Use a custom working directory
-jetpack start --dir /path/to/project
+# Start in a specific project directory
+jetpack start -d /path/to/project
+
+# Start without opening browser
+jetpack start --no-browser
+
+# CLI-only mode (no web UI)
+jetpack start --no-ui
 ```
 
 ### Creating Tasks
@@ -531,18 +555,20 @@ jetpack supervise "Migrate all class components to hooks" --agents 10
 
 ### Use Case 4: Manual Task Queue
 
-**Scenario:** You want fine-grained control
+**Scenario:** You want fine-grained control over tasks
 
 ```bash
-# Start agents
-jetpack start --agents 5
+# Start Jetpack (web UI opens automatically)
+jetpack start -a 5
 
-# Create tasks manually
+# In another terminal, create tasks manually
 jetpack task -t "Set up database schema" -p critical -s database
 jetpack task -t "Create API routes" -p high -s backend
 jetpack task -t "Build dashboard UI" -p medium -s react,frontend
 
-# Monitor progress
+# Or use the web UI at http://localhost:3002 to create/manage tasks
+
+# Check progress via CLI
 jetpack status
 ```
 

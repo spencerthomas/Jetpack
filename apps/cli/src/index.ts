@@ -3,62 +3,218 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
+import { spawn, ChildProcess } from 'child_process';
+import path from 'path';
 import { JetpackOrchestrator } from '@jetpack/orchestrator';
 import { AgentSkill, TaskPriority } from '@jetpack/shared';
 
 const program = new Command();
 
+// Web server process reference
+let webServerProcess: ChildProcess | null = null;
+
+// Function to start the web UI
+async function startWebUI(port: number = 3002): Promise<boolean> {
+  return new Promise((resolve) => {
+    // Find the web app directory
+    const webAppDir = path.resolve(__dirname, '../../web');
+
+    console.log(chalk.gray(`  Starting web UI from ${webAppDir}...`));
+
+    webServerProcess = spawn('pnpm', ['dev', '-p', port.toString()], {
+      cwd: webAppDir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false,
+      shell: true,
+    });
+
+    let started = false;
+
+    webServerProcess.stdout?.on('data', (data: Buffer) => {
+      const output = data.toString();
+      if (output.includes('Ready') || output.includes('started server') || output.includes('localhost')) {
+        if (!started) {
+          started = true;
+          resolve(true);
+        }
+      }
+    });
+
+    webServerProcess.stderr?.on('data', (data: Buffer) => {
+      // Next.js outputs some info to stderr, check for ready state there too
+      const output = data.toString();
+      if (output.includes('Ready') || output.includes('localhost')) {
+        if (!started) {
+          started = true;
+          resolve(true);
+        }
+      }
+    });
+
+    webServerProcess.on('error', (err) => {
+      console.error(chalk.red(`Failed to start web UI: ${err.message}`));
+      resolve(false);
+    });
+
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      if (!started) {
+        started = true;
+        // Assume it started even if we didn't see the ready message
+        resolve(true);
+      }
+    }, 30000);
+  });
+}
+
+// Function to open browser
+function openBrowser(url: string) {
+  const command = process.platform === 'darwin' ? 'open' :
+                  process.platform === 'win32' ? 'start' : 'xdg-open';
+  spawn(command, [url], { detached: true, stdio: 'ignore' }).unref();
+}
+
 program
   .name('jetpack')
-  .description('Multi-Agent Swarm Development Stack')
+  .description(`
+  Jetpack - Multi-Agent Development Stack
+
+  Start Jetpack to automatically launch:
+  • Orchestrator - coordinates agent work
+  • Agents - AI workers that execute tasks
+  • Web UI - visualize and interact at localhost:3002
+
+  Usage:
+    jetpack start              Start everything (recommended)
+    jetpack start -a 5         Start with 5 agents
+    jetpack start --no-browser Don't auto-open browser
+    jetpack task -t "title"    Create a new task
+
+  Once running, create tasks via:
+  • Web UI at http://localhost:3002
+  • CLI: jetpack task -t "Your task"
+  • Drop .md files in .beads/tasks/
+  • Use Claude Code to edit task files
+  `.trim())
   .version('0.1.0');
 
 program
   .command('start')
-  .description('Start the Jetpack multi-agent system')
+  .description('Start Jetpack - launches agents, orchestrator, and web UI')
   .option('-a, --agents <number>', 'Number of agents to start', '3')
+  .option('-p, --port <number>', 'Web UI port', '3002')
   .option('-d, --dir <path>', 'Working directory', process.cwd())
+  .option('--no-browser', 'Do not open browser automatically')
+  .option('--no-ui', 'Run without web UI (CLI only mode)')
   .action(async (options) => {
-    const spinner = ora('Initializing Jetpack...').start();
+    console.log(chalk.bold.cyan('\n🚀 Jetpack Multi-Agent Development Stack\n'));
+
+    const port = parseInt(options.port);
+    const url = `http://localhost:${port}`;
+
+    const spinner = ora('Initializing orchestrator...').start();
 
     try {
+      // 1. Initialize orchestrator
       const jetpack = new JetpackOrchestrator({
         workDir: options.dir,
         autoStart: true,
       });
 
       await jetpack.initialize();
-      spinner.text = 'Starting agents...';
+      spinner.succeed(chalk.green('Orchestrator initialized'));
 
+      // 2. Start agents
+      spinner.start('Starting agents...');
       await jetpack.startAgents(parseInt(options.agents));
-      spinner.succeed(chalk.green(`Jetpack started with ${options.agents} agents`));
+      spinner.succeed(chalk.green(`${options.agents} agents started`));
 
-      console.log(chalk.cyan('\nJetpack is running. Press Ctrl+C to stop.\n'));
+      // 3. Start web UI (unless --no-ui)
+      if (options.ui !== false) {
+        spinner.start('Starting web UI...');
+        const webStarted = await startWebUI(port);
+        if (webStarted) {
+          spinner.succeed(chalk.green('Web UI started'));
+        } else {
+          spinner.warn(chalk.yellow('Web UI may have started (could not confirm)'));
+        }
+      }
 
-      // Keep process alive and show status updates
+      // Display connection info
+      console.log(chalk.bold('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
+
+      if (options.ui !== false) {
+        console.log(chalk.bold('  📺 Web Interface'));
+        console.log(chalk.cyan(`     ${url}`));
+        console.log('');
+      }
+
+      console.log(chalk.bold('  💻 Working Directory'));
+      console.log(chalk.gray(`     ${options.dir}`));
+      console.log('');
+
+      console.log(chalk.bold('  🤖 Agents'));
+      console.log(chalk.gray(`     ${options.agents} agents watching for tasks`));
+      console.log('');
+
+      console.log(chalk.bold('  📝 Create Tasks'));
+      console.log(chalk.gray('     Use Claude Code, terminal, or web UI to create tasks:'));
+      console.log(chalk.gray('     • Drop .md files in .beads/tasks/'));
+      console.log(chalk.gray('     • jetpack task -t "Your task title"'));
+      console.log(chalk.gray('     • Use web UI at ') + chalk.cyan(url));
+      console.log('');
+
+      console.log(chalk.bold('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
+
+      // 4. Open browser (unless --no-browser)
+      if (options.ui !== false && options.browser !== false) {
+        console.log(chalk.gray('Opening browser...'));
+        openBrowser(url);
+      }
+
+      console.log(chalk.cyan('Jetpack is running. Press Ctrl+C to stop.\n'));
+
+      // Keep process alive - minimal status updates
+      let lastCompleted = 0;
       const statusInterval = setInterval(async () => {
-        const status = await jetpack.getStatus();
-        console.log(chalk.bold('\n--- Status Update ---'));
-        console.log(chalk.blue(`Agents: ${status.agents.length}`));
-        status.agents.forEach(agent => {
-          const statusColor = agent.status === 'busy' ? chalk.yellow : chalk.green;
-          const taskInfo = agent.currentTask ? ` (working on ${agent.currentTask})` : '';
-          console.log(`  ${statusColor(agent.name)}: ${agent.status}${taskInfo}`);
-        });
-        console.log(chalk.blue(`\nTasks:`));
-        console.log(`  Pending: ${status.tasks.pending}`);
-        console.log(`  In Progress: ${status.tasks.inProgress}`);
-        console.log(`  Completed: ${chalk.green(status.tasks.completed.toString())}`);
-        console.log(`  Failed: ${chalk.red(status.tasks.failed.toString())}`);
-        console.log(`\nMemory: ${status.memory.total} entries`);
-      }, 10000); // Every 10 seconds
+        try {
+          const status = await jetpack.getStatus();
+
+          // Only log when something changes
+          if (status.tasks.completed > lastCompleted) {
+            const newCompleted = status.tasks.completed - lastCompleted;
+            console.log(chalk.green(`✓ ${newCompleted} task(s) completed (total: ${status.tasks.completed})`));
+            lastCompleted = status.tasks.completed;
+          }
+
+          // Show agent activity
+          const busyAgents = status.agents.filter(a => a.status === 'busy');
+          if (busyAgents.length > 0) {
+            busyAgents.forEach(agent => {
+              if (agent.currentTask) {
+                console.log(chalk.blue(`  ${agent.name} working on: ${agent.currentTask}`));
+              }
+            });
+          }
+        } catch (err) {
+          // Ignore status errors silently
+        }
+      }, 5000); // Check every 5 seconds
 
       // Handle graceful shutdown
       process.on('SIGINT', async () => {
         clearInterval(statusInterval);
         console.log(chalk.yellow('\n\nShutting down Jetpack...'));
+
+        // Kill web server if running
+        if (webServerProcess) {
+          console.log(chalk.gray('  Stopping web UI...'));
+          webServerProcess.kill('SIGTERM');
+        }
+
+        console.log(chalk.gray('  Stopping agents...'));
         await jetpack.shutdown();
-        console.log(chalk.green('Jetpack shut down successfully'));
+        console.log(chalk.green('\n✓ Jetpack shut down successfully'));
         process.exit(0);
       });
     } catch (error) {
