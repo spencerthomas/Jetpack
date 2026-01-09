@@ -2,8 +2,8 @@
 
 import { forwardRef, ButtonHTMLAttributes } from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type ButtonSize = 'sm' | 'md' | 'lg';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+type ButtonSize = 'sm' | 'md' | 'lg' | 'icon' | 'icon-sm';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -14,16 +14,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-accent-purple text-white hover:bg-accent-purple-hover active:bg-[#6d28d9]',
-  secondary: 'bg-surface border border-default text-secondary hover:bg-hover hover:text-primary',
-  ghost: 'text-secondary hover:bg-hover hover:text-primary',
-  danger: 'bg-accent-red text-white hover:bg-[#dc2626] active:bg-[#b91c1c]',
+  primary: 'bg-[rgb(79,255,238)] text-black hover:bg-[rgb(79,255,238)]/90 active:bg-[rgb(79,255,238)]/80',
+  secondary: 'bg-[#1f1f24] border border-[#26262a] text-[#f7f8f8] hover:bg-[#2a2a30]',
+  ghost: 'text-[#8b8b8e] hover:bg-[#2a2a30] hover:text-[#f7f8f8]',
+  danger: 'bg-[#ff6467] text-black hover:bg-[#ff6467]/90 active:bg-[#ff6467]/80',
+  outline: 'border border-[#26262a] bg-transparent text-[#f7f8f8] hover:bg-[#2a2a30]',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'h-7 px-2 text-xs gap-1',
-  md: 'h-8 px-3 text-sm gap-1.5',
-  lg: 'h-10 px-4 text-sm gap-2',
+  sm: 'h-8 px-3 text-xs gap-1.5 rounded-md',
+  md: 'h-9 px-4 text-sm gap-2 rounded-md',
+  lg: 'h-10 px-6 text-sm gap-2 rounded-md',
+  icon: 'h-9 w-9 rounded-md',
+  'icon-sm': 'h-8 w-8 rounded-md',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -46,9 +49,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || isLoading}
         className={`
-          inline-flex items-center justify-center font-medium rounded-md
-          transition-colors duration-150
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-purple focus-visible:ring-offset-2 focus-visible:ring-offset-base
+          inline-flex items-center justify-center font-medium
+          transition-all duration-150
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(79,255,238)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d0f]
           disabled:opacity-50 disabled:pointer-events-none
           ${variantStyles[variant]}
           ${sizeStyles[size]}

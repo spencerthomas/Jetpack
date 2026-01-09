@@ -18,14 +18,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-secondary mb-1.5"
+            className="block text-sm font-medium text-[#f7f8f8] mb-1.5"
           >
             {label}
           </label>
         )}
         <div className="relative">
           {leftIcon && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8b8b8e]">
               {leftIcon}
             </div>
           )}
@@ -33,26 +33,27 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={`
-              w-full bg-surface border rounded-md px-3 py-2 text-sm text-primary
-              placeholder:text-muted
-              transition-colors duration-150
-              focus:outline-none focus:ring-2 focus:ring-accent-purple focus:border-transparent
+              w-full bg-[#2a2a30] border border-[#26262a] rounded-md px-3 py-2 text-sm text-[#f7f8f8]
+              placeholder:text-[#8b8b8e]
+              transition-all duration-150
+              focus:outline-none focus:ring-2 focus:ring-[rgb(79,255,238)]/50 focus:border-[rgb(79,255,238)]
+              hover:border-[#3a3a40]
               disabled:opacity-50 disabled:cursor-not-allowed
               ${leftIcon ? 'pl-10' : ''}
               ${rightIcon ? 'pr-10' : ''}
-              ${error ? 'border-accent-red' : 'border-default hover:border-strong'}
+              ${error ? 'border-[#ff6467] focus:ring-[#ff6467]/50' : ''}
               ${className}
             `.trim()}
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8b8b8e]">
               {rightIcon}
             </div>
           )}
         </div>
         {error && (
-          <p className="mt-1.5 text-xs text-accent-red">{error}</p>
+          <p className="mt-1.5 text-xs text-[#ff6467]">{error}</p>
         )}
       </div>
     );

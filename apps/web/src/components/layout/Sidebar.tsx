@@ -20,24 +20,24 @@ export function Sidebar() {
   return (
     <aside
       className={`
-        flex flex-col h-screen bg-surface border-r border-subtle
+        flex flex-col h-screen bg-[#121214] border-r border-[#26262a]
         transition-all duration-200 ease-in-out
         ${sidebarCollapsed ? 'w-16' : 'w-60'}
       `.trim()}
     >
       {/* Logo / Header */}
-      <div className="flex items-center justify-between h-14 px-4 border-b border-subtle">
+      <div className="flex items-center justify-between h-14 px-4 border-b border-[#26262a]">
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-accent-purple flex items-center justify-center">
-              <span className="text-white font-bold text-sm">J</span>
+            <div className="w-7 h-7 rounded-lg bg-[rgb(79,255,238)] flex items-center justify-center">
+              <span className="text-black font-bold text-sm">J</span>
             </div>
-            <span className="font-semibold text-primary">Jetpack</span>
+            <span className="font-semibold text-[#f7f8f8]">Jetpack</span>
           </div>
         )}
         {sidebarCollapsed && (
-          <div className="w-7 h-7 rounded-lg bg-accent-purple flex items-center justify-center mx-auto">
-            <span className="text-white font-bold text-sm">J</span>
+          <div className="w-7 h-7 rounded-lg bg-[rgb(79,255,238)] flex items-center justify-center mx-auto">
+            <span className="text-black font-bold text-sm">J</span>
           </div>
         )}
       </div>
@@ -48,9 +48,9 @@ export function Sidebar() {
           onClick={openCommandPalette}
           className={`
             w-full flex items-center gap-2 px-3 py-2 rounded-md
-            bg-hover border border-subtle
-            text-muted text-sm
-            hover:border-default hover:text-secondary
+            bg-[#1f1f24] border border-[#26262a]
+            text-[#8b8b8e] text-sm
+            hover:border-[#3a3a40] hover:text-[#f7f8f8]
             transition-colors duration-150
             ${sidebarCollapsed ? 'justify-center' : ''}
           `.trim()}
@@ -99,7 +99,7 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom section */}
-      <div className="px-3 py-3 border-t border-subtle space-y-1">
+      <div className="px-3 py-3 border-t border-[#26262a] space-y-1">
         <SidebarItem
           href="/settings"
           icon={<Settings className="w-5 h-5" />}
@@ -112,7 +112,7 @@ export function Sidebar() {
           onClick={toggleSidebar}
           className={`
             w-full flex items-center gap-3 px-3 py-2 rounded-md
-            text-muted hover:bg-hover hover:text-secondary
+            text-[#8b8b8e] hover:bg-[#1f1f24] hover:text-[#f7f8f8]
             transition-colors duration-150
             ${sidebarCollapsed ? 'justify-center' : ''}
           `.trim()}

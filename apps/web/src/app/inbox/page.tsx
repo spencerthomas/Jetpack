@@ -27,13 +27,13 @@ type MessageCategory = 'all' | 'unread' | 'task' | 'agent' | 'coordination';
 
 // Message type icons
 const getMessageIcon = (type: string) => {
-  if (type.startsWith('task.completed')) return <CheckCircle2 className="w-4 h-4 text-accent-green" />;
-  if (type.startsWith('task.failed')) return <XCircle className="w-4 h-4 text-accent-red" />;
-  if (type.startsWith('task.')) return <Bell className="w-4 h-4 text-accent-blue" />;
-  if (type.startsWith('agent.error')) return <AlertTriangle className="w-4 h-4 text-accent-red" />;
-  if (type.startsWith('agent.')) return <Activity className="w-4 h-4 text-accent-green" />;
-  if (type.startsWith('coordination.')) return <Send className="w-4 h-4 text-accent-purple" />;
-  return <Mail className="w-4 h-4 text-secondary" />;
+  if (type.startsWith('task.completed')) return <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />;
+  if (type.startsWith('task.failed')) return <XCircle className="w-4 h-4 text-[#ff6467]" />;
+  if (type.startsWith('task.')) return <Bell className="w-4 h-4 text-[#26b5ce]" />;
+  if (type.startsWith('agent.error')) return <AlertTriangle className="w-4 h-4 text-[#ff6467]" />;
+  if (type.startsWith('agent.')) return <Activity className="w-4 h-4 text-[#22c55e]" />;
+  if (type.startsWith('coordination.')) return <Send className="w-4 h-4 text-[rgb(79,255,238)]" />;
+  return <Mail className="w-4 h-4 text-[#8b8b8e]" />;
 };
 
 // Get label/badge color based on message type
@@ -161,19 +161,19 @@ export default function InboxPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent-purple border-t-transparent mx-auto"></div>
-          <p className="mt-3 text-sm text-secondary">Loading inbox...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-[rgb(79,255,238)] border-t-transparent mx-auto"></div>
+          <p className="mt-3 text-sm text-[#8b8b8e]">Loading inbox...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full bg-base">
+    <div className="flex h-full bg-[#0d0d0f]">
       {/* Left Sidebar - Categories */}
-      <div className="w-56 border-r border-subtle flex flex-col shrink-0">
-        <div className="h-14 flex items-center px-4 border-b border-subtle">
-          <h1 className="text-lg font-semibold text-primary">Inbox</h1>
+      <div className="w-56 border-r border-[#26262a] flex flex-col shrink-0">
+        <div className="h-14 flex items-center px-4 border-b border-[#26262a]">
+          <h1 className="text-lg font-semibold text-[#f7f8f8]">Inbox</h1>
         </div>
 
         <nav className="flex-1 p-2 space-y-1">
@@ -191,8 +191,8 @@ export default function InboxPage() {
                   w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm
                   transition-colors duration-150
                   ${isActive
-                    ? 'bg-accent-purple/10 text-accent-purple'
-                    : 'text-secondary hover:bg-hover hover:text-primary'
+                    ? 'bg-[rgb(79,255,238)]/10 text-[rgb(79,255,238)]'
+                    : 'text-[#8b8b8e] hover:bg-[#1f1f24] hover:text-[#f7f8f8]'
                   }
                 `}
               >
@@ -203,7 +203,7 @@ export default function InboxPage() {
                 {count > 0 && (
                   <span className={`
                     text-xs font-medium px-1.5 py-0.5 rounded
-                    ${isActive ? 'bg-accent-purple/20' : 'bg-hover'}
+                    ${isActive ? 'bg-[rgb(79,255,238)]/20' : 'bg-[#2a2a30]'}
                   `}>
                     {count}
                   </span>
@@ -214,19 +214,19 @@ export default function InboxPage() {
         </nav>
 
         {/* Categories section */}
-        <div className="p-4 border-t border-subtle">
-          <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-2">Labels</h3>
+        <div className="p-4 border-t border-[#26262a]">
+          <h3 className="text-xs font-medium text-[#8b8b8e] uppercase tracking-wider mb-2">Labels</h3>
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-sm text-secondary">
-              <div className="w-2 h-2 rounded-full bg-accent-green"></div>
+            <div className="flex items-center gap-2 text-sm text-[#8b8b8e]">
+              <div className="w-2 h-2 rounded-full bg-[#22c55e]"></div>
               <span>Success</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-secondary">
-              <div className="w-2 h-2 rounded-full bg-accent-red"></div>
+            <div className="flex items-center gap-2 text-sm text-[#8b8b8e]">
+              <div className="w-2 h-2 rounded-full bg-[#ff6467]"></div>
               <span>Errors</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-secondary">
-              <div className="w-2 h-2 rounded-full bg-accent-yellow"></div>
+            <div className="flex items-center gap-2 text-sm text-[#8b8b8e]">
+              <div className="w-2 h-2 rounded-full bg-[#eab308]"></div>
               <span>In Progress</span>
             </div>
           </div>
@@ -234,27 +234,27 @@ export default function InboxPage() {
       </div>
 
       {/* Middle Panel - Message List */}
-      <div className="w-96 border-r border-subtle flex flex-col shrink-0">
+      <div className="w-96 border-r border-[#26262a] flex flex-col shrink-0">
         {/* Search Header */}
-        <div className="h-14 flex items-center gap-2 px-4 border-b border-subtle">
+        <div className="h-14 flex items-center gap-2 px-4 border-b border-[#26262a]">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b8e]" />
             <input
               type="text"
               placeholder="Search messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-hover border border-subtle rounded-md text-sm text-primary placeholder:text-muted focus:border-accent-purple focus:outline-none transition-colors"
+              className="w-full pl-9 pr-3 py-1.5 bg-[#2a2a30] border border-[#26262a] rounded-md text-sm text-[#f7f8f8] placeholder:text-[#8b8b8e] focus:border-[rgb(79,255,238)] focus:outline-none transition-colors"
             />
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-subtle">
-          <button className="px-3 py-1 text-xs font-medium rounded bg-hover text-primary">
+        <div className="flex items-center gap-1 px-4 py-2 border-b border-[#26262a]">
+          <button className="px-3 py-1 text-xs font-medium rounded bg-[#2a2a30] text-[#f7f8f8]">
             All
           </button>
-          <button className="px-3 py-1 text-xs font-medium rounded text-muted hover:text-secondary hover:bg-hover transition-colors">
+          <button className="px-3 py-1 text-xs font-medium rounded text-[#8b8b8e] hover:text-[#f7f8f8] hover:bg-[#2a2a30] transition-colors">
             Unread
           </button>
         </div>
@@ -263,9 +263,9 @@ export default function InboxPage() {
         <div className="flex-1 overflow-y-auto">
           {filteredMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-              <Mail className="w-12 h-12 text-muted mb-3" />
-              <p className="text-secondary font-medium">No messages</p>
-              <p className="text-sm text-muted mt-1">
+              <Mail className="w-12 h-12 text-[#8b8b8e] mb-3" />
+              <p className="text-[#f7f8f8] font-medium">No messages</p>
+              <p className="text-sm text-[#8b8b8e] mt-1">
                 {searchQuery ? 'Try a different search' : 'Messages from agents will appear here'}
               </p>
             </div>
@@ -281,35 +281,35 @@ export default function InboxPage() {
                     key={message.id}
                     onClick={() => setSelectedMessage(message)}
                     className={`
-                      w-full text-left p-4 border-b border-subtle transition-colors
-                      ${isSelected ? 'bg-hover' : 'hover:bg-hover/50'}
-                      ${!isRead ? 'bg-accent-purple/5' : ''}
+                      w-full text-left p-4 border-b border-[#26262a] transition-colors
+                      ${isSelected ? 'bg-[#2a2a30]' : 'hover:bg-[#1f1f24]'}
+                      ${!isRead ? 'bg-[rgb(79,255,238)]/5' : ''}
                     `}
                   >
                     <div className="flex items-start gap-3">
                       <div className={`
                         w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shrink-0
-                        ${!isRead ? 'bg-accent-purple text-white' : 'bg-hover text-secondary'}
+                        ${!isRead ? 'bg-[rgb(79,255,238)] text-black' : 'bg-[#2a2a30] text-[#8b8b8e]'}
                       `}>
                         {getAgentInitial(message.from)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className={`font-medium truncate ${!isRead ? 'text-primary' : 'text-secondary'}`}>
+                          <span className={`font-medium truncate ${!isRead ? 'text-[#f7f8f8]' : 'text-[#8b8b8e]'}`}>
                             {getAgentName(message.from)}
                           </span>
-                          <span className="text-2xs text-muted shrink-0 flex items-center gap-1">
+                          <span className="text-2xs text-[#8b8b8e] shrink-0 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {formatDistanceToNow(new Date(message.timestamp), { addSuffix: false })}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 mb-1">
                           {getMessageIcon(message.type)}
-                          <span className={`text-sm truncate ${!isRead ? 'text-primary' : 'text-secondary'}`}>
+                          <span className={`text-sm truncate ${!isRead ? 'text-[#f7f8f8]' : 'text-[#8b8b8e]'}`}>
                             {formatMessageType(message.type)}
                           </span>
                         </div>
-                        <p className="text-xs text-muted truncate">
+                        <p className="text-xs text-[#8b8b8e] truncate">
                           {getPayloadSummary(message.payload)}
                         </p>
                         {badge && (
@@ -332,7 +332,7 @@ export default function InboxPage() {
         {selectedMessage ? (
           <>
             {/* Detail Header */}
-            <div className="h-14 flex items-center justify-between px-6 border-b border-subtle shrink-0">
+            <div className="h-14 flex items-center justify-between px-6 border-b border-[#26262a] shrink-0">
               <div className="flex items-center gap-4">
                 <Button variant="ghost" size="sm">
                   <Archive className="w-4 h-4" />
@@ -340,7 +340,7 @@ export default function InboxPage() {
                 <Button variant="ghost" size="sm">
                   <Trash2 className="w-4 h-4" />
                 </Button>
-                <div className="w-px h-6 bg-subtle" />
+                <div className="w-px h-6 bg-[#26262a]" />
                 <Button variant="ghost" size="sm">
                   <Clock className="w-4 h-4" />
                 </Button>
@@ -355,7 +355,7 @@ export default function InboxPage() {
                 <Button variant="ghost" size="sm">
                   <Forward className="w-4 h-4" />
                 </Button>
-                <div className="w-px h-6 bg-subtle" />
+                <div className="w-px h-6 bg-[#26262a]" />
                 <Button variant="ghost" size="sm">
                   <MoreVertical className="w-4 h-4" />
                 </Button>
@@ -367,28 +367,28 @@ export default function InboxPage() {
               {/* Sender Info */}
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-accent-purple/20 text-accent-purple flex items-center justify-center text-lg font-semibold">
+                  <div className="w-12 h-12 rounded-full bg-[rgb(79,255,238)]/20 text-[rgb(79,255,238)] flex items-center justify-center text-lg font-semibold">
                     {getAgentInitial(selectedMessage.from)}
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-primary">
+                    <h2 className="text-lg font-semibold text-[#f7f8f8]">
                       {getAgentName(selectedMessage.from)}
                     </h2>
-                    <p className="text-sm text-muted">
+                    <p className="text-sm text-[#8b8b8e]">
                       {formatMessageType(selectedMessage.type)}
                     </p>
                     {selectedMessage.to && (
-                      <p className="text-sm text-muted mt-1">
-                        To: <span className="text-secondary">{getAgentName(selectedMessage.to)}</span>
+                      <p className="text-sm text-[#8b8b8e] mt-1">
+                        To: <span className="text-[#f7f8f8]">{getAgentName(selectedMessage.to)}</span>
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-secondary">
+                  <p className="text-sm text-[#f7f8f8]">
                     {format(new Date(selectedMessage.timestamp), 'MMM d, yyyy')}
                   </p>
-                  <p className="text-xs text-muted">
+                  <p className="text-xs text-[#8b8b8e]">
                     {format(new Date(selectedMessage.timestamp), 'h:mm a')}
                   </p>
                 </div>
@@ -407,21 +407,21 @@ export default function InboxPage() {
               </div>
 
               {/* Payload Content */}
-              <div className="rounded-lg bg-surface border border-subtle overflow-hidden">
-                <div className="px-4 py-3 border-b border-subtle bg-hover/50">
-                  <h4 className="text-sm font-medium text-secondary">Message Payload</h4>
+              <div className="rounded-lg bg-[#16161a] border border-[#26262a] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[#26262a] bg-[#1f1f24]">
+                  <h4 className="text-sm font-medium text-[#f7f8f8]">Message Payload</h4>
                 </div>
                 <div className="p-4">
                   {/* Pretty print specific message types */}
                   {selectedMessage.type === 'task.created' && (selectedMessage.payload as { title?: string }).title && (
                     <div className="space-y-3 mb-4">
                       <div>
-                        <label className="text-xs text-muted uppercase tracking-wider">Task Title</label>
-                        <p className="text-primary font-medium">{String((selectedMessage.payload as { title?: string }).title)}</p>
+                        <label className="text-xs text-[#8b8b8e] uppercase tracking-wider">Task Title</label>
+                        <p className="text-[#f7f8f8] font-medium">{String((selectedMessage.payload as { title?: string }).title)}</p>
                       </div>
                       {Array.isArray((selectedMessage.payload as { requiredSkills?: string[] }).requiredSkills) && (
                         <div>
-                          <label className="text-xs text-muted uppercase tracking-wider">Required Skills</label>
+                          <label className="text-xs text-[#8b8b8e] uppercase tracking-wider">Required Skills</label>
                           <div className="flex gap-2 flex-wrap mt-1">
                             {((selectedMessage.payload as { requiredSkills?: string[] }).requiredSkills || []).map((skill: string) => (
                               <Badge key={skill} variant="default" size="sm">{skill}</Badge>
@@ -435,12 +435,12 @@ export default function InboxPage() {
                   {selectedMessage.type === 'agent.started' && (selectedMessage.payload as { name?: string }).name && (
                     <div className="space-y-3 mb-4">
                       <div>
-                        <label className="text-xs text-muted uppercase tracking-wider">Agent Name</label>
-                        <p className="text-primary font-medium">{String((selectedMessage.payload as { name?: string }).name)}</p>
+                        <label className="text-xs text-[#8b8b8e] uppercase tracking-wider">Agent Name</label>
+                        <p className="text-[#f7f8f8] font-medium">{String((selectedMessage.payload as { name?: string }).name)}</p>
                       </div>
                       {Array.isArray((selectedMessage.payload as { skills?: string[] }).skills) && (
                         <div>
-                          <label className="text-xs text-muted uppercase tracking-wider">Skills</label>
+                          <label className="text-xs text-[#8b8b8e] uppercase tracking-wider">Skills</label>
                           <div className="flex gap-2 flex-wrap mt-1">
                             {((selectedMessage.payload as { skills?: string[] }).skills || []).map((skill: string) => (
                               <Badge key={skill} variant="default" size="sm">{skill}</Badge>
@@ -452,9 +452,9 @@ export default function InboxPage() {
                   )}
 
                   {/* Raw JSON */}
-                  <div className="mt-4 pt-4 border-t border-subtle">
-                    <label className="text-xs text-muted uppercase tracking-wider block mb-2">Raw Data</label>
-                    <pre className="text-sm text-primary font-mono overflow-x-auto whitespace-pre-wrap bg-base p-3 rounded">
+                  <div className="mt-4 pt-4 border-t border-[#26262a]">
+                    <label className="text-xs text-[#8b8b8e] uppercase tracking-wider block mb-2">Raw Data</label>
+                    <pre className="text-sm text-[#f7f8f8] font-mono overflow-x-auto whitespace-pre-wrap bg-[#0d0d0f] p-3 rounded">
                       {JSON.stringify(selectedMessage.payload, null, 2)}
                     </pre>
                   </div>
@@ -465,15 +465,15 @@ export default function InboxPage() {
               <div className="mt-6 flex flex-wrap gap-4 text-sm">
                 {selectedMessage.correlationId && (
                   <div>
-                    <span className="text-muted">Correlation ID: </span>
-                    <code className="text-secondary font-mono text-xs bg-hover px-1.5 py-0.5 rounded">
+                    <span className="text-[#8b8b8e]">Correlation ID: </span>
+                    <code className="text-[#f7f8f8] font-mono text-xs bg-[#2a2a30] px-1.5 py-0.5 rounded">
                       {selectedMessage.correlationId}
                     </code>
                   </div>
                 )}
                 <div>
-                  <span className="text-muted">Message ID: </span>
-                  <code className="text-secondary font-mono text-xs bg-hover px-1.5 py-0.5 rounded">
+                  <span className="text-[#8b8b8e]">Message ID: </span>
+                  <code className="text-[#f7f8f8] font-mono text-xs bg-[#2a2a30] px-1.5 py-0.5 rounded">
                     {selectedMessage.id}
                   </code>
                 </div>
@@ -482,11 +482,11 @@ export default function InboxPage() {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-            <div className="w-16 h-16 rounded-full bg-hover flex items-center justify-center mb-4">
-              <Mail className="w-8 h-8 text-muted" />
+            <div className="w-16 h-16 rounded-full bg-[#2a2a30] flex items-center justify-center mb-4">
+              <Mail className="w-8 h-8 text-[#8b8b8e]" />
             </div>
-            <h3 className="text-lg font-medium text-primary mb-2">No message selected</h3>
-            <p className="text-sm text-muted max-w-sm">
+            <h3 className="text-lg font-medium text-[#f7f8f8] mb-2">No message selected</h3>
+            <p className="text-sm text-[#8b8b8e] max-w-sm">
               Select a message from the list to view its contents and details
             </p>
           </div>
