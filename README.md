@@ -106,50 +106,77 @@ pnpm install
 pnpm build
 ```
 
-### Getting Started (Single Command)
+### Getting Started
 
 ```bash
-# Start everything with one command
+# Initialize Jetpack in your project
+jetpack init
+
+# Start everything
 jetpack start
 ```
 
-This single command:
-1. 🚀 Starts the orchestrator
-2. 🤖 Launches 3 AI agents (configurable with `-a`)
-3. 📺 Opens the web UI at http://localhost:3002
-4. 🔄 Begins watching for tasks
+**`jetpack init` creates:**
+- `.beads/` - Task storage (git-tracked)
+- `.beads/tasks/` - Drop `.md` files here to create tasks
+- `.cass/` - Agent memory
+- `.jetpack/config.json` - Project configuration
+- Updates `CLAUDE.md` with usage instructions
 
-**Once running, create tasks any way you prefer:**
-- **Web UI** - Use the Kanban board at http://localhost:3002
-- **CLI** - Run `jetpack task -t "Your task"` in another terminal
-- **Claude Code** - Edit files in `.beads/tasks/` directly
-- **Drop files** - Place `.md` task files in `.beads/tasks/`
+**`jetpack start` launches:**
+1. 🚀 Orchestrator - coordinates agent work
+2. 🤖 AI Agents - execute tasks (default: 3)
+3. 📺 Web UI - http://localhost:3002
+4. 👀 File watcher - monitors `.beads/tasks/` for new task files
+
+### Creating Tasks
+
+**Option 1: Drop a markdown file**
+```bash
+# Create a file in .beads/tasks/my-task.md
+```
+
+```markdown
+---
+title: Implement user authentication
+priority: high
+skills: [typescript, backend]
+estimate: 30
+---
+
+Create JWT-based authentication with login/logout endpoints.
+```
+
+The file is automatically converted to a task and moved to `processed/`.
+
+**Option 2: CLI command**
+```bash
+jetpack task -t "Fix the login bug" -p high -s typescript
+```
+
+**Option 3: Web UI**
+Use the Kanban board at http://localhost:3002
 
 ### CLI Options
 
 ```bash
-# Start with 5 agents instead of 3
-jetpack start -a 5
+# Initialize with custom settings
+jetpack init -a 5 -p 3005      # 5 agents, port 3005
 
-# Start without auto-opening browser
-jetpack start --no-browser
+# Start (reads from .jetpack/config.json)
+jetpack start                   # Uses config defaults
+jetpack start -a 5              # Override: 5 agents
+jetpack start --no-browser      # Don't auto-open browser
+jetpack start --no-ui           # CLI-only mode
 
-# Start on a different port
-jetpack start -p 3005
-
-# CLI-only mode (no web UI)
-jetpack start --no-ui
-
-# Create a task directly
-jetpack task -t "Fix the login bug" -p high
-
-# Check current status
+# Task management
+jetpack task -t "Title" -p high -s typescript,backend
 jetpack status
 
-# Run a guided demo
+# Run guided demo
 jetpack demo --agents 5
 
-# Use AI supervisor for complex requests
+# AI supervisor for complex requests
 jetpack supervise "Build user authentication" --agents 5
 ```
 

@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { existsSync, watch, FSWatcher } from 'fs';
 import {
   Task,
   TaskPriority,
@@ -7,6 +8,51 @@ import {
   Logger,
   generateTaskId,
 } from '@jetpack/shared';
+
+// Simple frontmatter parser
+interface TaskFrontmatter {
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  skills?: AgentSkill[];
+  estimate?: number;
+  dependencies?: string[];
+}
+
+function parseFrontmatter(content: string): { frontmatter: TaskFrontmatter; body: string } | null {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  if (!match) return null;
+
+  const [, yamlContent, body] = match;
+  const frontmatter: TaskFrontmatter = { title: '' };
+
+  // Simple YAML-like parsing
+  for (const line of yamlContent.split('\n')) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx === -1) continue;
+
+    const key = line.slice(0, colonIdx).trim();
+    let value = line.slice(colonIdx + 1).trim();
+
+    // Handle arrays like [typescript, backend]
+    if (value.startsWith('[') && value.endsWith(']')) {
+      value = value.slice(1, -1);
+      const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+      if (key === 'skills') frontmatter.skills = arr as AgentSkill[];
+      if (key === 'dependencies') frontmatter.dependencies = arr;
+    } else if (key === 'title') {
+      frontmatter.title = value;
+    } else if (key === 'description') {
+      frontmatter.description = value;
+    } else if (key === 'priority') {
+      frontmatter.priority = value as TaskPriority;
+    } else if (key === 'estimate') {
+      frontmatter.estimate = parseInt(value, 10);
+    }
+  }
+
+  return { frontmatter, body: body.trim() };
+}
 import { BeadsAdapter, BeadsAdapterConfig } from '@jetpack/beads-adapter';
 import { MCPMailAdapter, MCPMailConfig } from '@jetpack/mcp-mail-adapter';
 import { CASSAdapter, CASSConfig } from '@jetpack/cass-adapter';
@@ -27,6 +73,8 @@ export class JetpackOrchestrator {
   private agentMails: Map<string, MCPMailAdapter> = new Map();
   private workDir: string;
   private supervisor?: SupervisorAgent;
+  private taskFileWatcher?: FSWatcher;
+  private processedFiles: Set<string> = new Set();
 
   constructor(private config: JetpackConfig) {
     this.logger = new Logger('Jetpack');
@@ -107,6 +155,102 @@ export class JetpackOrchestrator {
     }
 
     this.logger.info(`Started ${count} agents successfully`);
+
+    // Start watching for task files
+    await this.startTaskFileWatcher();
+  }
+
+  /**
+   * Start watching .beads/tasks/ for new .md task files
+   */
+  async startTaskFileWatcher(): Promise<void> {
+    const tasksDir = path.join(this.workDir, '.beads', 'tasks');
+    const processedDir = path.join(this.workDir, '.beads', 'processed');
+
+    // Ensure directories exist
+    await fs.mkdir(tasksDir, { recursive: true });
+    await fs.mkdir(processedDir, { recursive: true });
+
+    // Process any existing files first
+    await this.processTaskFiles();
+
+    // Start watching for new files
+    if (existsSync(tasksDir)) {
+      this.taskFileWatcher = watch(tasksDir, async (eventType, filename) => {
+        if (filename && filename.endsWith('.md') && eventType === 'rename') {
+          // Small delay to ensure file is fully written
+          setTimeout(() => this.processTaskFiles(), 100);
+        }
+      });
+
+      this.logger.info('Watching for task files in .beads/tasks/');
+    }
+  }
+
+  /**
+   * Process .md files in .beads/tasks/ and create tasks
+   */
+  private async processTaskFiles(): Promise<void> {
+    const tasksDir = path.join(this.workDir, '.beads', 'tasks');
+    const processedDir = path.join(this.workDir, '.beads', 'processed');
+
+    try {
+      const files = await fs.readdir(tasksDir);
+
+      for (const filename of files) {
+        if (!filename.endsWith('.md')) continue;
+
+        const filePath = path.join(tasksDir, filename);
+
+        // Skip if already processed
+        if (this.processedFiles.has(filePath)) continue;
+
+        try {
+          const content = await fs.readFile(filePath, 'utf-8');
+          const parsed = parseFrontmatter(content);
+
+          if (!parsed || !parsed.frontmatter.title) {
+            this.logger.warn(`Invalid task file: ${filename} (missing title)`);
+            continue;
+          }
+
+          const { frontmatter, body } = parsed;
+
+          // Create task
+          const task = await this.createTask({
+            title: frontmatter.title,
+            description: frontmatter.description || body || undefined,
+            priority: frontmatter.priority,
+            requiredSkills: frontmatter.skills,
+            estimatedMinutes: frontmatter.estimate,
+            dependencies: frontmatter.dependencies,
+          });
+
+          this.logger.info(`Created task from file: ${filename} -> ${task.id}`);
+
+          // Move to processed folder
+          const processedPath = path.join(processedDir, `${task.id}-${filename}`);
+          await fs.rename(filePath, processedPath);
+          this.processedFiles.add(filePath);
+
+        } catch (err) {
+          this.logger.error(`Failed to process task file ${filename}: ${err}`);
+        }
+      }
+    } catch (err) {
+      // Directory might not exist yet, that's OK
+    }
+  }
+
+  /**
+   * Stop watching for task files
+   */
+  stopTaskFileWatcher(): void {
+    if (this.taskFileWatcher) {
+      this.taskFileWatcher.close();
+      this.taskFileWatcher = undefined;
+      this.logger.info('Stopped task file watcher');
+    }
   }
 
   async stopAgents(): Promise<void> {
@@ -211,6 +355,9 @@ export class JetpackOrchestrator {
 
   async shutdown(): Promise<void> {
     this.logger.info('Shutting down Jetpack');
+
+    // Stop file watcher
+    this.stopTaskFileWatcher();
 
     await this.stopAgents();
 

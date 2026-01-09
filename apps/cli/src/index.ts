@@ -3,10 +3,86 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, execSync } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 import { JetpackOrchestrator } from '@jetpack/orchestrator';
 import { AgentSkill, TaskPriority } from '@jetpack/shared';
+
+// Default config for new projects
+const DEFAULT_CONFIG = {
+  version: '0.1.0',
+  agents: 3,
+  port: 3002,
+};
+
+// CLAUDE.md section to add
+const CLAUDE_MD_SECTION = `
+## Jetpack Multi-Agent System
+
+This project uses Jetpack for multi-agent task orchestration.
+
+### Creating Tasks
+
+To create a task for the agent swarm, you have two options:
+
+**Option 1: CLI**
+\`\`\`bash
+jetpack task -t "Task title" -d "Description" -p medium -s typescript,backend
+\`\`\`
+
+**Option 2: Drop a .md file in .beads/tasks/**
+\`\`\`markdown
+---
+title: Your task title
+priority: high
+skills: [typescript, backend]
+estimate: 30
+---
+
+Description of what needs to be done.
+\`\`\`
+
+### Checking Status
+- Web UI: http://localhost:3002 (when running)
+- CLI: \`jetpack status\`
+
+### Starting the System
+\`\`\`bash
+jetpack start          # Start orchestrator, agents, and web UI
+jetpack start -a 5     # Start with 5 agents
+\`\`\`
+`;
+
+// Check if a command exists
+function commandExists(cmd: string): boolean {
+  try {
+    execSync(`which ${cmd}`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Load config from .jetpack/config.json if it exists
+interface JetpackConfig {
+  version?: string;
+  agents?: number;
+  port?: number;
+}
+
+function loadConfig(workDir: string): JetpackConfig {
+  const configPath = path.join(workDir, '.jetpack', 'config.json');
+  try {
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch {
+    // Ignore errors, use defaults
+  }
+  return {};
+}
 
 const program = new Command();
 
@@ -99,17 +175,155 @@ program
   .version('0.1.0');
 
 program
+  .command('init')
+  .description('Initialize Jetpack in a directory')
+  .argument('[path]', 'Directory to initialize', '.')
+  .option('--no-gitignore', 'Skip .gitignore updates')
+  .option('--no-claude-md', 'Skip CLAUDE.md updates')
+  .option('-a, --agents <number>', 'Default number of agents', '3')
+  .option('-p, --port <number>', 'Default web UI port', '3002')
+  .action(async (targetPath: string, options) => {
+    const workDir = path.resolve(targetPath);
+
+    console.log(chalk.bold.cyan('\n🚀 Initializing Jetpack\n'));
+    console.log(chalk.gray(`Directory: ${workDir}\n`));
+
+    const spinner = ora('Creating directories...').start();
+
+    try {
+      // 1. Create directories
+      const dirs = [
+        path.join(workDir, '.beads'),
+        path.join(workDir, '.beads', 'tasks'),
+        path.join(workDir, '.beads', 'processed'),
+        path.join(workDir, '.cass'),
+        path.join(workDir, '.jetpack'),
+        path.join(workDir, '.jetpack', 'mail'),
+      ];
+
+      for (const dir of dirs) {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+      }
+      spinner.succeed(chalk.green('Directories created'));
+
+      // 2. Create config file
+      spinner.start('Creating config...');
+      const configPath = path.join(workDir, '.jetpack', 'config.json');
+      const config = {
+        ...DEFAULT_CONFIG,
+        agents: parseInt(options.agents),
+        port: parseInt(options.port),
+      };
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+      spinner.succeed(chalk.green('Config created'));
+
+      // 3. Update .gitignore (optional)
+      if (options.gitignore !== false) {
+        spinner.start('Updating .gitignore...');
+        const gitignorePath = path.join(workDir, '.gitignore');
+        const gitignoreEntries = [
+          '',
+          '# Jetpack',
+          '.cass/',
+          '.jetpack/mail/',
+        ];
+
+        let gitignoreContent = '';
+        if (fs.existsSync(gitignorePath)) {
+          gitignoreContent = fs.readFileSync(gitignorePath, 'utf-8');
+        }
+
+        // Only add if not already present
+        if (!gitignoreContent.includes('# Jetpack')) {
+          fs.appendFileSync(gitignorePath, gitignoreEntries.join('\n') + '\n');
+          spinner.succeed(chalk.green('.gitignore updated'));
+        } else {
+          spinner.succeed(chalk.gray('.gitignore already configured'));
+        }
+      }
+
+      // 4. Update CLAUDE.md (optional)
+      if (options.claudeMd !== false) {
+        spinner.start('Updating CLAUDE.md...');
+        const claudeMdPath = path.join(workDir, 'CLAUDE.md');
+
+        let claudeMdContent = '';
+        if (fs.existsSync(claudeMdPath)) {
+          claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8');
+        }
+
+        // Only add if not already present
+        if (!claudeMdContent.includes('## Jetpack Multi-Agent System')) {
+          fs.appendFileSync(claudeMdPath, CLAUDE_MD_SECTION);
+          spinner.succeed(chalk.green('CLAUDE.md updated'));
+        } else {
+          spinner.succeed(chalk.gray('CLAUDE.md already configured'));
+        }
+      }
+
+      // 5. Validate environment
+      console.log(chalk.bold('\n📋 Environment Check\n'));
+
+      // Check for Claude CLI
+      const hasClaude = commandExists('claude');
+      if (hasClaude) {
+        console.log(chalk.green('  ✓ Claude CLI found'));
+      } else {
+        console.log(chalk.yellow('  ⚠ Claude CLI not found'));
+        console.log(chalk.gray('    Install: npm install -g @anthropic-ai/claude-code'));
+      }
+
+      // Check for API key
+      const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+      if (hasApiKey) {
+        console.log(chalk.green('  ✓ ANTHROPIC_API_KEY set'));
+      } else {
+        console.log(chalk.yellow('  ⚠ ANTHROPIC_API_KEY not set'));
+        console.log(chalk.gray('    Set: export ANTHROPIC_API_KEY=your_key'));
+      }
+
+      // 6. Print success and next steps
+      console.log(chalk.bold('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
+      console.log(chalk.green.bold('  ✓ Jetpack initialized successfully!\n'));
+
+      console.log(chalk.bold('  Created:'));
+      console.log(chalk.gray('    .beads/          Task storage'));
+      console.log(chalk.gray('    .beads/tasks/    Drop .md files here to create tasks'));
+      console.log(chalk.gray('    .cass/           Agent memory'));
+      console.log(chalk.gray('    .jetpack/        Config and mail'));
+      console.log('');
+
+      console.log(chalk.bold('  Next steps:'));
+      console.log(chalk.cyan('    jetpack start    ') + chalk.gray('Launch agents and web UI'));
+      console.log('');
+      console.log(chalk.bold('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
+
+    } catch (error) {
+      spinner.fail(chalk.red('Initialization failed'));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+program
   .command('start')
   .description('Start Jetpack - launches agents, orchestrator, and web UI')
-  .option('-a, --agents <number>', 'Number of agents to start', '3')
-  .option('-p, --port <number>', 'Web UI port', '3002')
+  .option('-a, --agents <number>', 'Number of agents to start')
+  .option('-p, --port <number>', 'Web UI port')
   .option('-d, --dir <path>', 'Working directory', process.cwd())
   .option('--no-browser', 'Do not open browser automatically')
   .option('--no-ui', 'Run without web UI (CLI only mode)')
   .action(async (options) => {
     console.log(chalk.bold.cyan('\n🚀 Jetpack Multi-Agent Development Stack\n'));
 
-    const port = parseInt(options.port);
+    // Load config from .jetpack/config.json if it exists
+    const config = loadConfig(options.dir);
+
+    // Use config values as defaults, CLI flags override
+    const numAgents = options.agents ? parseInt(options.agents) : (config.agents || 3);
+    const port = options.port ? parseInt(options.port) : (config.port || 3002);
     const url = `http://localhost:${port}`;
 
     const spinner = ora('Initializing orchestrator...').start();
@@ -126,8 +340,8 @@ program
 
       // 2. Start agents
       spinner.start('Starting agents...');
-      await jetpack.startAgents(parseInt(options.agents));
-      spinner.succeed(chalk.green(`${options.agents} agents started`));
+      await jetpack.startAgents(numAgents);
+      spinner.succeed(chalk.green(`${numAgents} agents started`));
 
       // 3. Start web UI (unless --no-ui)
       if (options.ui !== false) {
@@ -154,7 +368,7 @@ program
       console.log('');
 
       console.log(chalk.bold('  🤖 Agents'));
-      console.log(chalk.gray(`     ${options.agents} agents watching for tasks`));
+      console.log(chalk.gray(`     ${numAgents} agents watching for tasks`));
       console.log('');
 
       console.log(chalk.bold('  📝 Create Tasks'));
