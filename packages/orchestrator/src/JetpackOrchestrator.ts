@@ -95,6 +95,7 @@ export class JetpackOrchestrator {
       const agentConfig: AgentControllerConfig = {
         name: agentName,
         skills,
+        workDir: this.config.workDir,
       };
       const agent = new AgentController(agentConfig, this.beads, mail, this.cass);
 

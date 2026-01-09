@@ -5,14 +5,17 @@ import {
   Logger,
   generateAgentId,
   Message,
+  MemoryEntry,
 } from '@jetpack/shared';
 import { BeadsAdapter } from '@jetpack/beads-adapter';
 import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
 import { CASSAdapter } from '@jetpack/cass-adapter';
+import { ClaudeCodeExecutor } from './ClaudeCodeExecutor';
 
 export interface AgentControllerConfig {
   name: string;
   skills: AgentSkill[];
+  workDir: string;
 }
 
 export class AgentController {
@@ -20,6 +23,8 @@ export class AgentController {
   private logger: Logger;
   private currentTask?: Task;
   private heartbeatInterval?: NodeJS.Timeout;
+  private executor: ClaudeCodeExecutor;
+  private workDir: string;
 
   constructor(
     config: AgentControllerConfig,
@@ -27,6 +32,8 @@ export class AgentController {
     private mail: MCPMailAdapter,
     private cass: CASSAdapter
   ) {
+    this.workDir = config.workDir;
+    this.executor = new ClaudeCodeExecutor(config.workDir);
     this.agent = {
       id: generateAgentId(config.name),
       name: config.name,
@@ -166,8 +173,8 @@ export class AgentController {
     this.logger.debug(`Retrieved ${memories.length} relevant memories`);
 
     try {
-      // Execute the task
-      await this.executeTask(claimed);
+      // Execute the task using Claude Code
+      await this.executeTask(claimed, memories);
 
       // Mark task as completed
       await this.beads.updateTask(task.id, {
@@ -228,31 +235,39 @@ export class AgentController {
     }
   }
 
-  private async executeTask(task: Task): Promise<void> {
-    // This is where the actual work happens
-    // In a real implementation, this would:
-    // 1. Analyze the task requirements
-    // 2. Execute the necessary operations (code changes, tests, etc.)
-    // 3. Use file leasing to prevent conflicts with other agents
-    // 4. Report progress
-
+  private async executeTask(task: Task, memories: MemoryEntry[]): Promise<void> {
     this.logger.info(`Executing task: ${task.title}`);
 
     await this.beads.updateTask(task.id, { status: 'in_progress' });
 
-    // Simulate work
-    const workDuration = task.estimatedMinutes
-      ? task.estimatedMinutes * 60000
-      : Math.random() * 30000 + 10000;
+    // Execute using Claude Code CLI
+    const result = await this.executor.execute({
+      task,
+      memories,
+      workDir: this.workDir,
+      agentName: this.agent.name,
+      agentSkills: this.agent.skills,
+    });
 
-    await new Promise(resolve => setTimeout(resolve, workDuration));
+    if (!result.success) {
+      throw new Error(result.error || 'Task execution failed');
+    }
 
-    // In a real implementation:
-    // - Parse task description
-    // - Make code changes
-    // - Run tests
-    // - Commit changes
-    // - Update documentation
+    this.logger.info(`Task executed in ${result.duration}ms`);
+
+    // Store the execution output as a learning
+    if (result.output) {
+      await this.cass.store({
+        type: 'agent_learning',
+        content: `Task "${task.title}" output: ${result.output.slice(0, 500)}`,
+        importance: 0.5,
+        metadata: {
+          taskId: task.id,
+          agentId: this.agent.id,
+          duration: result.duration,
+        },
+      });
+    }
   }
 
   getAgent(): Agent {
