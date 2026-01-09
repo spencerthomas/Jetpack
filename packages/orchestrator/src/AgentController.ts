@@ -1,6 +1,5 @@
 import {
   Agent,
-  AgentStatus,
   AgentSkill,
   Task,
   Logger,
@@ -92,7 +91,7 @@ export class AgentController {
     this.agent.status = 'offline';
   }
 
-  private async handleTaskCreated(message: Message): Promise<void> {
+  private async handleTaskCreated(_message: Message): Promise<void> {
     this.logger.debug('New task created, checking if suitable');
     await this.lookForWork();
   }

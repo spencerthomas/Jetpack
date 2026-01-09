@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const MessageTypeSchema = z.enum([
   'task.created',
   'task.claimed',
+  'task.assigned',
   'task.updated',
   'task.completed',
   'task.failed',

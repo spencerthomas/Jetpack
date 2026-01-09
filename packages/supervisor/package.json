@@ -1,6 +1,7 @@
 {
-  "name": "@jetpack/orchestrator",
+  "name": "@jetpack/supervisor",
   "version": "0.1.0",
+  "description": "LangGraph Supervisor Agent for multi-agent orchestration",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -9,11 +10,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@langchain/core": "^0.3.26",
+    "@langchain/langgraph": "^0.2.41",
+    "@langchain/anthropic": "^0.3.14",
+    "@langchain/openai": "^0.3.17",
     "@jetpack/shared": "workspace:*",
     "@jetpack/beads-adapter": "workspace:*",
     "@jetpack/mcp-mail-adapter": "workspace:*",
     "@jetpack/cass-adapter": "workspace:*",
-    "@jetpack/supervisor": "workspace:*",
     "zod": "^3.24.1"
   },
   "devDependencies": {

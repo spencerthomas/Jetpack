@@ -9,6 +9,9 @@
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../shared" }
+    { "path": "../shared" },
+    { "path": "../beads-adapter" },
+    { "path": "../mcp-mail-adapter" },
+    { "path": "../cass-adapter" }
   ]
 }

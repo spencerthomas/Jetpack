@@ -3,7 +3,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import * as path from 'path';
 import { JetpackOrchestrator } from '@jetpack/orchestrator';
 import { AgentSkill, TaskPriority } from '@jetpack/shared';
 
@@ -293,6 +292,76 @@ program
 
     } catch (error) {
       spinner.fail(chalk.red('Demo failed'));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('supervise')
+  .description('Use LangGraph supervisor to orchestrate a high-level request')
+  .argument('<request>', 'High-level request to execute (e.g., "Build user authentication")')
+  .option('-a, --agents <number>', 'Number of agents to start', '5')
+  .option('-l, --llm <provider>', 'LLM provider (claude, openai, ollama)', 'claude')
+  .option('-m, --model <model>', 'LLM model name', 'claude-3-5-sonnet-20241022')
+  .option('--dir <path>', 'Working directory', process.cwd())
+  .action(async (request: string, options) => {
+    console.log(chalk.bold.cyan('\n🧠 Jetpack LangGraph Supervisor\n'));
+    console.log(chalk.gray(`Request: "${request}"`));
+    console.log(chalk.gray(`LLM: ${options.llm} (${options.model})`));
+    console.log(chalk.gray(`Agents: ${options.agents}\n`));
+
+    const spinner = ora('Initializing Jetpack...').start();
+
+    try {
+      const jetpack = new JetpackOrchestrator({
+        workDir: options.dir,
+        autoStart: true,
+      });
+
+      await jetpack.initialize();
+      spinner.text = 'Starting agents...';
+
+      await jetpack.startAgents(parseInt(options.agents));
+      spinner.text = 'Initializing supervisor...';
+
+      await jetpack.createSupervisor({
+        provider: options.llm as 'claude' | 'openai' | 'ollama',
+        model: options.model,
+      });
+
+      spinner.succeed('Supervisor ready');
+      console.log(chalk.yellow('\nExecuting request with supervisor...\n'));
+
+      // Execute the request
+      const result = await jetpack.supervise(request);
+
+      // Display results
+      console.log(chalk.bold('\n=== Supervisor Execution Complete ===\n'));
+
+      if (result.success) {
+        console.log(chalk.green('✓ Request completed successfully'));
+      } else {
+        console.log(chalk.red('✗ Request failed'));
+        if (result.error) {
+          console.log(chalk.red(`  Error: ${result.error}`));
+        }
+      }
+
+      console.log(`\nTasks Created: ${result.completedTasks.length + result.failedTasks.length}`);
+      console.log(`  ${chalk.green('Completed')}: ${result.completedTasks.length}`);
+      console.log(`  ${chalk.red('Failed')}: ${result.failedTasks.length}`);
+      console.log(`Conflicts Resolved: ${result.conflicts}`);
+      console.log(`Iterations: ${result.iterations}`);
+
+      console.log(chalk.bold('\n--- Final Report ---'));
+      console.log(result.finalReport);
+
+      await jetpack.shutdown();
+      console.log(chalk.cyan('\nSupervision complete!'));
+      process.exit(result.success ? 0 : 1);
+    } catch (error) {
+      spinner.fail(chalk.red('Supervision failed'));
       console.error(error);
       process.exit(1);
     }

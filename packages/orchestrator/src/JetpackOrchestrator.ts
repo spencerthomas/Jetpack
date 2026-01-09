@@ -10,6 +10,7 @@ import {
 import { BeadsAdapter, BeadsAdapterConfig } from '@jetpack/beads-adapter';
 import { MCPMailAdapter, MCPMailConfig } from '@jetpack/mcp-mail-adapter';
 import { CASSAdapter, CASSConfig } from '@jetpack/cass-adapter';
+import { SupervisorAgent, SupervisorResult, LLMProviderConfigInput } from '@jetpack/supervisor';
 import { AgentController, AgentControllerConfig } from './AgentController';
 
 export interface JetpackConfig {
@@ -25,6 +26,7 @@ export class JetpackOrchestrator {
   private agents: AgentController[] = [];
   private agentMails: Map<string, MCPMailAdapter> = new Map();
   private workDir: string;
+  private supervisor?: SupervisorAgent;
 
   constructor(private config: JetpackConfig) {
     this.logger = new Logger('Jetpack');
@@ -228,5 +230,50 @@ export class JetpackOrchestrator {
 
   getAgents(): AgentController[] {
     return this.agents;
+  }
+
+  /**
+   * Create and initialize a supervisor agent
+   */
+  async createSupervisor(llmConfig: LLMProviderConfigInput): Promise<SupervisorAgent> {
+    this.logger.info('Creating supervisor agent');
+
+    this.supervisor = new SupervisorAgent({
+      llm: llmConfig,
+      beads: this.beads,
+      cass: this.cass,
+      getAgents: () => this.agents.map(a => a.getAgent()),
+      getAgentMail: (agentId: string) => this.agentMails.get(agentId),
+    });
+
+    await this.supervisor.initialize();
+    this.logger.info('Supervisor agent created');
+
+    return this.supervisor;
+  }
+
+  /**
+   * Execute a high-level request through the supervisor
+   */
+  async supervise(userRequest: string): Promise<SupervisorResult> {
+    if (!this.supervisor) {
+      throw new Error('No supervisor agent. Call createSupervisor() first.');
+    }
+
+    return this.supervisor.execute(userRequest);
+  }
+
+  /**
+   * Get the current supervisor agent (if any)
+   */
+  getSupervisor(): SupervisorAgent | undefined {
+    return this.supervisor;
+  }
+
+  /**
+   * Get agent mail adapter for a specific agent
+   */
+  getAgentMail(agentId: string): MCPMailAdapter | undefined {
+    return this.agentMails.get(agentId);
   }
 }

@@ -94,7 +94,34 @@ jetpack status
 
 # Run the demo
 jetpack demo --agents 5
+
+# Use LangGraph Supervisor for full orchestration
+jetpack supervise "Build a user authentication system" \
+  --llm claude \
+  --model claude-3-5-sonnet-20241022 \
+  --agents 5
 ```
+
+### LangGraph Supervisor
+
+The supervisor uses LangGraph to provide intelligent orchestration:
+
+```bash
+# With Claude (default)
+jetpack supervise "Add a REST API for user management" --llm claude
+
+# With OpenAI
+jetpack supervise "Implement dark mode" --llm openai --model gpt-4-turbo
+
+# With Ollama (local)
+jetpack supervise "Fix the login bug" --llm ollama --model llama2
+```
+
+The supervisor:
+1. **Plans** - Breaks down your request into specific tasks with dependencies
+2. **Assigns** - Matches tasks to agents based on skills
+3. **Monitors** - Tracks progress and detects issues
+4. **Coordinates** - Resolves conflicts and reassigns failed tasks
 
 ### Web UI Usage
 
@@ -462,6 +489,7 @@ const jetpack = new JetpackOrchestrator({
 
 - [x] **Kanban Web UI** - Modern drag-and-drop interface ✅
 - [x] **MCP Mail Inbox Viewer** - Real-time message monitoring ✅
+- [x] **LangGraph Supervisor** - Intelligent full orchestration with multi-LLM support ✅
 - [ ] Integration with Named Tmux Manager for command orchestration
 - [ ] Ultimate Bug Scanner adapter for quality gates
 - [ ] WebSocket support for instant UI updates
