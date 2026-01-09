@@ -12,12 +12,12 @@ interface KanbanBoardProps {
 }
 
 const COLUMNS: { status: TaskStatus; title: string; color: string }[] = [
-  { status: 'pending', title: 'Pending', color: 'bg-gray-200' },
-  { status: 'ready', title: 'Ready', color: 'bg-blue-200' },
-  { status: 'claimed', title: 'Claimed', color: 'bg-yellow-200' },
-  { status: 'in_progress', title: 'In Progress', color: 'bg-purple-200' },
-  { status: 'completed', title: 'Completed', color: 'bg-green-200' },
-  { status: 'failed', title: 'Failed', color: 'bg-red-200' },
+  { status: 'pending', title: 'Pending', color: 'bg-status-pending/20 text-secondary' },
+  { status: 'ready', title: 'Ready', color: 'bg-status-ready/20 text-accent-blue' },
+  { status: 'claimed', title: 'Claimed', color: 'bg-status-claimed/20 text-accent-purple' },
+  { status: 'in_progress', title: 'In Progress', color: 'bg-status-in-progress/20 text-accent-yellow' },
+  { status: 'completed', title: 'Completed', color: 'bg-status-completed/20 text-accent-green' },
+  { status: 'failed', title: 'Failed', color: 'bg-status-failed/20 text-accent-red' },
 ];
 
 export default function KanbanBoard({ tasks, onUpdateTask }: KanbanBoardProps) {

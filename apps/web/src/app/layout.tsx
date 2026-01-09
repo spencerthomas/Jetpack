@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 export const metadata: Metadata = {
   title: 'Jetpack - Multi-Agent Swarm Development',
-  description: 'Kanban board for multi-agent task coordination',
+  description: 'AI-powered task orchestration for multi-agent development teams',
 };
 
 export default function RootLayout({
@@ -12,8 +13,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className="dark">
+      <body className="min-h-screen">
+        <AppLayout>{children}</AppLayout>
+      </body>
     </html>
   );
 }

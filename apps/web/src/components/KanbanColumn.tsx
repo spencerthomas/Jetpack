@@ -20,18 +20,18 @@ export default function KanbanColumn({ status, title, color, tasks }: KanbanColu
 
   return (
     <div className="flex-shrink-0 w-80">
-      <div className={clsx('rounded-lg p-4 mb-2', color)}>
-        <h3 className="font-semibold text-gray-800 flex items-center justify-between">
+      <div className={clsx('rounded-t-lg px-4 py-3', color)}>
+        <h3 className="font-semibold flex items-center justify-between">
           <span>{title}</span>
-          <span className="text-sm bg-white px-2 py-1 rounded-full">{tasks.length}</span>
+          <span className="text-sm bg-surface px-2 py-0.5 rounded-full text-secondary">{tasks.length}</span>
         </h3>
       </div>
 
       <div
         ref={setNodeRef}
         className={clsx(
-          'min-h-[calc(100vh-200px)] rounded-lg p-2 transition-colors',
-          isOver ? 'bg-blue-100' : 'bg-gray-100'
+          'min-h-[calc(100vh-220px)] rounded-b-lg p-2 transition-colors border border-t-0 border-subtle',
+          isOver ? 'bg-accent-purple/10' : 'bg-surface/50'
         )}
       >
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
@@ -43,7 +43,7 @@ export default function KanbanColumn({ status, title, color, tasks }: KanbanColu
         </SortableContext>
 
         {tasks.length === 0 && (
-          <div className="text-center text-gray-400 py-8">
+          <div className="text-center text-muted py-8">
             <p>No tasks</p>
           </div>
         )}
