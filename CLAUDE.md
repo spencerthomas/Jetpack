@@ -127,6 +127,8 @@ jetpack supervise "Build user authentication" --llm claude --agents 5
 
 ## Agent Controller Lifecycle
 
+Agents execute real work by spawning Claude Code CLI processes.
+
 ```
 AgentController.start()
 ├── Subscribe to MCP Mail (task.created, task.updated)
@@ -145,11 +147,39 @@ claimAndExecuteTask()
 ├── Atomic claimTask() in Beads (prevents race conditions)
 ├── Publish task.claimed via MCP Mail
 ├── Retrieve relevant memories from CASS
-├── Execute task (update status to in_progress)
+├── Execute task via ClaudeCodeExecutor
+│   ├── Build prompt from task + memories
+│   ├── Spawn: claude --print --dangerously-skip-permissions "<prompt>"
+│   ├── Capture stdout/stderr
+│   └── Detect success/failure from exit code
 ├── On success: store learnings in CASS, publish task.completed
 ├── On failure: publish task.failed with error
 └── Return to lookForWork() after 1s delay
 ```
+
+### ClaudeCodeExecutor (packages/orchestrator/src/ClaudeCodeExecutor.ts)
+
+Spawns Claude Code CLI for each task:
+
+```typescript
+// Prompt structure sent to Claude Code
+`You are ${agentName}, an AI agent with skills in: ${skills}.
+
+## Task
+**Title:** ${task.title}
+**Priority:** ${task.priority}
+**Description:** ${task.description}
+
+## Relevant Context from Previous Work
+${memories.map(m => `- ${m.content}`).join('\n')}
+
+## Instructions
+Complete this task by making the necessary code changes...`
+```
+
+**Requirements:**
+- `claude` CLI in PATH
+- Anthropic API key configured for Claude Code
 
 ## Common Patterns
 

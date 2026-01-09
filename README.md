@@ -82,6 +82,16 @@ Jetpack has a layered architecture with three core storage adapters and an optio
 
 ## 🚦 Quick Start
 
+### Prerequisites
+
+- **Node.js** >= 20.0.0
+- **pnpm** >= 9.0.0
+- **Claude Code CLI** - Agents use Claude Code to execute real work
+  ```bash
+  # Install Claude Code CLI (requires Anthropic API key)
+  npm install -g @anthropic-ai/claude-code
+  ```
+
 ### Installation
 
 ```bash
@@ -354,7 +364,7 @@ const stats = await cass.getStats();
 
 ### Agent Controller (Worker)
 
-Each agent is an autonomous worker that claims and executes tasks. The AgentController manages the agent lifecycle.
+Each agent is an autonomous worker that claims and executes tasks using **Claude Code CLI**. The AgentController manages the agent lifecycle and spawns Claude Code processes for real work.
 
 **Agent Lifecycle:**
 ```
@@ -371,12 +381,28 @@ Each agent is an autonomous worker that claims and executes tasks. The AgentCont
 
 3. executeTask()
    ├── Retrieve context from CASS
-   ├── Execute work (code changes, tests, etc.)
+   ├── Spawn Claude Code CLI with task prompt
+   ├── Claude Code makes actual code changes
+   ├── Capture output and detect success/failure
    ├── Store learnings in CASS
    └── Publish completion via MCP Mail
 
 4. Loop back to lookForWork()
 ```
+
+**Claude Code Execution:**
+
+Each agent spawns a Claude Code process to do real work:
+
+```bash
+claude --print --dangerously-skip-permissions "<task prompt>"
+```
+
+The prompt includes:
+- Task title, description, and priority
+- Required skills
+- Relevant memories from CASS (past learnings)
+- Instructions to follow existing patterns
 
 **Agent Skills:**
 ```typescript
@@ -386,6 +412,10 @@ type AgentSkill =
   | 'backend' | 'frontend' | 'database' | 'devops'
   | 'testing' | 'documentation' | 'security';
 ```
+
+**Requirements:**
+- Claude Code CLI must be installed (`claude` command available)
+- Valid Anthropic API key configured for Claude Code
 
 ---
 
