@@ -154,6 +154,34 @@ code, pre, .font-mono {
   -webkit-backdrop-filter: blur(20px);
 }
 
+.glass-subtle {
+  background: rgba(22, 22, 26, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Grid backgrounds */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+
+.bg-grid-small {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.bg-grid-cyan {
+  background-image:
+    linear-gradient(rgba(79, 255, 238, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79, 255, 238, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
 /* Linear gradient backgrounds */
 .bg-gradient-radial {
   background: radial-gradient(circle, var(--tw-gradient-stops));
@@ -165,6 +193,37 @@ code, pre, .font-mono {
     rgba(79, 255, 238, 0.15) 0%,
     rgba(38, 181, 206, 0.1) 50%,
     rgba(187, 107, 217, 0.15) 100%
+  );
+}
+
+/* Glow effects */
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(79, 255, 238, 0.3);
+}
+
+.glow-cyan-subtle {
+  box-shadow: 0 0 15px rgba(79, 255, 238, 0.15);
+}
+
+.glow-text-cyan {
+  text-shadow: 0 0 10px rgba(79, 255, 238, 0.5);
+}
+
+/* Radial glow backgrounds */
+.bg-glow-top {
+  background: radial-gradient(
+    ellipse 60% 40% at 50% 0%,
+    rgba(79, 255, 238, 0.15) 0%,
+    rgba(79, 255, 238, 0.05) 40%,
+    transparent 70%
+  );
+}
+
+.bg-glow-center {
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(79, 255, 238, 0.1) 0%,
+    transparent 50%
   );
 }
 

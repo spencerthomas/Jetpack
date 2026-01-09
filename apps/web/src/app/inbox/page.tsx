@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Message, Agent } from '@jetpack/shared';
 import {
   Mail,
@@ -19,9 +19,34 @@ import {
   Reply,
   ReplyAll,
   Forward,
+  Zap,
 } from 'lucide-react';
-import { Button, Badge } from '@/components/ui';
+import { Button, Badge, LiveIndicator, SystemAlerts, useRotatingAlerts } from '@/components/ui';
+import type { SystemAlertItem } from '@/components/ui';
 import { formatDistanceToNow, format } from 'date-fns';
+import { useTypewriter } from '@/hooks/useTypewriter';
+
+// Animation keyframes for message slide-in
+const messageAnimationStyle = `
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(79, 255, 238, 0.4); }
+    50% { box-shadow: 0 0 20px 2px rgba(79, 255, 238, 0.2); }
+  }
+`;
 
 type MessageCategory = 'all' | 'unread' | 'task' | 'agent' | 'coordination';
 
@@ -71,6 +96,13 @@ const categories: { id: MessageCategory; label: string; icon: React.ReactNode }[
   { id: 'coordination', label: 'Coordination', icon: <Send className="w-4 h-4" /> },
 ];
 
+// System alerts for the inbox
+const defaultAlerts: SystemAlertItem[] = [
+  { id: '1', message: 'Real-time sync active', type: 'info' },
+  { id: '2', message: 'Agent communication channel open', type: 'success' },
+  { id: '3', message: 'Messages auto-refresh every 5s', type: 'info' },
+];
+
 export default function InboxPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -79,6 +111,18 @@ export default function InboxPage() {
   const [selectedCategory, setSelectedCategory] = useState<MessageCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [readMessages, setReadMessages] = useState<Set<string>>(new Set());
+  const [isConnected, setIsConnected] = useState(true);
+  const messageListRef = useRef<HTMLDivElement>(null);
+
+  // Rotating system alerts
+  const currentAlerts = useRotatingAlerts(defaultAlerts, 4000);
+
+  // Typewriter effect for empty state
+  const { displayText: emptyStateText } = useTypewriter({
+    text: 'Messages from agents will appear here',
+    speed: 30,
+    delay: 300,
+  });
 
   useEffect(() => {
     async function fetchData() {
@@ -93,8 +137,10 @@ export default function InboxPage() {
 
         setMessages(messagesData.messages || []);
         setAgents(agentsData.agents || []);
+        setIsConnected(true);
       } catch (error) {
         console.error('Failed to fetch data:', error);
+        setIsConnected(false);
       } finally {
         setLoading(false);
       }
@@ -159,22 +205,34 @@ export default function InboxPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-[#0d0d0f]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-[rgb(79,255,238)] border-t-transparent mx-auto"></div>
-          <p className="mt-3 text-sm text-[#8b8b8e]">Loading inbox...</p>
+          <div className="relative">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-[rgb(79,255,238)] border-t-transparent mx-auto"></div>
+            <div className="absolute inset-0 animate-ping rounded-full h-10 w-10 border border-[rgb(79,255,238)]/30 mx-auto"></div>
+          </div>
+          <p className="mt-4 text-sm text-[#8b8b8e] font-mono">Connecting to agent network...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full bg-[#0d0d0f]">
-      {/* Left Sidebar - Categories */}
-      <div className="w-56 border-r border-[#26262a] flex flex-col shrink-0">
-        <div className="h-14 flex items-center px-4 border-b border-[#26262a]">
-          <h1 className="text-lg font-semibold text-[#f7f8f8]">Inbox</h1>
-        </div>
+    <>
+      <style>{messageAnimationStyle}</style>
+      <div className="flex h-full bg-[#0d0d0f]">
+        {/* Left Sidebar - Categories */}
+        <div className="w-56 border-r border-[#26262a] flex flex-col shrink-0 bg-[#0d0d0f]/50 backdrop-blur-sm">
+          <div className="h-14 flex items-center justify-between px-4 border-b border-[#26262a]">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-[rgb(79,255,238)]" />
+              <h1 className="text-lg font-semibold text-[#f7f8f8]">Inbox</h1>
+            </div>
+            <LiveIndicator
+              label={isConnected ? 'LIVE' : 'OFFLINE'}
+              variant={isConnected ? 'success' : 'error'}
+            />
+          </div>
 
         <nav className="flex-1 p-2 space-y-1">
           {categories.map((category) => {
@@ -233,59 +291,74 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* Middle Panel - Message List */}
-      <div className="w-96 border-r border-[#26262a] flex flex-col shrink-0">
-        {/* Search Header */}
-        <div className="h-14 flex items-center gap-2 px-4 border-b border-[#26262a]">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b8e]" />
-            <input
-              type="text"
-              placeholder="Search messages..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-[#2a2a30] border border-[#26262a] rounded-md text-sm text-[#f7f8f8] placeholder:text-[#8b8b8e] focus:border-[rgb(79,255,238)] focus:outline-none transition-colors"
-            />
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-[#26262a]">
-          <button className="px-3 py-1 text-xs font-medium rounded bg-[#2a2a30] text-[#f7f8f8]">
-            All
-          </button>
-          <button className="px-3 py-1 text-xs font-medium rounded text-[#8b8b8e] hover:text-[#f7f8f8] hover:bg-[#2a2a30] transition-colors">
-            Unread
-          </button>
-        </div>
-
-        {/* Message List */}
-        <div className="flex-1 overflow-y-auto">
-          {filteredMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-              <Mail className="w-12 h-12 text-[#8b8b8e] mb-3" />
-              <p className="text-[#f7f8f8] font-medium">No messages</p>
-              <p className="text-sm text-[#8b8b8e] mt-1">
-                {searchQuery ? 'Try a different search' : 'Messages from agents will appear here'}
-              </p>
+        {/* Middle Panel - Message List */}
+        <div className="w-96 border-r border-[#26262a] flex flex-col shrink-0">
+          {/* Search Header */}
+          <div className="h-14 flex items-center gap-2 px-4 border-b border-[#26262a]">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b8e]" />
+              <input
+                type="text"
+                placeholder="Search messages..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 bg-[#2a2a30] border border-[#26262a] rounded-md text-sm text-[#f7f8f8] placeholder:text-[#8b8b8e] focus:border-[rgb(79,255,238)] focus:outline-none transition-colors"
+              />
             </div>
-          ) : (
-            <div>
-              {filteredMessages.map((message) => {
-                const isSelected = selectedMessage?.id === message.id;
-                const isRead = readMessages.has(message.id);
-                const badge = getMessageBadge(message.type);
+          </div>
 
-                return (
-                  <button
-                    key={message.id}
-                    onClick={() => setSelectedMessage(message)}
-                    className={`
-                      w-full text-left p-4 border-b border-[#26262a] transition-colors
-                      ${isSelected ? 'bg-[#2a2a30]' : 'hover:bg-[#1f1f24]'}
-                      ${!isRead ? 'bg-[rgb(79,255,238)]/5' : ''}
-                    `}
-                  >
+          {/* System Alerts Bar */}
+          <div className="px-4 py-2 border-b border-[#26262a] bg-[#16161a]/50">
+            <SystemAlerts alerts={currentAlerts} maxVisible={1} />
+          </div>
+
+          {/* Tabs */}
+          <div className="flex items-center gap-1 px-4 py-2 border-b border-[#26262a]">
+            <button className="px-3 py-1 text-xs font-medium rounded bg-[#2a2a30] text-[#f7f8f8]">
+              All
+            </button>
+            <button className="px-3 py-1 text-xs font-medium rounded text-[#8b8b8e] hover:text-[#f7f8f8] hover:bg-[#2a2a30] transition-colors">
+              Unread
+            </button>
+            <div className="flex-1" />
+            <span className="text-2xs text-[#8b8b8e] font-mono">
+              {filteredMessages.length} msg{filteredMessages.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          {/* Message List */}
+          <div ref={messageListRef} className="flex-1 overflow-y-auto">
+            {filteredMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full p-6 text-center" style={{ animation: 'fadeIn 0.5s ease-out' }}>
+                <div className="w-16 h-16 rounded-full bg-[#2a2a30] flex items-center justify-center mb-4" style={{ animation: 'pulse-glow 2s infinite' }}>
+                  <Mail className="w-8 h-8 text-[#8b8b8e]" />
+                </div>
+                <p className="text-[#f7f8f8] font-medium">No messages</p>
+                <p className="text-sm text-[#8b8b8e] mt-1 font-mono">
+                  {searchQuery ? 'Try a different search' : emptyStateText}
+                  <span className="animate-pulse text-[rgb(79,255,238)]">_</span>
+                </p>
+              </div>
+            ) : (
+              <div>
+                {filteredMessages.map((message, index) => {
+                  const isSelected = selectedMessage?.id === message.id;
+                  const isRead = readMessages.has(message.id);
+                  const badge = getMessageBadge(message.type);
+
+                  return (
+                    <button
+                      key={message.id}
+                      onClick={() => setSelectedMessage(message)}
+                      className={`
+                        w-full text-left p-4 border-b border-[#26262a] transition-all duration-200
+                        ${isSelected ? 'bg-[#2a2a30] border-l-2 border-l-[rgb(79,255,238)]' : 'hover:bg-[#1f1f24] border-l-2 border-l-transparent'}
+                        ${!isRead ? 'bg-[rgb(79,255,238)]/5' : ''}
+                      `}
+                      style={{
+                        animation: `slideInRight 0.3s ease-out ${index * 0.05}s both`,
+                      }}
+                    >
                     <div className="flex items-start gap-3">
                       <div className={`
                         w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shrink-0
@@ -490,8 +563,9 @@ export default function InboxPage() {
               Select a message from the list to view its contents and details
             </p>
           </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
