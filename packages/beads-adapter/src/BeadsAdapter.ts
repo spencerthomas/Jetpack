@@ -79,8 +79,13 @@ export class BeadsAdapter {
       await fs.writeFile(this.tasksFile, lines + '\n');
 
       if (this.config.autoCommit && this.config.gitEnabled) {
-        await this.git.add('.beads/*');
-        await this.git.commit(`Update tasks: ${new Date().toISOString()}`);
+        try {
+          await this.git.add(this.tasksFile);
+          await this.git.commit(`Update tasks: ${new Date().toISOString()}`);
+        } catch (gitError) {
+          // Ignore git errors (e.g., nothing to commit)
+          this.logger.debug('Git commit skipped:', gitError);
+        }
       }
 
       this.logger.debug(`Saved ${this.tasks.size} tasks to beads`);

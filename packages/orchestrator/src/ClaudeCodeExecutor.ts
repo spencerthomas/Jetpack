@@ -111,13 +111,13 @@ When done, provide a brief summary of what you accomplished.
     return new Promise((resolve, reject) => {
       // Use claude CLI with --print flag for non-interactive mode
       // and --dangerously-skip-permissions to allow file changes
+      // Pass prompt via stdin to avoid command line length limits
       const args = [
         '--print',  // Non-interactive, output only
         '--dangerously-skip-permissions',  // Allow file operations
-        prompt,
       ];
 
-      this.logger.debug(`Spawning: claude ${args.slice(0, 2).join(' ')} "<prompt>"`);
+      this.logger.debug(`Spawning: claude ${args.join(' ')} (prompt via stdin)`);
 
       this.currentProcess = spawn('claude', args, {
         cwd: workDir,
@@ -128,6 +128,12 @@ When done, provide a brief summary of what you accomplished.
         },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
+
+      // Write prompt to stdin and close it
+      if (this.currentProcess.stdin) {
+        this.currentProcess.stdin.write(prompt);
+        this.currentProcess.stdin.end();
+      }
 
       let stdout = '';
       let stderr = '';
