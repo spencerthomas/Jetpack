@@ -77,10 +77,110 @@ JetpackOrchestrator (packages/orchestrator)
 - `.cass/` - SQLite memory database
 - `.jetpack/mail/` - Inter-agent message queues
 
+### LangGraph Supervisor (packages/supervisor)
+
+The supervisor uses LangGraph to provide intelligent orchestration from high-level requests.
+
+```
+packages/supervisor/
+├── src/
+│   ├── SupervisorAgent.ts          # Main orchestration class
+│   ├── graph/
+│   │   ├── state.ts                # LangGraph state annotation
+│   │   ├── graph.ts                # Graph definition with edges
+│   │   └── nodes/
+│   │       ├── PlannerNode.ts      # LLM-powered task breakdown
+│   │       ├── AssignerNode.ts     # Skill-based agent matching
+│   │       ├── MonitorNode.ts      # Progress tracking
+│   │       └── CoordinatorNode.ts  # Conflict resolution
+│   ├── llm/
+│   │   ├── LLMProvider.ts          # Abstract interface
+│   │   ├── ClaudeProvider.ts       # Anthropic implementation
+│   │   └── OpenAIProvider.ts       # OpenAI implementation
+│   └── prompts/                    # LLM prompts for each node
+```
+
+**Graph Flow:**
+```
+START → Planner → Assigner → Monitor ─┬→ END (all complete)
+                      ▲               │
+                      └── Coordinator ◄┘ (on conflicts)
+```
+
+**Usage:**
+```typescript
+// Programmatic
+await jetpack.createSupervisor({ provider: 'claude', model: 'claude-3-5-sonnet-20241022' });
+const result = await jetpack.supervise("Build user authentication");
+
+// CLI
+jetpack supervise "Build user authentication" --llm claude --agents 5
+```
+
 ### Web API Routes (apps/web/src/app/api/)
 
 - `GET/POST /api/tasks` - List/create tasks
-- `PATCH /api/tasks/[id]` - Update task status
+- `PATCH/DELETE /api/tasks/[id]` - Update/delete task
 - `GET /api/agents` - List agents with status
 - `GET /api/status` - Full system status
 - `GET /api/messages` - MCP Mail messages
+
+## Agent Controller Lifecycle
+
+```
+AgentController.start()
+├── Subscribe to MCP Mail (task.created, task.updated)
+├── Start heartbeat timer (30s interval)
+├── Announce agent.started
+└── Begin lookForWork() loop
+
+lookForWork()
+├── Return if not idle
+├── getReadyTasks() from Beads (dependencies satisfied)
+├── Filter by agent.skills matching task.requiredSkills
+├── Sort by priority (critical > high > medium > low)
+└── claimAndExecuteTask() for best match
+
+claimAndExecuteTask()
+├── Atomic claimTask() in Beads (prevents race conditions)
+├── Publish task.claimed via MCP Mail
+├── Retrieve relevant memories from CASS
+├── Execute task (update status to in_progress)
+├── On success: store learnings in CASS, publish task.completed
+├── On failure: publish task.failed with error
+└── Return to lookForWork() after 1s delay
+```
+
+## Common Patterns
+
+### Creating a task with dependencies
+```typescript
+const task1 = await jetpack.createTask({
+  title: 'Set up database',
+  priority: 'high',
+  requiredSkills: ['database'],
+});
+
+const task2 = await jetpack.createTask({
+  title: 'Create API',
+  priority: 'high',
+  requiredSkills: ['backend'],
+  dependencies: [task1.id],  // Won't start until task1 completes
+});
+```
+
+### Extending with custom adapters
+```typescript
+// All adapters follow initialize/close pattern
+class CustomAdapter {
+  async initialize(): Promise<void> { /* setup */ }
+  async close(): Promise<void> { /* cleanup */ }
+}
+```
+
+### Environment Variables
+
+```bash
+ANTHROPIC_API_KEY=...   # Required for Claude supervisor
+OPENAI_API_KEY=...      # Required for OpenAI supervisor
+```
