@@ -20,7 +20,16 @@ import {
   ReplyAll,
   Forward,
   Zap,
+  Radio,
+  ArrowRight,
+  Users,
 } from 'lucide-react';
+
+// Extended message type with source info
+interface ExtendedMessage extends Message {
+  source?: 'broadcast' | 'direct';
+  direction?: 'sent' | 'received';
+}
 import { Button, Badge, LiveIndicator, SystemAlerts, useRotatingAlerts } from '@/components/ui';
 import type { SystemAlertItem } from '@/components/ui';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -48,7 +57,7 @@ const messageAnimationStyle = `
   }
 `;
 
-type MessageCategory = 'all' | 'unread' | 'task' | 'agent' | 'coordination';
+type MessageCategory = 'all' | 'unread' | 'task' | 'agent' | 'coordination' | 'direct' | 'flow';
 
 // Message type icons
 const getMessageIcon = (type: string) => {
@@ -93,7 +102,9 @@ const categories: { id: MessageCategory; label: string; icon: React.ReactNode }[
   { id: 'unread', label: 'Unread', icon: <Mail className="w-4 h-4" /> },
   { id: 'task', label: 'Tasks', icon: <Bell className="w-4 h-4" /> },
   { id: 'agent', label: 'Agents', icon: <Activity className="w-4 h-4" /> },
-  { id: 'coordination', label: 'Coordination', icon: <Send className="w-4 h-4" /> },
+  { id: 'direct', label: 'Direct', icon: <Send className="w-4 h-4" /> },
+  { id: 'coordination', label: 'Coordination', icon: <Radio className="w-4 h-4" /> },
+  { id: 'flow', label: 'Agent Flow', icon: <Users className="w-4 h-4" /> },
 ];
 
 // System alerts for the inbox
@@ -104,7 +115,7 @@ const defaultAlerts: SystemAlertItem[] = [
 ];
 
 export default function InboxPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -179,8 +190,12 @@ export default function InboxPage() {
       filtered = filtered.filter(msg => msg.type.startsWith('task.'));
     } else if (selectedCategory === 'agent') {
       filtered = filtered.filter(msg => msg.type.startsWith('agent.'));
+    } else if (selectedCategory === 'direct') {
+      filtered = filtered.filter(msg => msg.source === 'direct');
     } else if (selectedCategory === 'coordination') {
       filtered = filtered.filter(msg => msg.type.startsWith('coordination.') || msg.type.startsWith('file.'));
+    } else if (selectedCategory === 'flow') {
+      // Flow view shows all - filtering happens in the visualization
     }
 
     // Search filter
@@ -196,6 +211,35 @@ export default function InboxPage() {
 
     return filtered;
   }, [messages, selectedCategory, searchQuery, readMessages, agents]);
+
+  // Compute agent flow data for visualization
+  const agentFlowData = useMemo(() => {
+    const flows: Map<string, { from: string; to: string; count: number; types: string[] }> = new Map();
+    const agentSet = new Set<string>();
+
+    for (const msg of messages) {
+      if (msg.type === 'heartbeat') continue;
+      agentSet.add(msg.from);
+      if (msg.to) {
+        agentSet.add(msg.to);
+        const key = `${msg.from}->${msg.to}`;
+        const existing = flows.get(key);
+        if (existing) {
+          existing.count++;
+          if (!existing.types.includes(msg.type)) {
+            existing.types.push(msg.type);
+          }
+        } else {
+          flows.set(key, { from: msg.from, to: msg.to, count: 1, types: [msg.type] });
+        }
+      }
+    }
+
+    return {
+      agents: Array.from(agentSet),
+      flows: Array.from(flows.values()),
+    };
+  }, [messages]);
 
   // Count unread messages per category
   const unreadCount = useMemo(() => {
@@ -385,11 +429,17 @@ export default function InboxPage() {
                         <p className="text-xs text-[#8b8b8e] truncate">
                           {getPayloadSummary(message.payload)}
                         </p>
-                        {badge && (
-                          <div className="mt-2">
+                        <div className="mt-2 flex items-center gap-2">
+                          {badge && (
                             <Badge variant={badge.variant} size="sm">{badge.label}</Badge>
-                          </div>
-                        )}
+                          )}
+                          {(message as ExtendedMessage).source === 'direct' && (
+                            <Badge variant="info" size="sm">
+                              <Send className="w-3 h-3 mr-1" />
+                              Direct
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </button>
@@ -400,9 +450,130 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* Right Panel - Message Detail */}
+      {/* Right Panel - Message Detail or Flow View */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {selectedMessage ? (
+        {selectedCategory === 'flow' ? (
+          /* Agent Flow Visualization */
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-[#f7f8f8] flex items-center gap-2 mb-2">
+                <Users className="w-5 h-5 text-[rgb(79,255,238)]" />
+                Agent Communication Flow
+              </h2>
+              <p className="text-sm text-[#8b8b8e]">
+                Visualizing how agents communicate with each other
+              </p>
+            </div>
+
+            {agentFlowData.agents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-16 h-16 rounded-full bg-[#2a2a30] flex items-center justify-center mb-4">
+                  <Users className="w-8 h-8 text-[#8b8b8e]" />
+                </div>
+                <p className="text-[#f7f8f8] font-medium">No agent communications yet</p>
+                <p className="text-sm text-[#8b8b8e] mt-1">
+                  Direct messages between agents will appear here
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Agent list */}
+                <div className="rounded-xl bg-[#16161a]/50 border border-[#26262a] p-4">
+                  <h3 className="text-sm font-medium text-[#8b8b8e] uppercase tracking-wider mb-3">
+                    Active Agents ({agentFlowData.agents.length})
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {agentFlowData.agents.map((agentId) => (
+                      <div
+                        key={agentId}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#0d0d0f] border border-[#26262a]"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[rgb(79,255,238)]/20 text-[rgb(79,255,238)] flex items-center justify-center text-sm font-medium">
+                          {getAgentInitial(agentId)}
+                        </div>
+                        <span className="text-[#f7f8f8] text-sm">{getAgentName(agentId)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Communication flows */}
+                {agentFlowData.flows.length > 0 && (
+                  <div className="rounded-xl bg-[#16161a]/50 border border-[#26262a] p-4">
+                    <h3 className="text-sm font-medium text-[#8b8b8e] uppercase tracking-wider mb-3">
+                      Direct Communications ({agentFlowData.flows.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {agentFlowData.flows.map((flow, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-[#0d0d0f] border border-[#26262a]"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-[rgb(79,255,238)]/20 text-[rgb(79,255,238)] flex items-center justify-center text-sm font-medium">
+                              {getAgentInitial(flow.from)}
+                            </div>
+                            <span className="text-[#f7f8f8] text-sm">{getAgentName(flow.from)}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[rgb(79,255,238)]">
+                            <ArrowRight className="w-5 h-5" />
+                            <span className="text-xs bg-[rgb(79,255,238)]/20 px-2 py-0.5 rounded-full">
+                              {flow.count} msg{flow.count !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-[#f59e0b]/20 text-[#f59e0b] flex items-center justify-center text-sm font-medium">
+                              {getAgentInitial(flow.to)}
+                            </div>
+                            <span className="text-[#f7f8f8] text-sm">{getAgentName(flow.to)}</span>
+                          </div>
+                          <div className="ml-auto flex flex-wrap gap-1">
+                            {flow.types.slice(0, 3).map((type) => (
+                              <Badge key={type} variant="default" size="sm">
+                                {type.split('.').pop()}
+                              </Badge>
+                            ))}
+                            {flow.types.length > 3 && (
+                              <Badge variant="default" size="sm">
+                                +{flow.types.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Message type breakdown */}
+                <div className="rounded-xl bg-[#16161a]/50 border border-[#26262a] p-4">
+                  <h3 className="text-sm font-medium text-[#8b8b8e] uppercase tracking-wider mb-3">
+                    Message Types
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {Object.entries(
+                      messages.reduce((acc, msg) => {
+                        if (msg.type !== 'heartbeat') {
+                          const category = msg.type.split('.')[0];
+                          acc[category] = (acc[category] || 0) + 1;
+                        }
+                        return acc;
+                      }, {} as Record<string, number>)
+                    ).map(([category, count]) => (
+                      <div
+                        key={category}
+                        className="flex items-center justify-between p-2 rounded bg-[#0d0d0f] border border-[#26262a]"
+                      >
+                        <span className="text-sm text-[#f7f8f8] capitalize">{category}</span>
+                        <span className="text-sm font-medium text-[rgb(79,255,238)]">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : selectedMessage ? (
           <>
             {/* Detail Header */}
             <div className="h-14 flex items-center justify-between px-6 border-b border-[#26262a] shrink-0">

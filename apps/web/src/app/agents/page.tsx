@@ -1,9 +1,21 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Agent, Task } from '@jetpack/shared';
-import { Sparkles, Cpu, Clock, CheckCircle2, Terminal, Activity } from 'lucide-react';
+import { Task } from '@jetpack/shared';
+import { Sparkles, Cpu, Clock, CheckCircle2, Terminal, Activity, Timer } from 'lucide-react';
 import { Badge, LiveIndicator } from '@/components/ui';
+
+// Extended agent type with registry data
+interface AgentWithRegistry {
+  id: string;
+  name: string;
+  status: 'idle' | 'busy' | 'offline' | 'error';
+  skills: string[];
+  currentTask: string | null;
+  tasksCompleted: number;
+  lastHeartbeat: string;
+  startedAt: string;
+}
 
 // Animation styles
 const agentAnimationStyles = `
@@ -28,7 +40,7 @@ const PHASE_LABELS: Record<AgentPhase, string> = {
 };
 
 export default function AgentsPage() {
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agents, setAgents] = useState<AgentWithRegistry[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [heartbeatCount, setHeartbeatCount] = useState(0);
@@ -77,18 +89,6 @@ export default function AgentsPage() {
     return { idle, busy, error, total: agents.length };
   }, [agents]);
 
-  const getAgentTasks = (agentId: string) => {
-    return tasks.filter(t => t.assignedAgent === agentId);
-  };
-
-  const getAgentCurrentTask = (agentId: string) => {
-    return tasks.find(t => t.assignedAgent === agentId && t.status === 'in_progress');
-  };
-
-  const getAgentCompletedCount = (agentId: string) => {
-    return tasks.filter(t => t.assignedAgent === agentId && t.status === 'completed').length;
-  };
-
   const statusColors: Record<string, 'default' | 'primary' | 'success' | 'warning' | 'error' | 'info'> = {
     idle: 'default',
     busy: 'warning',
@@ -97,14 +97,24 @@ export default function AgentsPage() {
   };
 
   // Get agent phase based on status
-  const getAgentPhase = (agent: Agent): AgentPhase => {
+  const getAgentPhase = (agent: AgentWithRegistry): AgentPhase => {
     if (agent.status === 'busy') {
-      const currentTask = getAgentCurrentTask(agent.id);
-      if (currentTask) return 'executing';
+      if (agent.currentTask) return 'executing';
       return 'claiming';
     }
     if (agent.status === 'error') return 'idle';
     return 'looking';
+  };
+
+  // Format uptime from startedAt
+  const formatUptime = (startedAt: string): string => {
+    const start = new Date(startedAt).getTime();
+    const now = Date.now();
+    const diffMs = now - start;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) return `${diffMins}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    return `${diffHours}h ${diffMins % 60}m`;
   };
 
   if (loading) {
@@ -200,8 +210,7 @@ export default function AgentsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {agents.map((agent) => {
-                const currentTask = getAgentCurrentTask(agent.id);
-                const completedCount = getAgentCompletedCount(agent.id);
+                const currentTaskData = agent.currentTask ? tasks.find(t => t.id === agent.currentTask) : null;
                 const agentPhase = getAgentPhase(agent);
 
                 return (
@@ -268,7 +277,7 @@ export default function AgentsPage() {
                           <span
                             key={skill}
                             className={`px-2 py-0.5 text-xs rounded border ${
-                              currentTask?.requiredSkills?.includes(skill)
+                              currentTaskData?.requiredSkills?.includes(skill as any)
                                 ? 'border-[rgb(79,255,238)] text-[rgb(79,255,238)] bg-[rgb(79,255,238)]/10'
                                 : 'border-[#26262a] text-[#8b8b8e]'
                             }`}
@@ -280,16 +289,18 @@ export default function AgentsPage() {
                     </div>
 
                     {/* Current Task / CLI Output */}
-                    {currentTask ? (
+                    {agent.currentTask ? (
                       <div className="px-5 py-3 bg-[#0d0d0f]/50">
                         <div className="flex items-center gap-2 mb-2">
                           <Terminal className="w-3.5 h-3.5 text-[rgb(79,255,238)]" />
                           <span className="text-xs font-medium text-[rgb(79,255,238)]">Executing</span>
                         </div>
                         <div className="bg-[#0d0d0f] rounded-lg p-3 border border-[#26262a]">
-                          <p className="text-xs text-[#f7f8f8] font-mono truncate">{currentTask.title}</p>
+                          <p className="text-xs text-[#f7f8f8] font-mono truncate">
+                            {currentTaskData?.title || agent.currentTask}
+                          </p>
                           <p className="text-[10px] text-[#8b8b8e] mt-1">
-                            $ claude --task={currentTask.id.slice(0, 8)}
+                            $ claude --task={agent.currentTask.slice(0, 8)}
                             <span className="text-[rgb(79,255,238)] ml-1" style={{ animation: 'terminalCursor 1s step-end infinite' }}>█</span>
                           </p>
                         </div>
@@ -312,11 +323,12 @@ export default function AgentsPage() {
                     <div className="px-5 py-3 flex items-center justify-between text-xs border-t border-[#26262a]/50 bg-[#16161a]/30">
                       <div className="flex items-center gap-1.5 text-[#8b8b8e]">
                         <CheckCircle2 className="w-3.5 h-3.5 text-[#22c55e]" />
-                        <span>{completedCount} completed</span>
+                        <span>{agent.tasksCompleted} completed</span>
                       </div>
-                      <span className="text-[#8b8b8e]">
-                        {getAgentTasks(agent.id).length} total
-                      </span>
+                      <div className="flex items-center gap-1.5 text-[#8b8b8e]">
+                        <Timer className="w-3.5 h-3.5" />
+                        <span>up {formatUptime(agent.startedAt)}</span>
+                      </div>
                     </div>
                   </div>
                 );

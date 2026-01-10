@@ -16,6 +16,8 @@ export interface AgentControllerConfig {
   name: string;
   skills: AgentSkill[];
   workDir: string;
+  onStatusChange?: () => void | Promise<void>;
+  onTaskComplete?: (agentId: string) => void;
 }
 
 export class AgentController {
@@ -25,6 +27,7 @@ export class AgentController {
   private heartbeatInterval?: NodeJS.Timeout;
   private executor: ClaudeCodeExecutor;
   private workDir: string;
+  private config: AgentControllerConfig;
 
   constructor(
     config: AgentControllerConfig,
@@ -32,6 +35,7 @@ export class AgentController {
     private mail: MCPMailAdapter,
     private cass: CASSAdapter
   ) {
+    this.config = config;
     this.workDir = config.workDir;
     this.executor = new ClaudeCodeExecutor(config.workDir);
     this.agent = {
@@ -43,6 +47,24 @@ export class AgentController {
       lastActive: new Date(),
     };
     this.logger = new Logger(`Agent[${this.agent.name}]`);
+  }
+
+  /**
+   * Update agent status and notify via callback
+   */
+  private async updateStatus(status: Agent['status'], currentTask?: string): Promise<void> {
+    this.agent.status = status;
+    this.agent.currentTask = currentTask;
+    this.agent.lastActive = new Date();
+
+    // Notify orchestrator of status change
+    if (this.config.onStatusChange) {
+      try {
+        await this.config.onStatusChange();
+      } catch (err) {
+        this.logger.error('Failed to notify status change:', err);
+      }
+    }
   }
 
   async start(): Promise<void> {
@@ -95,7 +117,7 @@ export class AgentController {
       timestamp: new Date(),
     });
 
-    this.agent.status = 'offline';
+    await this.updateStatus('offline', undefined);
   }
 
   private async handleTaskCreated(_message: Message): Promise<void> {
@@ -153,8 +175,7 @@ export class AgentController {
     }
 
     this.currentTask = claimed;
-    this.agent.status = 'busy';
-    this.agent.currentTask = task.id;
+    await this.updateStatus('busy', task.id);
 
     // Notify other agents
     await this.mail.publish({
@@ -207,6 +228,11 @@ export class AgentController {
       });
 
       this.logger.info(`Successfully completed task: ${task.id}`);
+
+      // Notify orchestrator of task completion for metrics
+      if (this.config.onTaskComplete) {
+        this.config.onTaskComplete(this.agent.id);
+      }
     } catch (error) {
       this.logger.error(`Failed to execute task ${task.id}:`, error);
 
@@ -226,9 +252,7 @@ export class AgentController {
       });
     } finally {
       this.currentTask = undefined;
-      this.agent.status = 'idle';
-      this.agent.currentTask = undefined;
-      this.agent.lastActive = new Date();
+      await this.updateStatus('idle', undefined);
 
       // Look for more work
       setTimeout(() => this.lookForWork(), 1000);

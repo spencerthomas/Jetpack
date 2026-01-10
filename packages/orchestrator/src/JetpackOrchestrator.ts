@@ -65,6 +65,22 @@ export interface JetpackConfig {
   autoStart?: boolean;
 }
 
+export interface AgentRegistryEntry {
+  id: string;
+  name: string;
+  status: 'idle' | 'busy' | 'offline' | 'error';
+  skills: AgentSkill[];
+  currentTask: string | null;
+  lastHeartbeat: string;
+  tasksCompleted: number;
+  startedAt: string;
+}
+
+export interface AgentRegistry {
+  agents: AgentRegistryEntry[];
+  updatedAt: string;
+}
+
 export class JetpackOrchestrator {
   private logger: Logger;
   private beads!: BeadsAdapter;
@@ -75,6 +91,9 @@ export class JetpackOrchestrator {
   private supervisor?: SupervisorAgent;
   private taskFileWatcher?: FSWatcher;
   private processedFiles: Set<string> = new Set();
+  private agentTasksCompleted: Map<string, number> = new Map();
+  private agentStartTimes: Map<string, Date> = new Map();
+  private registryUpdateInterval?: NodeJS.Timeout;
 
   constructor(private config: JetpackConfig) {
     this.logger = new Logger('Jetpack');
@@ -139,11 +158,13 @@ export class JetpackOrchestrator {
       await mail.initialize();
       this.agentMails.set(agentName, mail);
 
-      // Create agent controller
+      // Create agent controller with status change callback
       const agentConfig: AgentControllerConfig = {
         name: agentName,
         skills,
         workDir: this.config.workDir,
+        onStatusChange: () => this.writeAgentRegistry(),
+        onTaskComplete: (agentId: string) => this.incrementAgentTaskCount(agentId),
       };
       const agent = new AgentController(agentConfig, this.beads, mail, this.cass);
 
@@ -152,9 +173,18 @@ export class JetpackOrchestrator {
       }
 
       this.agents.push(agent);
+
+      // Track agent start time and initialize task count
+      const agentData = agent.getAgent();
+      this.agentStartTimes.set(agentData.id, new Date());
+      this.agentTasksCompleted.set(agentData.id, 0);
     }
 
     this.logger.info(`Started ${count} agents successfully`);
+
+    // Write initial registry and start periodic updates
+    await this.writeAgentRegistry();
+    this.startRegistryUpdates();
 
     // Start watching for task files
     await this.startTaskFileWatcher();
@@ -256,6 +286,9 @@ export class JetpackOrchestrator {
   async stopAgents(): Promise<void> {
     this.logger.info('Stopping all agents');
 
+    // Stop registry updates
+    this.stopRegistryUpdates();
+
     for (const agent of this.agents) {
       await agent.stop();
     }
@@ -266,6 +299,11 @@ export class JetpackOrchestrator {
 
     this.agents = [];
     this.agentMails.clear();
+    this.agentTasksCompleted.clear();
+    this.agentStartTimes.clear();
+
+    // Clear the registry file
+    await this.clearAgentRegistry();
 
     this.logger.info('All agents stopped');
   }
@@ -378,6 +416,84 @@ export class JetpackOrchestrator {
 
   getAgents(): AgentController[] {
     return this.agents;
+  }
+
+  /**
+   * Write agent registry to .jetpack/agents.json
+   * Called periodically and on agent status changes
+   */
+  async writeAgentRegistry(): Promise<void> {
+    const registryPath = path.join(this.workDir, '.jetpack', 'agents.json');
+
+    const registry: AgentRegistry = {
+      agents: this.agents.map(controller => {
+        const agent = controller.getAgent();
+        return {
+          id: agent.id,
+          name: agent.name,
+          status: agent.status as 'idle' | 'busy' | 'offline' | 'error',
+          skills: agent.skills,
+          currentTask: agent.currentTask || null,
+          lastHeartbeat: new Date().toISOString(),
+          tasksCompleted: this.agentTasksCompleted.get(agent.id) || 0,
+          startedAt: this.agentStartTimes.get(agent.id)?.toISOString() || new Date().toISOString(),
+        };
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await fs.writeFile(registryPath, JSON.stringify(registry, null, 2));
+    } catch (err) {
+      this.logger.error('Failed to write agent registry:', err);
+    }
+  }
+
+  /**
+   * Clear agent registry (called on shutdown)
+   */
+  async clearAgentRegistry(): Promise<void> {
+    const registryPath = path.join(this.workDir, '.jetpack', 'agents.json');
+    const emptyRegistry: AgentRegistry = {
+      agents: [],
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await fs.writeFile(registryPath, JSON.stringify(emptyRegistry, null, 2));
+    } catch (err) {
+      this.logger.error('Failed to clear agent registry:', err);
+    }
+  }
+
+  /**
+   * Start periodic registry updates
+   */
+  private startRegistryUpdates(): void {
+    // Update registry every 5 seconds
+    this.registryUpdateInterval = setInterval(async () => {
+      await this.writeAgentRegistry();
+    }, 5000);
+  }
+
+  /**
+   * Stop periodic registry updates
+   */
+  private stopRegistryUpdates(): void {
+    if (this.registryUpdateInterval) {
+      clearInterval(this.registryUpdateInterval);
+      this.registryUpdateInterval = undefined;
+    }
+  }
+
+  /**
+   * Track task completion for agent metrics
+   */
+  incrementAgentTaskCount(agentId: string): void {
+    const current = this.agentTasksCompleted.get(agentId) || 0;
+    this.agentTasksCompleted.set(agentId, current + 1);
+    // Update registry immediately
+    this.writeAgentRegistry().catch(() => {});
   }
 
   /**

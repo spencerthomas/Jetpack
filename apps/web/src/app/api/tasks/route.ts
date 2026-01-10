@@ -1,25 +1,34 @@
 import { NextResponse } from 'next/server';
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
-import path from 'path';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
-let orchestrator: JetpackOrchestrator | null = null;
+// Read directly from tasks.jsonl to stay in sync with CLI orchestrator
+async function loadTasksFromFile() {
+  const beadsDir = path.join(process.cwd(), '../..', '.beads');
+  const tasksFile = path.join(beadsDir, 'tasks.jsonl');
 
-async function getOrchestrator() {
-  if (!orchestrator) {
-    orchestrator = new JetpackOrchestrator({
-      workDir: path.join(process.cwd(), '../..'),
-      autoStart: false,
+  try {
+    const content = await fs.readFile(tasksFile, 'utf-8');
+    const lines = content.split('\n').filter(line => line.trim());
+
+    return lines.map(line => {
+      const task = JSON.parse(line);
+      return {
+        ...task,
+        createdAt: new Date(task.createdAt),
+        updatedAt: new Date(task.updatedAt),
+        completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
+      };
     });
-    await orchestrator.initialize();
+  } catch (error) {
+    // File doesn't exist or is empty
+    return [];
   }
-  return orchestrator;
 }
 
 export async function GET() {
   try {
-    const jetpack = await getOrchestrator();
-    const beads = jetpack.getBeadsAdapter();
-    const tasks = await beads.listTasks();
+    const tasks = await loadTasksFromFile();
 
     // Convert Date objects to ISO strings for JSON serialization
     const serializedTasks = tasks.map(task => ({
@@ -36,27 +45,42 @@ export async function GET() {
   }
 }
 
+// Generate a short unique ID
+function generateTaskId(): string {
+  const chars = '0123456789abcdef';
+  let id = 'bd-';
+  for (let i = 0; i < 8; i++) {
+    id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return id;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const jetpack = await getOrchestrator();
+    const beadsDir = path.join(process.cwd(), '../..', '.beads');
+    const tasksFile = path.join(beadsDir, 'tasks.jsonl');
 
-    const task = await jetpack.createTask({
+    const now = new Date();
+    const task = {
+      id: generateTaskId(),
       title: body.title,
-      description: body.description,
+      description: body.description || '',
+      status: 'pending',
       priority: body.priority || 'medium',
+      dependencies: [],
+      blockers: [],
       requiredSkills: body.requiredSkills || [],
       estimatedMinutes: body.estimatedMinutes,
-    });
+      tags: [],
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
 
-    return NextResponse.json({
-      task: {
-        ...task,
-        createdAt: task.createdAt.toISOString(),
-        updatedAt: task.updatedAt.toISOString(),
-        completedAt: task.completedAt?.toISOString(),
-      },
-    });
+    // Append to tasks.jsonl
+    await fs.appendFile(tasksFile, JSON.stringify(task) + '\n');
+
+    return NextResponse.json({ task });
   } catch (error) {
     console.error('Failed to create task:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });

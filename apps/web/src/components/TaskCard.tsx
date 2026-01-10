@@ -6,10 +6,12 @@ import { CSS } from '@dnd-kit/utilities';
 import { Clock, Tag, User, AlertCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
+import { useRef } from 'react';
 
 interface TaskCardProps {
   task: Task;
   isDragging?: boolean;
+  onClick?: (task: Task) => void;
 }
 
 const priorityColors = {
@@ -26,7 +28,7 @@ const priorityBadgeColors = {
   critical: 'bg-accent-red/20 text-accent-red',
 };
 
-export default function TaskCard({ task, isDragging }: TaskCardProps) {
+export default function TaskCard({ task, isDragging, onClick }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -43,14 +45,42 @@ export default function TaskCard({ task, isDragging }: TaskCardProps) {
 
   const createdAt = typeof task.createdAt === 'string' ? new Date(task.createdAt) : task.createdAt;
 
+  // Track mouse position to distinguish clicks from drags
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    mouseDownPos.current = { x: e.clientX, y: e.clientY };
+    // Call original listener if exists
+    listeners?.onMouseDown?.(e as any);
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (mouseDownPos.current && onClick) {
+      const dx = Math.abs(e.clientX - mouseDownPos.current.x);
+      const dy = Math.abs(e.clientY - mouseDownPos.current.y);
+      // If mouse moved less than 5px, treat as click
+      if (dx < 5 && dy < 5) {
+        onClick(task);
+      }
+    }
+    mouseDownPos.current = null;
+  };
+
+  // Merge our handlers with dnd-kit listeners
+  const mergedListeners = {
+    ...listeners,
+    onMouseDown: handleMouseDown,
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
+      {...mergedListeners}
+      onMouseUp={handleMouseUp}
       className={clsx(
-        'bg-surface rounded-lg p-4 border border-subtle border-l-4 cursor-move',
+        'bg-surface rounded-lg p-4 border border-subtle border-l-4 cursor-pointer',
         'hover:border-default transition-colors',
         priorityColors[task.priority],
         (isDragging || isSortableDragging) && 'opacity-50'

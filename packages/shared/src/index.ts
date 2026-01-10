@@ -8,3 +8,4 @@ export * from './types/user';
 // Utilities
 export * from './utils/logger';
 export * from './utils/hash';
+export * from './utils/greeting';

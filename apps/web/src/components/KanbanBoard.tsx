@@ -9,6 +9,7 @@ import TaskCard from './TaskCard';
 interface KanbanBoardProps {
   tasks: Task[];
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
+  onTaskClick?: (task: Task) => void;
 }
 
 const COLUMNS: { status: TaskStatus; title: string; color: string }[] = [
@@ -20,7 +21,7 @@ const COLUMNS: { status: TaskStatus; title: string; color: string }[] = [
   { status: 'failed', title: 'Failed', color: 'bg-status-failed/20 text-accent-red' },
 ];
 
-export default function KanbanBoard({ tasks, onUpdateTask }: KanbanBoardProps) {
+export default function KanbanBoard({ tasks, onUpdateTask, onTaskClick }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -56,6 +57,7 @@ export default function KanbanBoard({ tasks, onUpdateTask }: KanbanBoardProps) {
               title={column.title}
               color={column.color}
               tasks={getTasksByStatus(column.status)}
+              onTaskClick={onTaskClick}
             />
           ))}
         </div>

@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  GitBranch,
 } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { SidebarItem } from './SidebarItem';
@@ -80,6 +81,13 @@ export function Sidebar() {
           icon={<LayoutGrid className="w-5 h-5" />}
           label="Board"
           shortcut={['g', 'b']}
+          collapsed={sidebarCollapsed}
+        />
+        <SidebarItem
+          href="/plans"
+          icon={<GitBranch className="w-5 h-5" />}
+          label="Plans"
+          shortcut={['g', 'l']}
           collapsed={sidebarCollapsed}
         />
         <SidebarItem
