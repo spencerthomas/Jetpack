@@ -2,21 +2,39 @@ import * as path from 'path';
 import Database from 'better-sqlite3';
 import { MemoryEntry, MemoryType, MemoryStore, Logger } from '@jetpack/shared';
 import * as crypto from 'crypto';
+import { EmbeddingGenerator, EmbeddingConfig, createEmbeddingGenerator } from './EmbeddingGenerator';
 
 export interface CASSConfig {
   cassDir: string;
   compactionThreshold: number; // 0-1, importance below this gets compacted
   maxEntries: number; // Max entries before forcing compaction
+  /** Enable automatic embedding generation when storing memories */
+  autoGenerateEmbeddings?: boolean;
+  /** Configuration for embedding generation */
+  embeddingConfig?: EmbeddingConfig;
 }
 
 export class CASSAdapter implements MemoryStore {
   private db!: Database.Database;
   private logger: Logger;
   private dbPath: string;
+  private embeddingGenerator: EmbeddingGenerator | null = null;
+  private autoGenerateEmbeddings: boolean;
 
   constructor(private config: CASSConfig) {
     this.logger = new Logger('CASS');
     this.dbPath = path.join(config.cassDir, 'memory.db');
+    this.autoGenerateEmbeddings = config.autoGenerateEmbeddings ?? false;
+
+    // Initialize embedding generator if configured
+    if (this.autoGenerateEmbeddings || config.embeddingConfig) {
+      this.embeddingGenerator = createEmbeddingGenerator(config.embeddingConfig);
+      if (this.embeddingGenerator) {
+        this.logger.info('Embedding generator initialized');
+      } else if (this.autoGenerateEmbeddings) {
+        this.logger.warn('Auto-embedding enabled but no API key found. Set OPENAI_API_KEY.');
+      }
+    }
   }
 
   async initialize(): Promise<void> {
@@ -51,6 +69,18 @@ export class CASSAdapter implements MemoryStore {
     const id = this.generateId();
     const now = Date.now();
 
+    // Generate embedding if auto-embed is enabled and no embedding provided
+    let embedding = entry.embedding;
+    if (!embedding && this.autoGenerateEmbeddings && this.embeddingGenerator) {
+      try {
+        const result = await this.embeddingGenerator.generate(entry.content);
+        embedding = result.embedding;
+        this.logger.debug(`Generated embedding for memory (${result.tokensUsed} tokens)`);
+      } catch (error) {
+        this.logger.warn('Failed to generate embedding, storing without:', error);
+      }
+    }
+
     const stmt = this.db.prepare(`
       INSERT INTO memories (id, type, content, embedding, metadata, importance, created_at, last_accessed, access_count)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
@@ -60,14 +90,14 @@ export class CASSAdapter implements MemoryStore {
       id,
       entry.type,
       entry.content,
-      entry.embedding ? JSON.stringify(entry.embedding) : null,
+      embedding ? JSON.stringify(embedding) : null,
       entry.metadata ? JSON.stringify(entry.metadata) : null,
       entry.importance,
       now,
       now
     );
 
-    this.logger.debug(`Stored memory: ${id} (${entry.type})`);
+    this.logger.debug(`Stored memory: ${id} (${entry.type})${embedding ? ' with embedding' : ''}`);
 
     // Check if compaction is needed
     const count = this.getCount();
@@ -127,11 +157,104 @@ export class CASSAdapter implements MemoryStore {
     return results.slice(0, limit).map(r => this.rowToMemoryEntry(r.row));
   }
 
+  /**
+   * Search memories using a text query (converts to embedding first)
+   * Falls back to text search if embedding generation fails
+   */
+  async semanticSearchByQuery(query: string, limit: number = 10): Promise<MemoryEntry[]> {
+    if (!this.embeddingGenerator) {
+      this.logger.warn('No embedding generator available, falling back to text search');
+      return this.search(query, limit);
+    }
+
+    try {
+      const result = await this.embeddingGenerator.generate(query);
+      return this.semanticSearch(result.embedding, limit);
+    } catch (error) {
+      this.logger.warn('Embedding generation failed, falling back to text search:', error);
+      return this.search(query, limit);
+    }
+  }
+
+  /**
+   * Generate embeddings for all memories that don't have them
+   * Returns the number of memories updated
+   */
+  async backfillEmbeddings(batchSize: number = 10): Promise<number> {
+    if (!this.embeddingGenerator) {
+      throw new Error('Embedding generator not available');
+    }
+
+    const stmt = this.db.prepare(
+      'SELECT id, content FROM memories WHERE embedding IS NULL LIMIT ?'
+    );
+    const rows = stmt.all(batchSize) as Array<{ id: string; content: string }>;
+
+    if (rows.length === 0) {
+      this.logger.info('No memories without embeddings');
+      return 0;
+    }
+
+    this.logger.info(`Backfilling embeddings for ${rows.length} memories`);
+
+    const contents = rows.map(r => r.content);
+    const results = await this.embeddingGenerator.generateBatch(contents);
+
+    const updateStmt = this.db.prepare('UPDATE memories SET embedding = ? WHERE id = ?');
+    const updateMany = this.db.transaction((items: Array<{ id: string; embedding: number[] }>) => {
+      for (const item of items) {
+        updateStmt.run(JSON.stringify(item.embedding), item.id);
+      }
+    });
+
+    updateMany(
+      rows.map((row, i) => ({
+        id: row.id,
+        embedding: results[i].embedding,
+      }))
+    );
+
+    this.logger.info(`Backfilled ${rows.length} embeddings`);
+    return rows.length;
+  }
+
+  /**
+   * Get count of memories with and without embeddings
+   */
+  async getEmbeddingStats(): Promise<{
+    withEmbedding: number;
+    withoutEmbedding: number;
+    total: number;
+  }> {
+    const withStmt = this.db.prepare(
+      'SELECT COUNT(*) as count FROM memories WHERE embedding IS NOT NULL'
+    );
+    const withoutStmt = this.db.prepare(
+      'SELECT COUNT(*) as count FROM memories WHERE embedding IS NULL'
+    );
+
+    const withEmbedding = (withStmt.get() as any).count;
+    const withoutEmbedding = (withoutStmt.get() as any).count;
+
+    return {
+      withEmbedding,
+      withoutEmbedding,
+      total: withEmbedding + withoutEmbedding,
+    };
+  }
+
+  /**
+   * Check if embedding generator is available
+   */
+  hasEmbeddingGenerator(): boolean {
+    return this.embeddingGenerator !== null;
+  }
+
   async compact(threshold: number): Promise<number> {
+    // SQLite doesn't support ORDER BY in DELETE, so we just delete by threshold
     const stmt = this.db.prepare(`
       DELETE FROM memories
       WHERE importance < ? AND type != 'codebase_knowledge'
-      ORDER BY importance ASC, access_count ASC
     `);
 
     const result = stmt.run(threshold);

@@ -6,6 +6,7 @@ export interface ExecutionResult {
   output: string;
   error?: string;
   duration: number;
+  timedOut?: boolean;
 }
 
 export interface ExecutionContext {
@@ -16,18 +17,34 @@ export interface ExecutionContext {
   agentSkills: string[];
 }
 
+export interface ExecutorConfig {
+  /** Maximum execution time in ms (default: 5 minutes) */
+  timeoutMs?: number;
+  /** Time to wait after SIGTERM before sending SIGKILL (default: 10 seconds) */
+  gracefulShutdownMs?: number;
+}
+
+const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_GRACEFUL_SHUTDOWN_MS = 10 * 1000; // 10 seconds
+
 export class ClaudeCodeExecutor {
   private logger: Logger;
   private currentProcess?: ChildProcess;
   private defaultWorkDir: string;
+  private timeoutMs: number;
+  private gracefulShutdownMs: number;
+  private executionTimeout?: NodeJS.Timeout;
+  private killTimeout?: NodeJS.Timeout;
 
-  constructor(workDir: string) {
+  constructor(workDir: string, config: ExecutorConfig = {}) {
     this.defaultWorkDir = workDir;
+    this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.gracefulShutdownMs = config.gracefulShutdownMs ?? DEFAULT_GRACEFUL_SHUTDOWN_MS;
     this.logger = new Logger('ClaudeCodeExecutor');
   }
 
   /**
-   * Execute a task using Claude Code CLI
+   * Execute a task using Claude Code CLI with timeout protection
    */
   async execute(context: ExecutionContext): Promise<ExecutionResult> {
     const startTime = Date.now();
@@ -35,10 +52,28 @@ export class ClaudeCodeExecutor {
     const workDir = context.workDir || this.defaultWorkDir;
 
     this.logger.info(`Executing task: ${context.task.title}`);
-    this.logger.debug(`Prompt length: ${prompt.length} chars`);
+    this.logger.debug(`Prompt length: ${prompt.length} chars, timeout: ${this.timeoutMs}ms`);
+
+    // Create a timeout promise that will abort the execution
+    let timedOut = false;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      this.executionTimeout = setTimeout(() => {
+        timedOut = true;
+        this.logger.warn(`Task execution timed out after ${this.timeoutMs}ms`);
+        this.abort();
+        reject(new Error(`Task execution timed out after ${this.timeoutMs}ms`));
+      }, this.timeoutMs);
+    });
 
     try {
-      const output = await this.runClaudeCode(prompt, workDir);
+      // Race between execution and timeout
+      const output = await Promise.race([
+        this.runClaudeCode(prompt, workDir),
+        timeoutPromise,
+      ]);
+
+      // Clear timeout if execution completed
+      this.clearTimeouts();
       const duration = Date.now() - startTime;
 
       this.logger.info(`Task completed in ${duration}ms`);
@@ -49,6 +84,7 @@ export class ClaudeCodeExecutor {
         duration,
       };
     } catch (error) {
+      this.clearTimeouts();
       const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -59,7 +95,22 @@ export class ClaudeCodeExecutor {
         output: '',
         error: errorMessage,
         duration,
+        timedOut,
       };
+    }
+  }
+
+  /**
+   * Clear all pending timeouts
+   */
+  private clearTimeouts(): void {
+    if (this.executionTimeout) {
+      clearTimeout(this.executionTimeout);
+      this.executionTimeout = undefined;
+    }
+    if (this.killTimeout) {
+      clearTimeout(this.killTimeout);
+      this.killTimeout = undefined;
     }
   }
 
@@ -170,13 +221,67 @@ When done, provide a brief summary of what you accomplished.
   }
 
   /**
-   * Kill the current Claude Code process if running
+   * Kill the current Claude Code process if running.
+   * First sends SIGTERM for graceful shutdown, then SIGKILL after timeout.
    */
   abort(): void {
+    if (!this.currentProcess) {
+      return;
+    }
+
+    const proc = this.currentProcess;
+    const pid = proc.pid;
+
+    this.logger.warn(`Aborting Claude Code execution (pid: ${pid})`);
+
+    // First try graceful termination
+    proc.kill('SIGTERM');
+
+    // Set up SIGKILL fallback if process doesn't terminate
+    this.killTimeout = setTimeout(() => {
+      // Check if process is still running
+      if (proc.killed) {
+        this.logger.debug(`Process ${pid} already terminated`);
+        return;
+      }
+
+      this.logger.warn(`Process ${pid} did not terminate after ${this.gracefulShutdownMs}ms, sending SIGKILL`);
+
+      try {
+        proc.kill('SIGKILL');
+      } catch (error) {
+        // Process might have already exited
+        this.logger.debug(`SIGKILL failed (process likely already exited):`, error);
+      }
+    }, this.gracefulShutdownMs);
+
+    // Also listen for exit to clear the kill timeout
+    proc.once('exit', () => {
+      if (this.killTimeout) {
+        clearTimeout(this.killTimeout);
+        this.killTimeout = undefined;
+      }
+      this.currentProcess = undefined;
+    });
+  }
+
+  /**
+   * Force kill the process immediately without graceful shutdown
+   */
+  forceKill(): void {
     if (this.currentProcess) {
-      this.logger.warn('Aborting Claude Code execution');
-      this.currentProcess.kill('SIGTERM');
+      const pid = this.currentProcess.pid;
+      this.logger.warn(`Force killing Claude Code execution (pid: ${pid})`);
+      this.clearTimeouts();
+      this.currentProcess.kill('SIGKILL');
       this.currentProcess = undefined;
     }
+  }
+
+  /**
+   * Check if there's currently an execution in progress
+   */
+  isExecuting(): boolean {
+    return this.currentProcess !== undefined;
   }
 }

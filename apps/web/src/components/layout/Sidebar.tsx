@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Search,
   GitBranch,
+  Brain,
 } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { SidebarItem } from './SidebarItem';
@@ -102,6 +103,13 @@ export function Sidebar() {
           icon={<Sparkles className="w-5 h-5" />}
           label="Agents"
           shortcut={['g', 'a']}
+          collapsed={sidebarCollapsed}
+        />
+        <SidebarItem
+          href="/supervisor"
+          icon={<Brain className="w-5 h-5" />}
+          label="Supervisor"
+          shortcut={['g', 's']}
           collapsed={sidebarCollapsed}
         />
       </nav>
