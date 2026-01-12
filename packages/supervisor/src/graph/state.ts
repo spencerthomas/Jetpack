@@ -54,6 +54,68 @@ export const PlannedTaskSchema = z.object({
 export type PlannedTask = z.infer<typeof PlannedTaskSchema>;
 
 /**
+ * Milestone status for continuous objective tracking
+ */
+export const MilestoneStatusSchema = z.enum([
+  'pending',
+  'in_progress',
+  'completed',
+]);
+export type MilestoneStatus = z.infer<typeof MilestoneStatusSchema>;
+
+/**
+ * A milestone represents a phase within an objective
+ */
+export const MilestoneSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  completionCriteria: z.array(z.string()), // Checkable criteria
+  estimatedTasks: z.number(),
+  taskIds: z.array(z.string()), // Tasks spawned for this milestone
+  status: MilestoneStatusSchema,
+});
+export type Milestone = z.infer<typeof MilestoneSchema>;
+
+/**
+ * Objective status for high-level goal tracking
+ */
+export const ObjectiveStatusSchema = z.enum([
+  'active',
+  'paused',
+  'completed',
+  'failed',
+]);
+export type ObjectiveStatus = z.infer<typeof ObjectiveStatusSchema>;
+
+/**
+ * An objective is a high-level goal broken into milestones
+ */
+export const ObjectiveSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  userRequest: z.string(),
+  status: ObjectiveStatusSchema,
+  milestones: z.array(MilestoneSchema),
+  currentMilestoneIndex: z.number(),
+  progressPercent: z.number(), // 0-100
+  generationRound: z.number(), // Tracks task generation iterations
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+export type Objective = z.infer<typeof ObjectiveSchema>;
+
+/**
+ * Queue management thresholds for continuous operation
+ */
+export const QueueThresholdsSchema = z.object({
+  lowWatermark: z.number().default(2),   // Trigger generation when below
+  highWatermark: z.number().default(8),  // Target queue size
+  maxWatermark: z.number().default(15),  // Never exceed this
+  cooldownMs: z.number().default(30000), // Min time between generations
+});
+export type QueueThresholds = z.infer<typeof QueueThresholdsSchema>;
+
+/**
  * LangGraph state annotation for the supervisor
  */
 export const SupervisorStateAnnotation = Annotation.Root({
@@ -130,6 +192,54 @@ export const SupervisorStateAnnotation = Annotation.Root({
   error: Annotation<string | undefined>({
     default: () => undefined,
     reducer: (_, err) => err,
+  }),
+
+  // === Continuous mode extensions ===
+
+  // Active objective (for continuous task generation)
+  objective: Annotation<Objective | undefined>({
+    default: () => undefined,
+    reducer: (_, obj) => obj,
+  }),
+
+  // Queue management thresholds
+  queueThresholds: Annotation<QueueThresholds>({
+    default: () => ({
+      lowWatermark: 2,
+      highWatermark: 8,
+      maxWatermark: 15,
+      cooldownMs: 30000,
+    }),
+    reducer: (_, thresholds) => thresholds,
+  }),
+
+  // Current pending task count in the queue
+  pendingTaskCount: Annotation<number>({
+    default: () => 0,
+    reducer: (_, count) => count,
+  }),
+
+  // Last time tasks were generated (for cooldown)
+  lastGenerationTime: Annotation<Date | undefined>({
+    default: () => undefined,
+    reducer: (_, time) => time,
+  }),
+
+  // Whether we're in continuous mode
+  continuousMode: Annotation<boolean>({
+    default: () => false,
+    reducer: (_, mode) => mode,
+  }),
+
+  // Milestone completion check results
+  milestoneCheckResult: Annotation<{
+    milestoneId: string;
+    criteriaSatisfied: boolean[];
+    allSatisfied: boolean;
+    reasoning: string;
+  } | undefined>({
+    default: () => undefined,
+    reducer: (_, result) => result,
   }),
 });
 
