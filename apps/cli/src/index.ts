@@ -159,22 +159,28 @@ program
   .description(`
   Jetpack - Multi-Agent Development Stack
 
-  Start Jetpack to automatically launch:
-  • Orchestrator - coordinates agent work
-  • Agents - AI workers that execute tasks
-  • Web UI - visualize and interact at localhost:3002
+  Commands:
+    init [path]                Initialize Jetpack in a directory
+    start                      Start orchestrator, agents, and web UI
+    task                       Create a new task for agents
+    status                     Show current system status
+    demo                       Run demo with sample tasks
+    supervise <request>        LLM-powered task orchestration
 
-  Usage:
-    jetpack start              Start everything (recommended)
+  Examples:
+    jetpack init .             Initialize in current directory
+    jetpack start              Start everything (default: 3 agents, port 3002)
     jetpack start -a 5         Start with 5 agents
-    jetpack start --no-browser Don't auto-open browser
-    jetpack task -t "title"    Create a new task
+    jetpack start --no-ui      CLI only, no web UI
+    jetpack task -t "Title"    Create a task
+    jetpack status             Check system status
+    jetpack demo               Run demo workflow
+    jetpack supervise "Build auth" --llm claude
 
-  Once running, create tasks via:
-  • Web UI at http://localhost:3002
-  • CLI: jetpack task -t "Your task"
-  • Drop .md files in .beads/tasks/
-  • Use Claude Code to edit task files
+  Create tasks via:
+    • Web UI at http://localhost:3002
+    • CLI: jetpack task -t "Your task" -p high -s typescript
+    • Drop .md files in .beads/tasks/
   `.trim())
   .version('0.1.0');
 
