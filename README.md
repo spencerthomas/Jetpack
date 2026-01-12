@@ -229,6 +229,76 @@ The web UI launches automatically at http://localhost:3002 when you run `jetpack
 cd apps/web && pnpm dev -p 3002
 ```
 
+## 📂 Working with Existing Projects
+
+Jetpack works **on the local machine** in the folder you specify. It creates hidden folders inside your project directory to store tasks, memory, and agent communication.
+
+### How It Works
+
+When you run Jetpack on a project:
+
+```bash
+pnpm jetpack start --dir /path/to/your/project --agents 3
+```
+
+Jetpack creates **hidden folders inside your project directory**:
+
+```
+/your-project/
+├── .beads/              # Task storage (JSONL, git-backed)
+│   └── tasks.jsonl      # All tasks with dependencies, status, etc.
+├── .cass/               # Agent memory (SQLite)
+│   └── memory.db        # Learnings, codebase knowledge, embeddings
+├── .jetpack/
+│   ├── mail/            # Inter-agent messaging
+│   │   ├── inbox/       # Messages to specific agents
+│   │   ├── outbox/      # Broadcast messages
+│   │   ├── archive/     # Processed messages
+│   │   └── sent/        # Sent message copies
+│   ├── agents.json      # Agent registry (status, heartbeats)
+│   └── settings.json    # Configuration
+└── src/                 # Your actual code (agents work here)
+```
+
+### Key Points
+
+| Aspect | Behavior |
+|--------|----------|
+| **Code location** | Your local machine, in the specified `--dir` |
+| **Data storage** | Hidden folders (`.beads/`, `.cass/`, `.jetpack/`) inside your project |
+| **Agent execution** | Local Claude Code CLI processes with `--dangerously-skip-permissions` |
+| **Isolation** | Each project has its own task/memory/message stores |
+| **Git-friendly** | `.beads/` can be committed to track task history |
+
+### Example: Starting on an Existing Project
+
+```bash
+# Navigate to your project
+cd /Users/tom/dev/my-app
+
+# Start Jetpack with 3 agents
+pnpm jetpack start --agents 3
+
+# Or specify the directory explicitly from anywhere
+pnpm jetpack start --dir /Users/tom/dev/my-app --agents 3
+```
+
+The agents then work directly on your codebase, creating and editing files just like you would.
+
+### Multiple Projects
+
+Each project maintains its own isolated state:
+
+```bash
+# Project A - has its own .beads/, .cass/, .jetpack/
+pnpm jetpack start --dir /path/to/project-a --agents 3
+
+# Project B - completely separate state
+pnpm jetpack start --dir /path/to/project-b --agents 5
+```
+
+---
+
 ## 📖 Usage Examples
 
 ### Starting the System
