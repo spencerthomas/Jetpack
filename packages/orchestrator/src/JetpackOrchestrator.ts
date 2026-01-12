@@ -414,6 +414,23 @@ export class JetpackOrchestrator {
     return this.cass;
   }
 
+  /**
+   * Get current CASS configuration (for UI display)
+   */
+  getCASSConfig(): ReturnType<CASSAdapter['getConfig']> {
+    return this.cass.getConfig();
+  }
+
+  /**
+   * Reconfigure CASS settings at runtime (hot reload)
+   * Call this after updating settings to apply changes immediately
+   */
+  async reconfigureCASS(config: Partial<CASSConfig>): Promise<void> {
+    this.logger.info('Reconfiguring CASS via orchestrator');
+    await this.cass.reconfigure(config);
+    this.logger.info('CASS reconfiguration applied');
+  }
+
   getAgents(): AgentController[] {
     return this.agents;
   }

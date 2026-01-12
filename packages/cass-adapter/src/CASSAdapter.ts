@@ -250,6 +250,76 @@ export class CASSAdapter implements MemoryStore {
     return this.embeddingGenerator !== null;
   }
 
+  /**
+   * Get current configuration (for UI display)
+   * Note: API key is masked for security
+   */
+  getConfig(): {
+    cassDir: string;
+    compactionThreshold: number;
+    maxEntries: number;
+    autoGenerateEmbeddings: boolean;
+    hasEmbeddingGenerator: boolean;
+    embeddingModel?: string;
+  } {
+    return {
+      cassDir: this.config.cassDir,
+      compactionThreshold: this.config.compactionThreshold,
+      maxEntries: this.config.maxEntries,
+      autoGenerateEmbeddings: this.autoGenerateEmbeddings,
+      hasEmbeddingGenerator: this.embeddingGenerator !== null,
+      embeddingModel: this.config.embeddingConfig?.model,
+    };
+  }
+
+  /**
+   * Reconfigure CASS settings at runtime (hot reload)
+   * Allows updating compaction settings and embedding configuration without restart
+   */
+  async reconfigure(newConfig: Partial<CASSConfig>): Promise<void> {
+    this.logger.info('Reconfiguring CASS settings');
+
+    // Update compaction settings
+    if (newConfig.compactionThreshold !== undefined) {
+      this.config.compactionThreshold = newConfig.compactionThreshold;
+      this.logger.debug(`Updated compactionThreshold to ${newConfig.compactionThreshold}`);
+    }
+
+    if (newConfig.maxEntries !== undefined) {
+      this.config.maxEntries = newConfig.maxEntries;
+      this.logger.debug(`Updated maxEntries to ${newConfig.maxEntries}`);
+    }
+
+    // Update embedding configuration
+    if (newConfig.autoGenerateEmbeddings !== undefined) {
+      this.autoGenerateEmbeddings = newConfig.autoGenerateEmbeddings;
+      this.config.autoGenerateEmbeddings = newConfig.autoGenerateEmbeddings;
+    }
+
+    // Reinitialize embedding generator if config provided
+    if (newConfig.embeddingConfig !== undefined) {
+      this.config.embeddingConfig = newConfig.embeddingConfig;
+
+      if (this.autoGenerateEmbeddings || newConfig.embeddingConfig) {
+        const newGenerator = createEmbeddingGenerator(newConfig.embeddingConfig);
+
+        if (newGenerator) {
+          this.embeddingGenerator = newGenerator;
+          this.logger.info('Embedding generator reinitialized');
+        } else {
+          this.embeddingGenerator = null;
+          if (this.autoGenerateEmbeddings) {
+            this.logger.warn('Auto-embedding enabled but no valid API key. Set OPENAI_API_KEY or provide apiKey in config.');
+          }
+        }
+      } else {
+        this.embeddingGenerator = null;
+      }
+    }
+
+    this.logger.info('CASS reconfiguration complete');
+  }
+
   async compact(threshold: number): Promise<number> {
     // SQLite doesn't support ORDER BY in DELETE, so we just delete by threshold
     const stmt = this.db.prepare(`

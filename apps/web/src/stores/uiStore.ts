@@ -19,7 +19,7 @@ interface UIState {
   toggleChatPanel: () => void;
 
   // Active view for navigation
-  activeView: 'inbox' | 'board' | 'projects' | 'agents' | 'settings';
+  activeView: 'inbox' | 'board' | 'projects' | 'agents' | 'memory' | 'settings';
   setActiveView: (view: UIState['activeView']) => void;
 
   // Unread counts

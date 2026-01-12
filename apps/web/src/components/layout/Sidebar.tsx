@@ -11,6 +11,7 @@ import {
   Search,
   GitBranch,
   Brain,
+  Database,
 } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { SidebarItem } from './SidebarItem';
@@ -103,6 +104,13 @@ export function Sidebar() {
           icon={<Sparkles className="w-5 h-5" />}
           label="Agents"
           shortcut={['g', 'a']}
+          collapsed={sidebarCollapsed}
+        />
+        <SidebarItem
+          href="/memory"
+          icon={<Database className="w-5 h-5" />}
+          label="Memory"
+          shortcut={['g', 'm']}
           collapsed={sidebarCollapsed}
         />
         <SidebarItem
