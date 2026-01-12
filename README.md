@@ -545,6 +545,89 @@ type AgentSkill =
 
 ---
 
+### File Locking (Lease System)
+
+Jetpack uses a **lease-based file locking system** via MCP Mail to prevent agents from overwriting each other's work.
+
+**Storage:**
+```
+.jetpack/mail/leases.json
+```
+
+**Lease Format:**
+```json
+[
+  {
+    "path": "src/components/Button.tsx",
+    "agentId": "agent-1",
+    "timestamp": "2024-01-11T19:00:00Z",
+    "expiresAt": "2024-01-11T19:01:00Z"
+  }
+]
+```
+
+**How It Works:**
+
+```
+Agent-1 wants to edit Button.tsx
+    │
+    ▼
+acquireLease("src/components/Button.tsx", 60000)
+    │
+    ├─► Load leases.json from disk
+    ├─► Check if file already leased by another agent
+    │      └─► If yes: RETURN FALSE (blocked)
+    │      └─► If no: Continue
+    ├─► Create lease with 60s expiry
+    ├─► Save to leases.json
+    └─► RETURN TRUE (acquired)
+
+Agent-1 edits file...
+    │
+    ▼
+releaseLease("src/components/Button.tsx")
+    │
+    └─► Remove from leases.json
+```
+
+**Key Features:**
+
+| Feature | How It Works |
+|---------|--------------|
+| **Shared state** | `leases.json` on disk - all agents read/write same file |
+| **Auto-expiry** | Leases expire after duration (default 60s) |
+| **Cleanup** | Every 60s, expired leases are removed |
+| **Renewal** | Long tasks can call `renewLease()` to extend |
+| **Graceful shutdown** | Agent releases all its leases on `close()` |
+
+**API Usage:**
+```typescript
+const mail = jetpack.getMCPMailAdapter();
+
+// Acquire a lease (blocks other agents)
+const acquired = await mail.acquireLease("src/Button.tsx", 60000);
+if (!acquired) {
+  // File is locked by another agent - skip or wait
+}
+
+// Check if file is leased
+const { leased, agentId } = await mail.isLeased("src/Button.tsx");
+
+// Extend lease for long operations
+await mail.renewLease("src/Button.tsx", 60000);
+
+// Release when done
+await mail.releaseLease("src/Button.tsx");
+```
+
+**Conflict Handling:**
+- If an agent tries to edit a file another agent is working on, `acquireLease()` returns `false`
+- The blocked agent logs a warning and looks for other work
+- If an agent crashes, leases auto-expire after 60s
+- Long-running tasks should call `renewLease()` periodically
+
+---
+
 ### LangGraph Supervisor (Orchestration)
 
 The Supervisor uses LangGraph to break down high-level requests into tasks and coordinate their execution.
