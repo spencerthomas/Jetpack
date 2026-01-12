@@ -84,6 +84,31 @@ const PRIORITY_COLORS: Record<string, string> = {
   critical: 'bg-[#ef4444]/20 text-[#ef4444]',
 };
 
+// Task type colors for hierarchy levels
+type TaskType = 'Epic' | 'Task' | 'Sub-task' | 'Leaf';
+
+const TASK_TYPE_COLORS: Record<TaskType, string> = {
+  'Epic': 'text-[#a855f7]',      // Purple
+  'Task': 'text-[#3b82f6]',      // Blue
+  'Sub-task': 'text-[#8b8b8e]',  // Gray
+  'Leaf': 'text-[#22c55e]',      // Green
+};
+
+const TASK_TYPE_BG: Record<TaskType, string> = {
+  'Epic': 'bg-[#a855f7]/10',
+  'Task': 'bg-[#3b82f6]/10',
+  'Sub-task': 'bg-[#8b8b8e]/10',
+  'Leaf': 'bg-[#22c55e]/10',
+};
+
+// Get task type based on depth and children
+const getTaskType = (depth: number, hasChildren: boolean): TaskType => {
+  if (depth === 0) return 'Epic';
+  if (depth === 1) return hasChildren ? 'Task' : 'Leaf';
+  if (depth === 2) return hasChildren ? 'Sub-task' : 'Leaf';
+  return 'Leaf';
+};
+
 // Hierarchical task node for tree view
 interface TaskNode {
   task: Task;
@@ -561,24 +586,23 @@ function BeadRow({
         animation: `fadeInRow 0.2s ease-out ${index * 0.02}s both`,
       }}
     >
-      {/* Tree connectors */}
-      <div className="flex items-center mr-2" style={{ width: `${depth * 28 + 24}px` }}>
-        {/* Parent path lines */}
+      {/* Tree connectors - proper ASCII tree lines */}
+      <div className="flex items-center mr-2 text-[#3a3a3f]" style={{ minWidth: `${depth * 20 + 8}px` }}>
+        {/* Parent path vertical lines */}
         {parentPath.map((showLine, i) => (
           <span
             key={i}
-            className={clsx(
-              'inline-block w-7 text-center text-[#26262a]',
-              showLine ? 'border-l border-[#26262a]' : ''
-            )}
+            className="inline-block w-5 text-left"
           >
-            {i === parentPath.length - 1 && ''}
+            {showLine ? '│' : ' '}
           </span>
         ))}
 
         {/* Current level connector */}
         {depth > 0 && (
-          <span className="text-[#26262a] w-7 text-center">—</span>
+          <span className="inline-block w-5 text-left whitespace-pre">
+            {node.isLast ? '└─' : '├─'}
+          </span>
         )}
       </div>
 
@@ -622,12 +646,26 @@ function BeadRow({
 
       {/* Hierarchical ID */}
       <span className={clsx(
-        'w-32 flex-shrink-0 mr-4',
+        'w-28 flex-shrink-0 mr-2',
         isActive ? 'text-[#f7f8f8]' : 'text-[#8b8b8e]',
         isCompleted && 'text-[#8b8b8e]/60'
       )}>
         {hierarchicalId}
       </span>
+
+      {/* Task Type Label */}
+      {(() => {
+        const taskType = getTaskType(depth, hasChildren);
+        return (
+          <span className={clsx(
+            'w-16 flex-shrink-0 mr-3 px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-wider text-center',
+            TASK_TYPE_COLORS[taskType],
+            TASK_TYPE_BG[taskType]
+          )}>
+            {taskType}
+          </span>
+        );
+      })()}
 
       {/* Title */}
       <span className={clsx(
@@ -646,22 +684,30 @@ function BeadRow({
         {task.status.replace('_', '-')}
       </span>
 
-      {/* Progress bars */}
-      <div className="flex items-center gap-0.5 w-8">
-        {[1, 2, 3].map((barIndex) => (
-          <div
-            key={barIndex}
-            className={clsx(
-              'w-1.5 h-4 rounded-sm transition-all duration-300',
-              barIndex <= progressBars
-                ? 'bg-[rgb(79,255,238)]'
-                : 'bg-[#26262a]'
-            )}
-            style={{
-              opacity: barIndex <= progressBars ? 1 : 0.3,
-            }}
-          />
-        ))}
+      {/* Progress bars with percentage */}
+      <div className="flex items-center gap-1.5 w-20 justify-end">
+        <div className="flex items-center gap-0.5">
+          {[1, 2, 3].map((barIndex) => (
+            <div
+              key={barIndex}
+              className={clsx(
+                'w-1.5 h-4 rounded-sm transition-all duration-300',
+                barIndex <= progressBars
+                  ? 'bg-[rgb(79,255,238)]'
+                  : 'bg-[#26262a]'
+              )}
+              style={{
+                opacity: barIndex <= progressBars ? 1 : 0.3,
+              }}
+            />
+          ))}
+        </div>
+        <span className={clsx(
+          'text-[10px] w-8 text-right tabular-nums',
+          progress === 100 ? 'text-[#22c55e]' : 'text-[#8b8b8e]'
+        )}>
+          {progress}%
+        </span>
       </div>
     </div>
   );

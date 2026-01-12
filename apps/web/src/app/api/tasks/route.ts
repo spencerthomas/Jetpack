@@ -2,9 +2,14 @@ import { NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+// Get working directory from environment variable or default to repo root
+function getWorkDir(): string {
+  return process.env.JETPACK_WORK_DIR || path.join(process.cwd(), '../..');
+}
+
 // Read directly from tasks.jsonl to stay in sync with CLI orchestrator
 async function loadTasksFromFile() {
-  const beadsDir = path.join(process.cwd(), '../..', '.beads');
+  const beadsDir = path.join(getWorkDir(), '.beads');
   const tasksFile = path.join(beadsDir, 'tasks.jsonl');
 
   try {
@@ -58,7 +63,7 @@ function generateTaskId(): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const beadsDir = path.join(process.cwd(), '../..', '.beads');
+    const beadsDir = path.join(getWorkDir(), '.beads');
     const tasksFile = path.join(beadsDir, 'tasks.jsonl');
 
     const now = new Date();

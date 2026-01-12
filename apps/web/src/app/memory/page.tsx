@@ -321,7 +321,6 @@ export default function MemoryPage() {
             {/* Type buttons */}
             {Object.entries(TYPE_COLORS).map(([type, colors]) => {
               const count = stats?.stats.byType[type] ?? 0;
-              const percentage = stats?.stats.total ? Math.round((count / stats.stats.total) * 100) : 0;
 
               return (
                 <button
@@ -405,7 +404,7 @@ export default function MemoryPage() {
                               {typeColors.label}
                             </span>
                             {memory.hasEmbedding && (
-                              <Sparkles className="w-3 h-3 text-purple-400" title="Has embedding" />
+                              <span title="Has embedding"><Sparkles className="w-3 h-3 text-purple-400" /></span>
                             )}
                           </div>
                           <p className="text-sm text-primary line-clamp-2">{memory.content}</p>

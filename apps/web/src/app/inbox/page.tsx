@@ -362,79 +362,7 @@ export default function InboxPage() {
     return name.charAt(0).toUpperCase();
   };
 
-  // Filter messages
-  const filteredMessages = useMemo(() => {
-    let filtered = messages.filter(msg => msg.type !== 'heartbeat');
-
-    // Category filter
-    if (selectedCategory === 'unread') {
-      filtered = filtered.filter(msg => !readMessages.has(msg.id));
-    } else if (selectedCategory === 'task') {
-      filtered = filtered.filter(msg => msg.type.startsWith('task.'));
-    } else if (selectedCategory === 'agent') {
-      filtered = filtered.filter(msg => msg.type.startsWith('agent.'));
-    } else if (selectedCategory === 'direct') {
-      filtered = filtered.filter(msg => msg.source === 'direct');
-    } else if (selectedCategory === 'coordination') {
-      filtered = filtered.filter(msg => msg.type.startsWith('coordination.') || msg.type.startsWith('file.'));
-    } else if (selectedCategory === 'flow') {
-      // Flow view shows all - filtering happens in the visualization
-    } else if (selectedCategory === 'threads') {
-      // Show only messages that are part of threads
-      const threadMessageIds = new Set(threads.flatMap(t => t.messages.map(m => m.id)));
-      filtered = filtered.filter(msg => threadMessageIds.has(msg.id));
-    }
-
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(msg => {
-        const agentName = getAgentName(msg.from).toLowerCase();
-        const type = msg.type.toLowerCase();
-        const summary = getPayloadSummary(msg.payload).toLowerCase();
-        return agentName.includes(query) || type.includes(query) || summary.includes(query);
-      });
-    }
-
-    return filtered;
-  }, [messages, selectedCategory, searchQuery, readMessages, agents]);
-
-  // Compute agent flow data for visualization
-  const agentFlowData = useMemo(() => {
-    const flows: Map<string, { from: string; to: string; count: number; types: string[] }> = new Map();
-    const agentSet = new Set<string>();
-
-    for (const msg of messages) {
-      if (msg.type === 'heartbeat') continue;
-      agentSet.add(msg.from);
-      if (msg.to) {
-        agentSet.add(msg.to);
-        const key = `${msg.from}->${msg.to}`;
-        const existing = flows.get(key);
-        if (existing) {
-          existing.count++;
-          if (!existing.types.includes(msg.type)) {
-            existing.types.push(msg.type);
-          }
-        } else {
-          flows.set(key, { from: msg.from, to: msg.to, count: 1, types: [msg.type] });
-        }
-      }
-    }
-
-    return {
-      agents: Array.from(agentSet),
-      flows: Array.from(flows.values()),
-    };
-  }, [messages]);
-
-  // Count unread messages per category
-  const unreadCount = useMemo(() => {
-    const nonHeartbeat = messages.filter(m => m.type !== 'heartbeat');
-    return nonHeartbeat.filter(m => !readMessages.has(m.id)).length;
-  }, [messages, readMessages]);
-
-  // Group messages into threads by correlationId
+  // Group messages into threads by correlationId (must be before filteredMessages which uses it)
   const threads = useMemo(() => {
     const threadMap = new Map<string, ExtendedMessage[]>();
 
@@ -487,6 +415,78 @@ export default function InboxPage() {
     // Sort threads by latest timestamp
     return threadList.sort((a, b) => b.latestTimestamp.getTime() - a.latestTimestamp.getTime());
   }, [messages]);
+
+  // Filter messages
+  const filteredMessages = useMemo(() => {
+    let filtered = messages.filter(msg => msg.type !== 'heartbeat');
+
+    // Category filter
+    if (selectedCategory === 'unread') {
+      filtered = filtered.filter(msg => !readMessages.has(msg.id));
+    } else if (selectedCategory === 'task') {
+      filtered = filtered.filter(msg => msg.type.startsWith('task.'));
+    } else if (selectedCategory === 'agent') {
+      filtered = filtered.filter(msg => msg.type.startsWith('agent.'));
+    } else if (selectedCategory === 'direct') {
+      filtered = filtered.filter(msg => msg.source === 'direct');
+    } else if (selectedCategory === 'coordination') {
+      filtered = filtered.filter(msg => msg.type.startsWith('coordination.') || msg.type.startsWith('file.'));
+    } else if (selectedCategory === 'flow') {
+      // Flow view shows all - filtering happens in the visualization
+    } else if (selectedCategory === 'threads') {
+      // Show only messages that are part of threads
+      const threadMessageIds = new Set(threads.flatMap(t => t.messages.map(m => m.id)));
+      filtered = filtered.filter(msg => threadMessageIds.has(msg.id));
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(msg => {
+        const agentName = getAgentName(msg.from).toLowerCase();
+        const type = msg.type.toLowerCase();
+        const summary = getPayloadSummary(msg.payload).toLowerCase();
+        return agentName.includes(query) || type.includes(query) || summary.includes(query);
+      });
+    }
+
+    return filtered;
+  }, [messages, selectedCategory, searchQuery, readMessages, agents, threads]);
+
+  // Compute agent flow data for visualization
+  const agentFlowData = useMemo(() => {
+    const flows: Map<string, { from: string; to: string; count: number; types: string[] }> = new Map();
+    const agentSet = new Set<string>();
+
+    for (const msg of messages) {
+      if (msg.type === 'heartbeat') continue;
+      agentSet.add(msg.from);
+      if (msg.to) {
+        agentSet.add(msg.to);
+        const key = `${msg.from}->${msg.to}`;
+        const existing = flows.get(key);
+        if (existing) {
+          existing.count++;
+          if (!existing.types.includes(msg.type)) {
+            existing.types.push(msg.type);
+          }
+        } else {
+          flows.set(key, { from: msg.from, to: msg.to, count: 1, types: [msg.type] });
+        }
+      }
+    }
+
+    return {
+      agents: Array.from(agentSet),
+      flows: Array.from(flows.values()),
+    };
+  }, [messages]);
+
+  // Count unread messages per category
+  const unreadCount = useMemo(() => {
+    const nonHeartbeat = messages.filter(m => m.type !== 'heartbeat');
+    return nonHeartbeat.filter(m => !readMessages.has(m.id)).length;
+  }, [messages, readMessages]);
 
   // Thread count for sidebar
   const threadCount = threads.length;

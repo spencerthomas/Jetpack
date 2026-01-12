@@ -2,15 +2,24 @@ import { NextResponse } from 'next/server';
 import { JetpackOrchestrator } from '@jetpack/orchestrator';
 import path from 'path';
 
+// Get working directory from environment variable or default to repo root
+function getWorkDir(): string {
+  return process.env.JETPACK_WORK_DIR || path.join(process.cwd(), '../..');
+}
+
 let orchestrator: JetpackOrchestrator | null = null;
+let currentWorkDir: string | null = null;
 
 async function getOrchestrator() {
-  if (!orchestrator) {
+  const workDir = getWorkDir();
+  // Reinitialize if workDir changed
+  if (!orchestrator || currentWorkDir !== workDir) {
     orchestrator = new JetpackOrchestrator({
-      workDir: path.join(process.cwd(), '../..'),
+      workDir,
       autoStart: false,
     });
     await orchestrator.initialize();
+    currentWorkDir = workDir;
   }
   return orchestrator;
 }

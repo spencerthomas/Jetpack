@@ -90,7 +90,7 @@ const program = new Command();
 let webServerProcess: ChildProcess | null = null;
 
 // Function to start the web UI
-async function startWebUI(port: number = 3002): Promise<boolean> {
+async function startWebUI(port: number = 3002, workDir?: string): Promise<boolean> {
   return new Promise((resolve) => {
     // Find the web app directory
     const webAppDir = path.resolve(__dirname, '../../web');
@@ -102,6 +102,10 @@ async function startWebUI(port: number = 3002): Promise<boolean> {
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: false,
       shell: true,
+      env: {
+        ...process.env,
+        JETPACK_WORK_DIR: workDir || process.cwd(),
+      },
     });
 
     let started = false;
@@ -346,7 +350,7 @@ program
       // 3. Start web UI (unless --no-ui)
       if (options.ui !== false) {
         spinner.start('Starting web UI...');
-        const webStarted = await startWebUI(port);
+        const webStarted = await startWebUI(port, options.dir);
         if (webStarted) {
           spinner.succeed(chalk.green('Web UI started'));
         } else {
