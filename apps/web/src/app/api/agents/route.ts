@@ -18,9 +18,14 @@ interface AgentRegistry {
   updatedAt: string;
 }
 
+// Get work directory from env or default
+function getWorkDir(): string {
+  return process.env.JETPACK_WORK_DIR || path.join(process.cwd(), '../..');
+}
+
 // Read agent registry from .jetpack/agents.json
 async function loadAgentRegistry(): Promise<AgentRegistry> {
-  const registryPath = path.join(process.cwd(), '../..', '.jetpack', 'agents.json');
+  const registryPath = path.join(getWorkDir(), '.jetpack', 'agents.json');
 
   try {
     const content = await fs.readFile(registryPath, 'utf-8');

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Moon, Bell, Keyboard, Terminal, Brain, Loader2, Check, AlertCircle } from 'lucide-react';
+import { Moon, Bell, Keyboard, Terminal, Brain, Loader2, Check, AlertCircle, Users, Plus, X } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
 
 interface CASSSettings {
@@ -17,6 +17,37 @@ interface CASSSettings {
   maxEntries: number;
 }
 
+// Agent skills and presets
+const ALL_SKILLS = [
+  'typescript', 'python', 'rust', 'go', 'java',
+  'react', 'vue',
+  'backend', 'frontend', 'devops', 'database', 'testing', 'documentation',
+  'sql', 'data', 'ml', 'api', 'security', 'mobile',
+] as const;
+
+type AgentSkill = typeof ALL_SKILLS[number];
+
+interface AgentPreset {
+  name: string;
+  skills: AgentSkill[];
+}
+
+const DEFAULT_PRESETS: Record<string, AgentSkill[]> = {
+  'Frontend Developer': ['typescript', 'react', 'vue', 'frontend', 'testing'],
+  'Backend Developer': ['typescript', 'python', 'backend', 'database', 'devops'],
+  'Full Stack': ['typescript', 'react', 'backend', 'database', 'testing'],
+  'Data Engineer': ['python', 'sql', 'database', 'data'],
+  'ML Engineer': ['python', 'data', 'ml', 'testing'],
+  'DevOps Engineer': ['go', 'devops', 'backend', 'security'],
+  'QA Engineer': ['typescript', 'python', 'testing', 'documentation'],
+  'Custom': [],
+};
+
+interface AgentConfig {
+  defaultCount: number;
+  presets: AgentPreset[];
+}
+
 export default function SettingsPage() {
   // CASS settings state
   const [cassSettings, setCassSettings] = useState<CASSSettings | null>(null);
@@ -24,6 +55,16 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Agent config state
+  const [agentConfig, setAgentConfig] = useState<AgentConfig>({
+    defaultCount: 3,
+    presets: [
+      { name: 'Frontend Developer', skills: ['typescript', 'react', 'vue', 'frontend', 'testing'] },
+      { name: 'Backend Developer', skills: ['typescript', 'python', 'backend', 'database', 'devops'] },
+      { name: 'Full Stack', skills: ['typescript', 'react', 'backend', 'database', 'testing'] },
+    ],
+  });
 
   // Load settings on mount
   useEffect(() => {
@@ -33,6 +74,9 @@ export default function SettingsPage() {
         if (res.ok) {
           const data = await res.json();
           setCassSettings(data.cass);
+          if (data.agents) {
+            setAgentConfig(data.agents);
+          }
         }
       } catch (err) {
         console.error('Failed to load settings:', err);
@@ -63,6 +107,7 @@ export default function SettingsPage() {
           compactionThreshold: cassSettings.compactionThreshold,
           maxEntries: cassSettings.maxEntries,
         },
+        agents: agentConfig,
       };
 
       // Save settings
@@ -257,6 +302,168 @@ export default function SettingsPage() {
             </div>
           </section>
 
+          {/* Agent Configuration */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="w-5 h-5 text-secondary" />
+              <h2 className="text-base font-medium text-primary">Agent Configuration</h2>
+            </div>
+            <div className="space-y-4 pl-7">
+              {/* Default Agent Count */}
+              <div>
+                <p className="text-sm font-medium text-primary mb-2">Default Agent Count</p>
+                <Input
+                  type="number"
+                  value={agentConfig.defaultCount}
+                  onChange={(e) =>
+                    setAgentConfig((prev) => ({
+                      ...prev,
+                      defaultCount: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)),
+                    }))
+                  }
+                  min="1"
+                  max="10"
+                  className="w-24"
+                />
+                <p className="text-xs text-muted mt-1.5">
+                  Number of agents to spawn when starting Jetpack (1-10)
+                </p>
+              </div>
+
+              {/* Agent Skill Presets */}
+              <div>
+                <p className="text-sm font-medium text-primary mb-3">Agent Skill Presets</p>
+                <div className="space-y-3">
+                  {agentConfig.presets.map((preset, index) => (
+                    <div
+                      key={index}
+                      className="p-3 bg-hover rounded-lg border border-default"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-xs text-muted font-medium">Agent {index + 1}:</span>
+                        <select
+                          value={preset.name}
+                          onChange={(e) => {
+                            const newPresets = [...agentConfig.presets];
+                            const newName = e.target.value;
+                            newPresets[index] = {
+                              name: newName,
+                              skills: newName === 'Custom'
+                                ? preset.skills
+                                : [...(DEFAULT_PRESETS[newName] || [])],
+                            };
+                            setAgentConfig((prev) => ({ ...prev, presets: newPresets }));
+                          }}
+                          className="flex-1 px-2 py-1 text-sm bg-surface border border-default rounded text-primary focus:outline-none focus:ring-1 focus:ring-accent-purple"
+                        >
+                          {Object.keys(DEFAULT_PRESETS).map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                        {agentConfig.presets.length > 1 && (
+                          <button
+                            onClick={() => {
+                              const newPresets = agentConfig.presets.filter((_, i) => i !== index);
+                              setAgentConfig((prev) => ({ ...prev, presets: newPresets }));
+                            }}
+                            className="p-1 text-muted hover:text-red-400 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {preset.skills.map((skill) => (
+                          <span
+                            key={skill}
+                            className="px-2 py-0.5 text-[10px] font-medium bg-accent-purple/20 text-accent-purple rounded"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                        {preset.skills.length === 0 && (
+                          <span className="text-xs text-muted">No skills selected</span>
+                        )}
+                      </div>
+                      {/* Custom skill selection */}
+                      {preset.name === 'Custom' && (
+                        <div className="mt-2 pt-2 border-t border-default">
+                          <p className="text-xs text-muted mb-2">Select skills:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {ALL_SKILLS.map((skill) => (
+                              <button
+                                key={skill}
+                                onClick={() => {
+                                  const newPresets = [...agentConfig.presets];
+                                  const hasSkill = preset.skills.includes(skill);
+                                  newPresets[index] = {
+                                    ...preset,
+                                    skills: hasSkill
+                                      ? preset.skills.filter((s) => s !== skill)
+                                      : [...preset.skills, skill],
+                                  };
+                                  setAgentConfig((prev) => ({ ...prev, presets: newPresets }));
+                                }}
+                                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
+                                  preset.skills.includes(skill)
+                                    ? 'bg-accent-purple/20 text-accent-purple'
+                                    : 'bg-hover text-muted hover:text-primary'
+                                }`}
+                              >
+                                {skill}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add Agent Slot */}
+                <div className="flex items-center gap-2 mt-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (agentConfig.presets.length < 10) {
+                        setAgentConfig((prev) => ({
+                          ...prev,
+                          presets: [
+                            ...prev.presets,
+                            { name: 'Full Stack', skills: [...DEFAULT_PRESETS['Full Stack']] },
+                          ],
+                        }));
+                      }
+                    }}
+                    disabled={agentConfig.presets.length >= 10}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Agent Slot
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setAgentConfig({
+                        defaultCount: 3,
+                        presets: [
+                          { name: 'Frontend Developer', skills: [...DEFAULT_PRESETS['Frontend Developer']] },
+                          { name: 'Backend Developer', skills: [...DEFAULT_PRESETS['Backend Developer']] },
+                          { name: 'Full Stack', skills: [...DEFAULT_PRESETS['Full Stack']] },
+                        ],
+                      });
+                    }}
+                  >
+                    Reset to Defaults
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Appearance */}
           <section>
             <div className="flex items-center gap-2 mb-4">
@@ -365,19 +572,6 @@ export default function SettingsPage() {
                 />
                 <p className="text-xs text-muted mt-1.5">
                   Directory where task files are stored
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-primary mb-2">Default Agent Count</p>
-                <Input
-                  type="number"
-                  defaultValue="3"
-                  min="1"
-                  max="10"
-                  className="w-24"
-                />
-                <p className="text-xs text-muted mt-1.5">
-                  Number of agents to spawn by default
                 </p>
               </div>
             </div>

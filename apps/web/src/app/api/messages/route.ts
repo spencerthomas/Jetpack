@@ -9,13 +9,21 @@ interface ExtendedMessage extends Message {
   direction?: 'sent' | 'received';
 }
 
-// Singleton message index
+// Get work directory from env or default
+function getWorkDir(): string {
+  return process.env.JETPACK_WORK_DIR || path.join(process.cwd(), '../..');
+}
+
+// Singleton message index - track workdir to reinitialize if changed
 let messageIndex: MessageIndex | null = null;
+let currentWorkDir: string | null = null;
 
 function getMessageIndex(): MessageIndex {
-  if (!messageIndex) {
-    const indexDir = path.join(process.cwd(), '../..', '.jetpack', 'mail');
+  const workDir = getWorkDir();
+  if (!messageIndex || currentWorkDir !== workDir) {
+    const indexDir = path.join(workDir, '.jetpack', 'mail');
     messageIndex = createMessageIndex({ indexDir });
+    currentWorkDir = workDir;
   }
   return messageIndex;
 }
@@ -143,7 +151,7 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '100', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    const mailBaseDir = path.join(process.cwd(), '../..', '.jetpack', 'mail');
+    const mailBaseDir = path.join(getWorkDir(), '.jetpack', 'mail');
 
     // If there's a search query, use the indexed search
     if (query && query.trim()) {

@@ -2,12 +2,24 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import KanbanBoard from '@/components/KanbanBoard';
+import StatusDashboard from '@/components/StatusDashboard';
+import ActivityFeed from '@/components/ActivityFeed';
+import QueueDisplay from '@/components/QueueDisplay';
 import { Task } from '@jetpack/shared';
 import { Plus, Scan, CheckCircle2, X, LayoutGrid, Clock, Tag, User, Link2, AlertCircle, ExternalLink, ChevronRight, ChevronDown, GitBranch, Box, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui';
 import CreateTaskModal from '@/components/CreateTaskModal';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
+
+// Agent type for status dashboard
+interface Agent {
+  id: string;
+  name: string;
+  status: 'idle' | 'busy' | 'offline' | 'error';
+  skills: string[];
+  currentTask: string | null;
+}
 
 // Animation styles for the board
 const boardAnimationStyles = `
@@ -122,6 +134,7 @@ interface TaskNode {
 
 export default function BoardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [phase, setPhase] = useState<BoardPhase>('idle');
@@ -173,23 +186,31 @@ export default function BoardPage() {
   }, [tasks]);
 
   useEffect(() => {
-    async function fetchTasks() {
+    async function fetchData() {
       try {
-        const res = await fetch('/api/tasks');
-        const data = await res.json();
-        setTasks(data.tasks || []);
+        // Fetch tasks and agents in parallel
+        const [tasksRes, agentsRes] = await Promise.all([
+          fetch('/api/tasks'),
+          fetch('/api/agents'),
+        ]);
+
+        const tasksData = await tasksRes.json();
+        const agentsData = await agentsRes.json();
+
+        setTasks(tasksData.tasks || []);
+        setAgents(agentsData.agents || []);
         setIsConnected(true);
         setLastUpdate(new Date());
       } catch (error) {
-        console.error('Failed to fetch tasks:', error);
+        console.error('Failed to fetch data:', error);
         setIsConnected(false);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchTasks();
-    const interval = setInterval(fetchTasks, 2000);
+    fetchData();
+    const interval = setInterval(fetchData, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -295,6 +316,18 @@ export default function BoardPage() {
           </div>
         </div>
 
+        {/* Status Dashboard */}
+        <StatusDashboard tasks={tasks} agents={agents} />
+
+        {/* Queue Display - show pending/blocked tasks */}
+        <QueueDisplay
+          tasks={tasks}
+          onTaskClick={(taskId) => {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) setSelectedTask(task);
+          }}
+        />
+
         {/* Main Content Area */}
         <div className="flex-1 overflow-hidden relative flex">
           {/* Scan line overlay when scanning */}
@@ -328,6 +361,9 @@ export default function BoardPage() {
             <TaskDetailPanel task={selectedTask} onClose={() => setSelectedTask(null)} allTasks={tasks} />
           )}
         </div>
+
+        {/* Activity Feed */}
+        <ActivityFeed maxEvents={30} defaultExpanded={false} />
 
         {/* CLI Command Footer */}
         <div className="border-t border-[#26262a] bg-[#0d0d0f] px-6 py-3 flex items-center justify-between">
