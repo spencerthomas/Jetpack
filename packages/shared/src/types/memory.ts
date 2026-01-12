@@ -6,6 +6,11 @@ export const MemoryTypeSchema = z.enum([
   'pattern_recognition',
   'conversation_history',
   'decision_rationale',
+  // Quality and self-improvement types
+  'test_failure_analysis',    // Analysis of why tests failed
+  'quality_improvement',      // Learnings about improving code quality
+  'regression_pattern',       // Patterns that cause regressions
+  'successful_fix',           // How a regression was successfully fixed
 ]);
 export type MemoryType = z.infer<typeof MemoryTypeSchema>;
 
