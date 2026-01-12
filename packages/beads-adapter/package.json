@@ -1,15 +1,40 @@
 {
   "name": "@jetpack/beads-adapter",
   "version": "0.1.0",
+  "description": "Git-backed task management adapter for Jetpack (Steve Yegge's Beads system)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jetpack",
+    "beads",
+    "task-management",
+    "git",
+    "ai-agents"
+  ],
+  "author": "Tom Spencer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spencerthomas/Jetpack.git",
+    "directory": "packages/beads-adapter"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/shared": "workspace:*",
+    "@jetpack/shared": "^0.1.0",
     "simple-git": "^3.27.0",
     "zod": "^3.24.1"
   },

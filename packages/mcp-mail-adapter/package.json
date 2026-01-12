@@ -1,17 +1,43 @@
 {
   "name": "@jetpack/mcp-mail-adapter",
   "version": "0.1.0",
+  "description": "Inter-agent pub/sub messaging and file leasing for Jetpack",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jetpack",
+    "mcp",
+    "messaging",
+    "pub-sub",
+    "file-locking",
+    "ai-agents"
+  ],
+  "author": "Tom Spencer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spencerthomas/Jetpack.git",
+    "directory": "packages/mcp-mail-adapter"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/shared": "workspace:*",
+    "@jetpack/shared": "^0.1.0",
     "better-sqlite3": "^11.8.1",
     "eventemitter3": "^5.0.1",
     "zod": "^3.24.1"

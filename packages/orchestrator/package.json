@@ -1,21 +1,47 @@
 {
   "name": "@jetpack/orchestrator",
   "version": "0.1.0",
+  "description": "Multi-agent orchestration engine for Jetpack swarm development",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jetpack",
+    "orchestrator",
+    "multi-agent",
+    "swarm",
+    "ai-agents",
+    "coordination"
+  ],
+  "author": "Tom Spencer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spencerthomas/Jetpack.git",
+    "directory": "packages/orchestrator"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/shared": "workspace:*",
-    "@jetpack/beads-adapter": "workspace:*",
-    "@jetpack/mcp-mail-adapter": "workspace:*",
-    "@jetpack/cass-adapter": "workspace:*",
-    "@jetpack/supervisor": "workspace:*",
+    "@jetpack/shared": "^0.1.0",
+    "@jetpack/beads-adapter": "^0.1.0",
+    "@jetpack/mcp-mail-adapter": "^0.1.0",
+    "@jetpack/cass-adapter": "^0.1.0",
+    "@jetpack/supervisor": "^0.1.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

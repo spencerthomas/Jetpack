@@ -4,6 +4,7 @@ export * from './types/task';
 export * from './types/message';
 export * from './types/memory';
 export * from './types/user';
+export * from './types/runtime';
 
 // Utilities
 export * from './utils/logger';

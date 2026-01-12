@@ -94,9 +94,21 @@ Jetpack has a layered architecture with three core storage adapters and an optio
 
 ### Installation
 
+**Option 1: Install from npm (recommended)**
+
+```bash
+# Install globally
+npm install -g @jetpack/cli
+
+# Now use from anywhere
+jetpack start --agents 3
+```
+
+**Option 2: Build from source**
+
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/spencerthomas/Jetpack.git
 cd Jetpack
 
 # Install dependencies
@@ -104,6 +116,9 @@ pnpm install
 
 # Build all packages
 pnpm build
+
+# Run via pnpm
+pnpm jetpack start --agents 3
 ```
 
 ### Getting Started

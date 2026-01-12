@@ -1,20 +1,47 @@
 {
   "name": "@jetpack/cli",
   "version": "0.1.0",
-  "description": "Jetpack CLI - Multi-Agent Swarm Development",
+  "description": "Jetpack CLI - Multi-Agent Swarm Development orchestration tool",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
     "jetpack": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jetpack",
+    "cli",
+    "multi-agent",
+    "swarm",
+    "ai-agents",
+    "development",
+    "orchestration"
+  ],
+  "author": "Tom Spencer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spencerthomas/Jetpack.git",
+    "directory": "apps/cli"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/orchestrator": "workspace:*",
-    "@jetpack/shared": "workspace:*",
+    "@jetpack/orchestrator": "^0.1.0",
+    "@jetpack/shared": "^0.1.0",
     "commander": "^12.1.0",
     "chalk": "^4.1.2",
     "ora": "^5.4.1"

@@ -7,7 +7,12 @@ import {
   AgentSkill,
   Logger,
   generateTaskId,
+  RuntimeLimits,
+  RuntimeStats,
+  EndState,
+  RuntimeEvent,
 } from '@jetpack/shared';
+import { RuntimeManager } from './RuntimeManager';
 
 // Simple frontmatter parser
 interface TaskFrontmatter {
@@ -63,6 +68,9 @@ export interface JetpackConfig {
   workDir: string;
   numAgents?: number;
   autoStart?: boolean;
+  runtimeLimits?: Partial<RuntimeLimits>;
+  onEndState?: (endState: EndState, stats: RuntimeStats) => void | Promise<void>;
+  onRuntimeEvent?: (event: RuntimeEvent) => void;
 }
 
 export interface AgentRegistryEntry {
@@ -94,6 +102,7 @@ export class JetpackOrchestrator {
   private agentTasksCompleted: Map<string, number> = new Map();
   private agentStartTimes: Map<string, Date> = new Map();
   private registryUpdateInterval?: NodeJS.Timeout;
+  private runtimeManager?: RuntimeManager;
 
   constructor(private config: JetpackConfig) {
     this.logger = new Logger('Jetpack');
@@ -130,7 +139,43 @@ export class JetpackOrchestrator {
     this.cass = new CASSAdapter(cassConfig);
     await this.cass.initialize();
 
+    // Initialize RuntimeManager if limits are configured
+    if (this.config.runtimeLimits) {
+      this.runtimeManager = new RuntimeManager({
+        workDir: this.workDir,
+        limits: this.config.runtimeLimits,
+        onEndState: async (endState, stats) => {
+          this.logger.info(`Runtime end state: ${endState}`);
+          await this.handleRuntimeEndState(endState, stats);
+          if (this.config.onEndState) {
+            await this.config.onEndState(endState, stats);
+          }
+        },
+        onEvent: (event) => {
+          if (this.config.onRuntimeEvent) {
+            this.config.onRuntimeEvent(event);
+          }
+        },
+      });
+    }
+
     this.logger.info('Jetpack orchestrator initialized');
+  }
+
+  /**
+   * Handle runtime end state by gracefully shutting down
+   */
+  private async handleRuntimeEndState(endState: EndState, stats: RuntimeStats): Promise<void> {
+    this.logger.info(`Handling end state: ${endState}`, stats);
+
+    // Stop accepting new tasks
+    this.stopTaskFileWatcher();
+
+    // Stop the supervisor if running
+    // (supervisor will finish current iteration)
+
+    // Stop all agents
+    await this.stopAgents();
   }
 
   async startAgents(count: number = 3): Promise<void> {

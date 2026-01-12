@@ -1,23 +1,48 @@
 {
   "name": "@jetpack/supervisor",
   "version": "0.1.0",
-  "description": "LangGraph Supervisor Agent for multi-agent orchestration",
+  "description": "LangGraph Supervisor Agent for intelligent multi-agent orchestration",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jetpack",
+    "langgraph",
+    "supervisor",
+    "multi-agent",
+    "orchestration",
+    "ai-agents"
+  ],
+  "author": "Tom Spencer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spencerthomas/Jetpack.git",
+    "directory": "packages/supervisor"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@langchain/core": "^0.3.26",
     "@langchain/langgraph": "^0.2.41",
     "@langchain/anthropic": "^0.3.14",
     "@langchain/openai": "^0.3.17",
-    "@jetpack/shared": "workspace:*",
-    "@jetpack/beads-adapter": "workspace:*",
-    "@jetpack/mcp-mail-adapter": "workspace:*",
-    "@jetpack/cass-adapter": "workspace:*",
+    "@jetpack/shared": "^0.1.0",
+    "@jetpack/beads-adapter": "^0.1.0",
+    "@jetpack/mcp-mail-adapter": "^0.1.0",
+    "@jetpack/cass-adapter": "^0.1.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

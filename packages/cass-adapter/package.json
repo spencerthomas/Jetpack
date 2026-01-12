@@ -1,17 +1,43 @@
 {
   "name": "@jetpack/cass-adapter",
   "version": "0.1.0",
+  "description": "SQLite-based persistent agent memory for Jetpack (CASS - Claude Agent Storage System)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jetpack",
+    "cass",
+    "memory",
+    "sqlite",
+    "ai-agents",
+    "semantic-search"
+  ],
+  "author": "Tom Spencer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spencerthomas/Jetpack.git",
+    "directory": "packages/cass-adapter"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/shared": "workspace:*",
+    "@jetpack/shared": "^0.1.0",
     "zod": "^3.24.1",
     "better-sqlite3": "^11.8.1",
     "openai": "^4.76.0"
