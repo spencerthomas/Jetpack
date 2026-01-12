@@ -18,6 +18,8 @@ export interface AgentControllerConfig {
   workDir: string;
   onStatusChange?: () => void | Promise<void>;
   onTaskComplete?: (agentId: string) => void;
+  onTaskFailed?: (agentId: string, taskId: string, error: string) => void;
+  onCycleComplete?: () => void;
 }
 
 export class AgentController {
@@ -250,9 +252,19 @@ export class AgentController {
         },
         timestamp: new Date(),
       });
+
+      // Notify orchestrator of task failure
+      if (this.config.onTaskFailed) {
+        this.config.onTaskFailed(this.agent.id, task.id, (error as Error).message);
+      }
     } finally {
       this.currentTask = undefined;
       await this.updateStatus('idle', undefined);
+
+      // Notify orchestrator of cycle completion
+      if (this.config.onCycleComplete) {
+        this.config.onCycleComplete();
+      }
 
       // Look for more work
       setTimeout(() => this.lookForWork(), 1000);

@@ -40,8 +40,8 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/orchestrator": "^0.1.0",
-    "@jetpack/shared": "^0.1.0",
+    "@jetpack/orchestrator": "workspace:*",
+    "@jetpack/shared": "workspace:*",
     "commander": "^12.1.0",
     "chalk": "^4.1.2",
     "ora": "^5.4.1"

@@ -34,7 +34,6 @@ export interface RuntimeManagerConfig {
 export class RuntimeManager extends EventEmitter {
   private logger: Logger;
   private limits: RuntimeLimits;
-  private workDir: string;
   private stateFile: string;
 
   // Runtime tracking
@@ -55,7 +54,6 @@ export class RuntimeManager extends EventEmitter {
   constructor(config: RuntimeManagerConfig) {
     super();
     this.logger = new Logger('RuntimeManager');
-    this.workDir = config.workDir;
     this.stateFile = path.join(config.workDir, '.jetpack', 'runtime-state.json');
     this.limits = RuntimeLimitsSchema.parse(config.limits);
     this.onEndStateCallback = config.onEndState;
@@ -203,7 +201,6 @@ export class RuntimeManager extends EventEmitter {
 
     const now = Date.now();
     const elapsed = now - this.startedAt.getTime();
-    const stats = this.getStats();
 
     // Check runtime limit
     if (this.limits.maxRuntimeMs > 0 && elapsed >= this.limits.maxRuntimeMs) {

@@ -181,6 +181,11 @@ export class JetpackOrchestrator {
   async startAgents(count: number = 3): Promise<void> {
     this.logger.info(`Starting ${count} agents`);
 
+    // Start RuntimeManager if configured
+    if (this.runtimeManager) {
+      await this.runtimeManager.start();
+    }
+
     const skillSets: AgentSkill[][] = [
       ['typescript', 'react', 'frontend'],
       ['typescript', 'backend', 'database'],
@@ -209,7 +214,10 @@ export class JetpackOrchestrator {
         skills,
         workDir: this.config.workDir,
         onStatusChange: () => this.writeAgentRegistry(),
-        onTaskComplete: (agentId: string) => this.incrementAgentTaskCount(agentId),
+        onTaskComplete: (agentId: string) => this.handleAgentTaskComplete(agentId),
+        onTaskFailed: (agentId: string, taskId: string, error: string) =>
+          this.handleAgentTaskFailed(agentId, taskId, error),
+        onCycleComplete: () => this.handleAgentCycleComplete(),
       };
       const agent = new AgentController(agentConfig, this.beads, mail, this.cass);
 
@@ -439,6 +447,11 @@ export class JetpackOrchestrator {
   async shutdown(): Promise<void> {
     this.logger.info('Shutting down Jetpack');
 
+    // Stop RuntimeManager if running
+    if (this.runtimeManager?.isRunning()) {
+      await this.runtimeManager.stop('manual_stop');
+    }
+
     // Stop file watcher
     this.stopTaskFileWatcher();
 
@@ -449,6 +462,20 @@ export class JetpackOrchestrator {
     }
 
     this.logger.info('Jetpack shut down complete');
+  }
+
+  /**
+   * Get the RuntimeManager instance (if configured)
+   */
+  getRuntimeManager(): RuntimeManager | undefined {
+    return this.runtimeManager;
+  }
+
+  /**
+   * Get current runtime stats (if RuntimeManager is configured)
+   */
+  getRuntimeStats(): RuntimeStats | null {
+    return this.runtimeManager?.getStats() || null;
   }
 
   getBeadsAdapter(): BeadsAdapter {
@@ -549,13 +576,59 @@ export class JetpackOrchestrator {
   }
 
   /**
-   * Track task completion for agent metrics
+   * Handle agent task completion - updates metrics and notifies RuntimeManager
    */
-  incrementAgentTaskCount(agentId: string): void {
+  private handleAgentTaskComplete(agentId: string): void {
+    // Update metrics
     const current = this.agentTasksCompleted.get(agentId) || 0;
     this.agentTasksCompleted.set(agentId, current + 1);
-    // Update registry immediately
     this.writeAgentRegistry().catch(() => {});
+
+    // Notify RuntimeManager
+    if (this.runtimeManager) {
+      const agent = this.agents.find(a => a.getAgent().id === agentId);
+      const taskId = agent?.getCurrentTask()?.id || 'unknown';
+      this.runtimeManager.recordTaskComplete(taskId);
+    }
+  }
+
+  /**
+   * Handle agent task failure - notifies RuntimeManager
+   */
+  private handleAgentTaskFailed(_agentId: string, taskId: string, error: string): void {
+    if (this.runtimeManager) {
+      this.runtimeManager.recordTaskFailed(taskId, error);
+    }
+  }
+
+  /**
+   * Handle agent work cycle completion - notifies RuntimeManager
+   */
+  private handleAgentCycleComplete(): void {
+    if (this.runtimeManager) {
+      this.runtimeManager.recordCycle();
+    }
+
+    // Check if all tasks are complete (for natural end state)
+    this.checkAllTasksComplete().catch(() => {});
+  }
+
+  /**
+   * Check if all tasks are complete for natural end state
+   */
+  private async checkAllTasksComplete(): Promise<void> {
+    if (!this.runtimeManager) return;
+
+    const stats = await this.beads.getStats();
+    const pendingOrActive =
+      stats.byStatus.pending +
+      stats.byStatus.ready +
+      stats.byStatus.claimed +
+      stats.byStatus.in_progress;
+
+    if (pendingOrActive === 0 && stats.total > 0) {
+      this.runtimeManager.signalAllTasksComplete();
+    }
   }
 
   /**

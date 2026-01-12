@@ -39,10 +39,10 @@
     "@langchain/langgraph": "^0.2.41",
     "@langchain/anthropic": "^0.3.14",
     "@langchain/openai": "^0.3.17",
-    "@jetpack/shared": "^0.1.0",
-    "@jetpack/beads-adapter": "^0.1.0",
-    "@jetpack/mcp-mail-adapter": "^0.1.0",
-    "@jetpack/cass-adapter": "^0.1.0",
+    "@jetpack/shared": "workspace:*",
+    "@jetpack/beads-adapter": "workspace:*",
+    "@jetpack/mcp-mail-adapter": "workspace:*",
+    "@jetpack/cass-adapter": "workspace:*",
     "zod": "^3.24.1"
   },
   "devDependencies": {

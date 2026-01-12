@@ -7,7 +7,7 @@ import { spawn, ChildProcess, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { JetpackOrchestrator } from '@jetpack/orchestrator';
-import { AgentSkill, TaskPriority } from '@jetpack/shared';
+import { AgentSkill, TaskPriority, parseDurationMs, formatDuration, RuntimeLimits } from '@jetpack/shared';
 
 // Default config for new projects
 const DEFAULT_CONFIG = {
@@ -319,6 +319,10 @@ program
   .option('-d, --dir <path>', 'Working directory', process.cwd())
   .option('--no-browser', 'Do not open browser automatically')
   .option('--no-ui', 'Run without web UI (CLI only mode)')
+  .option('--max-cycles <number>', 'Stop after N work cycles (0 = unlimited)')
+  .option('--max-runtime <duration>', 'Stop after duration (e.g., "8h", "30m", "1d")')
+  .option('--idle-timeout <duration>', 'Stop if idle for duration (e.g., "5m")')
+  .option('--max-failures <number>', 'Stop after N consecutive failures', '5')
   .action(async (options) => {
     console.log(chalk.bold.cyan('\n🚀 Jetpack Multi-Agent Development Stack\n'));
 
@@ -333,10 +337,55 @@ program
     const spinner = ora('Initializing orchestrator...').start();
 
     try {
+      // Build runtime limits from CLI options
+      const runtimeLimits: Partial<RuntimeLimits> = {};
+
+      if (options.maxCycles) {
+        runtimeLimits.maxCycles = parseInt(options.maxCycles);
+      }
+      if (options.maxRuntime) {
+        try {
+          runtimeLimits.maxRuntimeMs = parseDurationMs(options.maxRuntime);
+        } catch (err) {
+          spinner.fail(chalk.red(`Invalid --max-runtime format: ${options.maxRuntime}`));
+          console.log(chalk.gray('Use formats like "30m", "8h", "1d"'));
+          process.exit(1);
+        }
+      }
+      if (options.idleTimeout) {
+        try {
+          runtimeLimits.idleTimeoutMs = parseDurationMs(options.idleTimeout);
+        } catch (err) {
+          spinner.fail(chalk.red(`Invalid --idle-timeout format: ${options.idleTimeout}`));
+          console.log(chalk.gray('Use formats like "5m", "30m", "1h"'));
+          process.exit(1);
+        }
+      }
+      if (options.maxFailures) {
+        runtimeLimits.maxConsecutiveFailures = parseInt(options.maxFailures);
+      }
+
+      const hasRuntimeLimits = Object.keys(runtimeLimits).length > 0;
+
       // 1. Initialize orchestrator
       const jetpack = new JetpackOrchestrator({
         workDir: options.dir,
         autoStart: true,
+        runtimeLimits: hasRuntimeLimits ? runtimeLimits : undefined,
+        onEndState: async (endState, stats) => {
+          console.log(chalk.bold.yellow(`\n\n⏹ Jetpack stopped: ${endState}`));
+          console.log(chalk.gray(`  Cycles: ${stats.cycleCount}`));
+          console.log(chalk.gray(`  Tasks completed: ${stats.tasksCompleted}`));
+          console.log(chalk.gray(`  Tasks failed: ${stats.tasksFailed}`));
+          console.log(chalk.gray(`  Runtime: ${formatDuration(stats.elapsedMs)}`));
+
+          // Kill web server if running
+          if (webServerProcess) {
+            webServerProcess.kill('SIGTERM');
+          }
+
+          process.exit(0);
+        },
       });
 
       await jetpack.initialize();
@@ -374,6 +423,24 @@ program
       console.log(chalk.bold('  🤖 Agents'));
       console.log(chalk.gray(`     ${numAgents} agents watching for tasks`));
       console.log('');
+
+      // Display runtime limits if configured
+      if (hasRuntimeLimits) {
+        console.log(chalk.bold('  ⏱ Runtime Limits'));
+        if (runtimeLimits.maxCycles) {
+          console.log(chalk.gray(`     Max cycles: ${runtimeLimits.maxCycles}`));
+        }
+        if (runtimeLimits.maxRuntimeMs) {
+          console.log(chalk.gray(`     Max runtime: ${formatDuration(runtimeLimits.maxRuntimeMs)}`));
+        }
+        if (runtimeLimits.idleTimeoutMs) {
+          console.log(chalk.gray(`     Idle timeout: ${formatDuration(runtimeLimits.idleTimeoutMs)}`));
+        }
+        if (runtimeLimits.maxConsecutiveFailures) {
+          console.log(chalk.gray(`     Max consecutive failures: ${runtimeLimits.maxConsecutiveFailures}`));
+        }
+        console.log('');
+      }
 
       console.log(chalk.bold('  📝 Create Tasks'));
       console.log(chalk.gray('     Use Claude Code, terminal, or web UI to create tasks:'));
