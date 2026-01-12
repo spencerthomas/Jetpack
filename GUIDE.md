@@ -245,6 +245,55 @@ jetpack task -t "Add JSDoc to core modules" -p low -s documentation,typescript
 
 ---
 
+## Web UI Pages
+
+The web UI at http://localhost:3002 includes these pages:
+
+### Board (/board)
+Dual-view task management with Kanban columns and hierarchical tree view.
+- **Kanban View**: Drag-and-drop across 6 status columns
+- **Tree View**: Hierarchical display with ASCII connectors (│├└)
+- **Task Types**: Epic (purple), Task (blue), Sub-task (gray), Leaf (green)
+- **Progress**: Visual bars with completion percentages
+
+### Inbox (/inbox)
+3-panel mail interface for agent communication.
+- **Categories**: All, Unread, Tasks, Agents, Coordination, Threads
+- **Search**: Full-text search across messages
+- **Threads**: Grouped conversations with correlation tracking
+
+### Agents (/agents)
+Agent lifecycle visualization and management.
+- **Lifecycle Phases**: idle → looking → claiming → retrieving → executing → storing → publishing
+- **Harness Selection**: Claude Code, Codex CLI, Gemini CLI
+- **Status**: idle (gray), busy (cyan), offline (red), error (orange)
+
+### Plans (/plans)
+Plan creation, templates, and workflow execution.
+- **Create**: Define task sequences with dependencies
+- **Templates**: Save reusable plan workflows
+- **Execute**: Convert plans into actual tasks
+
+### Memory (/memory)
+CASS memory system dashboard.
+- **Stats**: Total entries, type distribution, embedding coverage
+- **Actions**: Backfill embeddings, compact low-importance entries
+- **Browse**: Filter by type, view details, access history
+
+### Supervisor (/supervisor)
+LangGraph supervisor monitor.
+- **Visualization**: Planner → Assigner → Monitor → Coordinator nodes
+- **Queue**: Submit requests with priority, track status
+- **Metrics**: Iterations, tasks created, conflicts resolved
+
+### Settings (/settings)
+System configuration interface.
+- **CASS Config**: Auto-generate embeddings, model selection, API keys
+- **Thresholds**: Max entries, compaction threshold
+- **Hot Reload**: Changes apply immediately
+
+---
+
 ## Troubleshooting
 
 ### "Claude CLI not found"
@@ -297,9 +346,13 @@ jetpack start
 │  └── Store learnings in CASS                        │
 ├─────────────────────────────────────────────────────┤
 │  Web UI (localhost:3002)                            │
-│  ├── Kanban board                                   │
-│  ├── Agent status                                   │
-│  └── Inbox (agent messages)                         │
+│  ├── Board (Kanban + Tree view)                     │
+│  ├── Inbox (3-panel mail interface)                 │
+│  ├── Agents (lifecycle visualization)              │
+│  ├── Plans (workflow management)                    │
+│  ├── Memory (CASS dashboard)                        │
+│  ├── Supervisor (LangGraph monitor)                 │
+│  └── Settings (configuration)                       │
 └─────────────────────────────────────────────────────┘
 ```
 

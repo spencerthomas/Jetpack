@@ -76,13 +76,21 @@ An integrated agentic development platform that combines the best open-source to
   - Agent feedback loop for code quality
 - **APIs**: REST API
 
-### 6. **Beads Viewer** - Visual Task Dashboard
-- **Role**: Real-time visualization of task dependencies and agent activity
+### 6. **Web Dashboard** - Multi-Page Interface
+- **Role**: Visual oversight and management of multi-agent system
+- **Pages**:
+  - Board: Kanban + hierarchical tree view with task types
+  - Inbox: 3-panel mail interface with threads
+  - Agents: Lifecycle visualization with phase tracking
+  - Plans: Workflow creation and template management
+  - Memory: CASS dashboard with stats and actions
+  - Supervisor: LangGraph node visualization
+  - Settings: System configuration
 - **Integration Points**:
-  - Reads `.beads/` directory
-  - 9 graph metrics for task analysis
-  - Agent status overlay
-- **UI**: Web dashboard (React/Next.js)
+  - Reads `.beads/tasks.jsonl` for tasks
+  - Connects to CASS for memory management
+  - Monitors MCP Mail for agent communication
+- **UI**: Next.js 15, React 19, Tailwind, dark theme with cyan accent
 
 ### 7. **Simultaneous Launch Button (SLB)** - Safe Execution
 - **Role**: Cryptographically safe multi-command execution
@@ -215,35 +223,36 @@ jetpack/
 
 ## Development Phases
 
-### Phase 1: Foundation (Week 1-2)
-- [ ] Monorepo setup (pnpm workspaces)
-- [ ] Core orchestrator skeleton
-- [ ] Beads adapter (basic task CRUD)
-- [ ] MCP Mail adapter (basic messaging)
+### Phase 1: Foundation ✅
+- [x] Monorepo setup (pnpm workspaces)
+- [x] Core orchestrator skeleton
+- [x] Beads adapter (task CRUD with JSONL storage)
+- [x] MCP Mail adapter (pub/sub messaging)
 
-### Phase 2: Agent Coordination (Week 3-4)
-- [ ] Agent Farm integration
-- [ ] CASS memory integration
-- [ ] Task claiming and assignment logic
-- [ ] Multi-agent conflict resolution
+### Phase 2: Agent Coordination ✅
+- [x] Agent Farm integration (AgentController)
+- [x] CASS memory integration (SQLite with embeddings)
+- [x] Task claiming and assignment logic
+- [x] Multi-agent conflict resolution (file leasing)
 
-### Phase 3: Execution & Safety (Week 5-6)
-- [ ] NTM integration (tmux orchestration)
-- [ ] SLB integration (safe execution)
-- [ ] Bug Scanner integration
-- [ ] Rollback and error recovery
+### Phase 3: Execution & Safety ✅
+- [x] Claude Code CLI execution
+- [x] File leasing for concurrent safety
+- [x] Error recovery and task retry
+- [x] Heartbeat monitoring
 
-### Phase 4: Intelligence & UI (Week 7-8)
-- [ ] Session Search integration
-- [ ] Beads Viewer web UI
-- [ ] Agent Farm dashboard
-- [ ] RAG-based agent learning
+### Phase 4: Intelligence & UI ✅
+- [x] LangGraph Supervisor (Planner → Assigner → Monitor → Coordinator)
+- [x] Multi-page web UI with dark theme
+- [x] Memory dashboard with stats and actions
+- [x] Agent lifecycle visualization
+- [x] Plan management and templates
 
-### Phase 5: Polish & Deploy (Week 9-10)
+### Phase 5: Polish & Deploy (In Progress)
 - [ ] Docker compose setup
 - [ ] End-to-end testing
-- [ ] Documentation
-- [ ] Example workflows
+- [x] Documentation
+- [x] Example workflows
 
 ## Usage Example
 
@@ -284,9 +293,16 @@ jetpack view --task bd-a1b2
 
 ## Future Enhancements
 
-- Multi-repository support
-- Cloud-hosted agent farm
-- Custom agent personas and specializations
-- Integration with GitHub Issues, Jira, Linear
-- Real-time collaboration features
-- Agent performance metrics and leaderboards
+- [x] Memory system dashboard ✅
+- [x] Plan management UI ✅
+- [x] LangGraph supervisor visualization ✅
+- [x] Dark mode with cyan accent ✅
+- [x] Agent spawning UI with harness selection ✅
+- [x] Hierarchical task tree view ✅
+- [ ] Multi-repository support
+- [ ] Cloud-hosted agent farm
+- [ ] Custom agent personas and specializations
+- [ ] Integration with GitHub Issues, Jira, Linear
+- [ ] Real-time collaboration features
+- [ ] Agent performance metrics and leaderboards
+- [ ] WebSocket for instant UI updates

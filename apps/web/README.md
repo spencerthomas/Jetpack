@@ -1,41 +1,301 @@
 # Jetpack Web UI
 
-Modern Kanban board interface for visualizing and managing multi-agent task execution.
+Modern dark-themed interface for multi-agent orchestration and task management.
 
-## Features
+## Features Overview
 
-### 📊 Kanban Board
-- **6 Status Columns**: Pending, Ready, Claimed, In Progress, Completed, Failed
-- **Drag & Drop**: Move tasks between columns to update status
-- **Task Cards**: Show priority, skills, dependencies, assigned agent, and more
-- **Real-time Updates**: Auto-refreshes every 2 seconds
+- **8 Pages**: Board, Inbox, Agents, Plans, Projects, Memory, Supervisor, Settings
+- **Dark Theme**: Default dark mode with cyan accent (`rgb(79, 255, 238)`)
+- **Real-time Updates**: Auto-refresh every 2 seconds
+- **Responsive Design**: Optimized for desktop with sidebar navigation
 
-### 🤖 Agent Panel
-- **Live Status**: See which agents are idle, busy, or offline
-- **Current Tasks**: View what each agent is working on
-- **Skills Display**: See agent capabilities at a glance
-- **Activity Timestamps**: Last active time for each agent
+## Pages
 
-### 📬 MCP Mail Inbox
-- **Real-time Messages**: View inter-agent communication
-- **Message Types**: Task created, claimed, completed, agent started, etc.
-- **Payload Details**: See full message content
-- **Agent Attribution**: Know which agent sent each message
+### Board (/board)
 
-### ✨ Header Controls
-- **Create Task**: Modal form for creating new tasks
-- **Stats Display**: Active agents, in-progress tasks, completed count
-- **Inbox Toggle**: Show/hide the message inbox panel
+Dual-view task management interface with Kanban and hierarchical tree views.
+
+**Kanban View:**
+- 6 status columns: Pending, Ready, Claimed, In Progress, Completed, Failed
+- Drag-and-drop between columns to update task status
+- Priority badges (low/medium/high/critical) with color coding
+- Skill tags for task requirements
+
+**Tree View:**
+- Hierarchical task display with ASCII connectors (│├└)
+- Task type labels with colors:
+  - **Epic** (purple) - Top-level parent tasks
+  - **Task** (blue) - Mid-level tasks with children
+  - **Sub-task** (gray) - Nested tasks
+  - **Leaf** (green) - Bottom-level tasks without children
+- Progress bars with completion percentages
+- Expand/collapse subtask hierarchies
+- Hierarchical IDs (e.g., `bd-a1b2.1.1`)
+
+---
+
+### Inbox (/inbox)
+
+3-panel mail interface for agent communication.
+
+**Left Panel - Categories:**
+- All messages
+- Unread only
+- Task events (created, claimed, completed, failed)
+- Agent status (started, stopped, heartbeat)
+- Coordination messages
+- Threads (grouped conversations)
+
+**Middle Panel - Message List:**
+- Type badges: Completed (green), Failed (red), Claimed (yellow), Started (blue)
+- Agent attribution with avatar initials
+- Relative timestamps (e.g., "2m ago")
+- Full-text search functionality
+- Read/unread state tracking
+
+**Right Panel - Message Detail:**
+- Full message content and metadata
+- JSON payload viewer with formatting
+- Reply and archive actions
+- Correlation ID for thread tracking
+
+---
+
+### Agents (/agents)
+
+Agent lifecycle visualization and management.
+
+**Agent Cards:**
+- Status indicators: idle (gray), busy (cyan), offline (red), error (orange)
+- Current task display with ID and title
+- Skills badges (typescript, react, backend, etc.)
+- Tasks completed counter
+- Last heartbeat timestamp
+
+**Lifecycle Phases:**
+```
+idle → looking → claiming → retrieving → executing → storing → publishing → complete
+```
+- Visual phase progress bar
+- Terminal-style execution logs
+- Real-time phase updates
+
+**Agent Spawning:**
+- Harness selection: Claude Code, Codex CLI, Gemini CLI
+- Skills configuration checkboxes
+- Real-time spawn feedback
+
+---
+
+### Plans (/plans)
+
+Plan creation, template management, and workflow execution.
+
+**Features:**
+- Plan list with status filters (all/active/templates)
+- Create new plans with task breakdown
+- Set dependencies between planned tasks
+- Estimated duration calculations
+- Tag-based organization
+- Template system for reusable workflows
+- Execute plans to create actual tasks
+
+**Plan Statuses:**
+- `draft` - Plan being created
+- `approved` - Ready for execution
+- `executing` - Tasks being created
+- `completed` - All tasks finished
+- `failed` - Execution error
+
+---
+
+### Projects (/projects)
+
+Project overview and progress tracking.
+
+**Features:**
+- Project cards with status badges
+- Task completion progress bars
+- Link to associated plans
+- Connection status indicator
+
+---
+
+### Memory (/memory)
+
+CASS memory system dashboard for viewing and managing agent memories.
+
+**Statistics Cards:**
+- Total entries count
+- Type distribution breakdown (bar chart)
+- Average importance score (0-1)
+- Total access count
+- Embedding coverage percentage
+
+**Memory Types (with colors):**
+- `codebase_knowledge` (cyan) - Project structure understanding
+- `agent_learning` (green) - Patterns from completed tasks
+- `pattern_recognition` (purple) - Recognized code patterns
+- `conversation_history` (blue) - Past interactions
+- `decision_rationale` (orange) - Why choices were made
+
+**Actions:**
+- **Backfill Embeddings**: Generate vector embeddings for entries without them
+- **Compact Memory**: Remove low-importance entries below threshold
+
+**Memory Browser:**
+- Filter by type with toggle buttons
+- Selected memory detail view
+- Content preview with full expansion
+- Importance score, access count, timestamps
+
+---
+
+### Supervisor (/supervisor)
+
+LangGraph supervisor execution monitor for intelligent orchestration.
+
+**LangGraph Visualization:**
+```
+Planner → Assigner → Monitor → Coordinator (loop back)
+```
+- Node diagram with real-time highlighting
+- Active node indicator during execution
+- Feedback loop visualization for conflict resolution
+
+**Request Queue:**
+- Submit new requests with text input
+- Priority selection: low, medium, high, critical
+- Queue status display: pending/processing/completed/failed
+- Execution history with timestamps
+
+**Metrics Dashboard:**
+- Current iteration count
+- Tasks created/completed/failed
+- Conflicts resolved
+- Final report display
+
+---
+
+### Settings (/settings)
+
+System configuration interface.
+
+**CASS Embedding Configuration:**
+- Auto-generate embeddings toggle (on/off)
+- Embedding model selection:
+  - `text-embedding-3-small` (default, fastest)
+  - `text-embedding-3-large` (highest quality)
+  - `text-embedding-ada-002` (legacy)
+- OpenAI API key management (masked input)
+- Dimensions configuration
+
+**Memory Settings:**
+- Compaction threshold (0.0-1.0 slider)
+- Max entries limit
+- **Hot Reload**: Changes apply immediately without restart
+
+---
+
+## API Routes
+
+### Tasks
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/tasks` | List all tasks |
+| POST | `/api/tasks` | Create new task |
+| PATCH | `/api/tasks/[id]` | Update task |
+| DELETE | `/api/tasks/[id]` | Delete task |
+
+### Agents
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/agents` | List all agents |
+| POST | `/api/agents/spawn` | Spawn new agent with config |
+
+### Messages
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/messages` | List MCP Mail messages |
+| POST | `/api/messages/[id]/ack` | Acknowledge message |
+| POST | `/api/messages/broadcast` | Broadcast to all agents |
+| GET | `/api/messages/stream` | SSE real-time updates |
+
+### Plans
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/plans` | List plans |
+| POST | `/api/plans` | Create plan |
+| GET | `/api/plans/[id]` | Get plan details |
+| PUT | `/api/plans/[id]` | Update plan |
+| DELETE | `/api/plans/[id]` | Delete plan |
+| POST | `/api/plans/[id]/execute` | Execute plan |
+| POST | `/api/plans/[id]/complete` | Mark complete |
+
+### Memory (CASS)
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/cass/stats` | Memory statistics |
+| GET | `/api/cass/memories` | List memories with filtering |
+| POST | `/api/cass/reconfigure` | Hot reload config |
+| POST | `/api/cass/backfill` | Generate embeddings |
+| POST | `/api/cass/compact` | Remove low-importance entries |
+
+### Settings
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/settings` | Get current settings |
+| POST | `/api/settings` | Update settings |
+
+### System
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/status` | Full system status |
+| POST | `/api/supervisor` | Submit supervisor request |
+
+---
+
+## Color Scheme
+
+**Theme:** Dark mode default with cyan accent
+
+**Primary Colors:**
+| Name | Value | Usage |
+|------|-------|-------|
+| Accent | `rgb(79, 255, 238)` | Primary actions, highlights |
+| Background | `#09090b` | Page background |
+| Card | `#18181b` | Card backgrounds |
+| Border | `#27272a` | Borders, dividers |
+
+**Task Type Colors:**
+| Type | Color | Hex |
+|------|-------|-----|
+| Epic | Purple | `#a855f7` |
+| Task | Blue | `#3b82f6` |
+| Sub-task | Gray | `#8b8b8e` |
+| Leaf | Green | `#22c55e` |
+
+**Status Colors:**
+| Status | Color |
+|--------|-------|
+| Pending | Gray |
+| Ready | Blue |
+| Claimed | Yellow |
+| In Progress | Cyan |
+| Completed | Green |
+| Failed | Red |
+
+---
 
 ## Getting Started
 
 ### Development
 
 ```bash
-# From the root of Jetpack
+# From the Jetpack root directory
 cd apps/web
 
-# Install dependencies (done via root pnpm install)
+# Install dependencies (usually done via root pnpm install)
 pnpm install
 
 # Run development server
@@ -44,204 +304,103 @@ pnpm dev
 
 Visit [http://localhost:3000](http://localhost:3000)
 
+### With Jetpack CLI (Recommended)
+
+```bash
+# Start everything together
+jetpack start
+
+# Browser opens automatically to http://localhost:3002
+```
+
 ### Production Build
 
 ```bash
-# Build for production
 pnpm build
-
-# Start production server
 pnpm start
 ```
 
-## Usage
+---
 
-### 1. Start Jetpack Backend
+## Tech Stack
 
-First, start the Jetpack orchestrator with agents:
+- **Framework:** Next.js 15 with App Router
+- **UI Library:** React 19
+- **Styling:** Tailwind CSS with custom animations
+- **Drag & Drop:** @dnd-kit/core, @dnd-kit/sortable
+- **State:** Zustand
+- **Icons:** lucide-react
+- **Dates:** date-fns
+- **TypeScript:** Strict mode
 
-```bash
-# From root directory
-jetpack start --agents 5
-```
-
-### 2. Launch Web UI
-
-```bash
-# From root directory
-cd apps/web
-pnpm dev
-```
-
-### 3. Create Tasks
-
-Use the "New Task" button in the header to create tasks. Agents will automatically claim and execute them.
-
-### 4. Monitor Progress
-
-- **Kanban Board**: Watch tasks move through columns
-- **Agent Panel**: See which agents are working
-- **Inbox**: View agent communication in real-time
+---
 
 ## Architecture
 
-### API Routes
-
-- `GET /api/tasks` - List all tasks
-- `POST /api/tasks` - Create new task
-- `PATCH /api/tasks/[id]` - Update task
-- `DELETE /api/tasks/[id]` - Delete task
-- `GET /api/agents` - List all agents
-- `GET /api/messages` - List MCP Mail messages
-- `GET /api/status` - Get system status
-
-### Components
-
 ```
-src/
-├── app/
-│   ├── api/            # Next.js API routes
-│   │   ├── tasks/
-│   │   ├── agents/
-│   │   ├── messages/
-│   │   └── status/
-│   ├── layout.tsx      # Root layout
-│   ├── page.tsx        # Main page
-│   └── globals.css     # Global styles
-└── components/
-    ├── KanbanBoard.tsx     # Main board with drag-drop
-    ├── KanbanColumn.tsx    # Status column
-    ├── TaskCard.tsx        # Individual task card
-    ├── Header.tsx          # Top navigation
-    ├── AgentPanel.tsx      # Right sidebar with agents
-    ├── InboxPanel.tsx      # MCP Mail inbox viewer
-    └── CreateTaskModal.tsx # Task creation form
+apps/web/
+├── src/
+│   ├── app/
+│   │   ├── api/              # Next.js API routes
+│   │   │   ├── tasks/
+│   │   │   ├── agents/
+│   │   │   ├── messages/
+│   │   │   ├── plans/
+│   │   │   ├── cass/
+│   │   │   ├── settings/
+│   │   │   └── status/
+│   │   ├── board/            # Kanban + tree view
+│   │   ├── inbox/            # 3-panel mail
+│   │   ├── agents/           # Agent lifecycle
+│   │   ├── plans/            # Plan management
+│   │   ├── projects/         # Project overview
+│   │   ├── memory/           # CASS dashboard
+│   │   ├── supervisor/       # LangGraph monitor
+│   │   ├── settings/         # Configuration
+│   │   ├── layout.tsx        # Root layout with sidebar
+│   │   └── globals.css       # Global styles
+│   └── components/
+│       └── ui/               # Shared UI components
+├── public/
+└── package.json
 ```
 
-### Real-time Updates
-
-The UI polls the API every 2 seconds to fetch:
-- Latest task statuses
-- Agent activity
-- New MCP Mail messages
-
-This ensures the UI stays synchronized with agent actions.
-
-## Drag & Drop
-
-Tasks can be dragged between columns to update their status:
-
-- **Pending** → Ready (manually mark as ready)
-- **Ready** → Claimed (agents auto-claim)
-- **Claimed** → In Progress (agent starts work)
-- **In Progress** → Completed (task finished)
-- **Any** → Failed (manual override)
-
-## Task Card Details
-
-Each task card displays:
-
-- **Title** and **ID** (bd-XXXX format)
-- **Description** (if provided)
-- **Priority** badge (low, medium, high, critical)
-- **Assigned Agent** (if claimed)
-- **Estimated Time** (if provided)
-- **Required Skills** (tags)
-- **Dependencies** count (if any)
-- **Blockers** count (if any)
-- **Created** timestamp
-
-## MCP Mail Inbox
-
-The inbox shows agent-to-agent messages:
-
-### Message Types
-
-- 🔔 **task.created** - New task broadcast
-- ⚡ **task.claimed** - Agent claimed a task
-- ✅ **task.completed** - Task finished successfully
-- ❌ **task.failed** - Task failed with error
-- 🤖 **agent.started** - Agent came online
-- 🔒 **file.lock** - File leasing
-- 📨 **coordination.*** - Agent coordination
-
-### Features
-
-- **Color-coded** by message type
-- **Agent names** instead of IDs
-- **Payload preview** with smart formatting
-- **Timestamp** relative to now
-- **Auto-scroll** to latest messages
-
-## Styling
-
-Built with **Tailwind CSS** for:
-- Responsive design
-- Consistent spacing
-- Color themes
-- Animations
-
-### Color Scheme
-
-- **Primary**: Blue gradient (#0ea5e9)
-- **Status Colors**:
-  - Pending: Gray
-  - Ready: Blue
-  - Claimed: Yellow
-  - In Progress: Purple
-  - Completed: Green
-  - Failed: Red
-
-## Performance
-
-- **Server-side rendering** with Next.js App Router
-- **API route caching** for faster responses
-- **Optimized polling** (2s interval)
-- **Lazy loading** for large task lists
+---
 
 ## Troubleshooting
 
 ### No tasks showing
-
-Make sure:
-1. Jetpack backend is running
-2. Tasks have been created (via CLI or UI)
-3. `.beads/` directory exists with `tasks.jsonl`
+1. Ensure Jetpack backend is running (`jetpack start`)
+2. Check `.beads/tasks.jsonl` exists
+3. Verify API is accessible at `/api/tasks`
 
 ### No agents showing
-
-Ensure:
-1. Agents were started with `jetpack start --agents N`
+1. Confirm agents started with `jetpack start --agents N`
 2. Check agent status with `jetpack status`
 
 ### Inbox empty
+1. Verify `.jetpack/mail/` directory exists
+2. Ensure agents are sending messages
+3. Check for message type filters
 
-Verify:
-1. `.jetpack/mail/outbox/` directory exists
-2. Agents are communicating
-3. Messages are recent (only shows last 50)
+### Memory page shows no data
+1. Confirm `.cass/memory.db` exists
+2. Check if any memories have been stored
+3. Verify CASS adapter is initialized
+
+---
 
 ## Future Enhancements
 
 - [ ] WebSocket support for true real-time updates
-- [ ] Task filtering and search
-- [ ] Agent performance metrics
 - [ ] Task dependency graph visualization
-- [ ] Dark mode support
+- [ ] Agent performance metrics and leaderboards
 - [ ] Mobile responsive design improvements
 - [ ] Task editing inline
 - [ ] Bulk task operations
 - [ ] Export task reports
 
-## Tech Stack
-
-- **Next.js 15** - React framework
-- **React 19** - UI library
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Styling
-- **@dnd-kit** - Drag and drop
-- **Lucide React** - Icons
-- **date-fns** - Date formatting
+---
 
 ## License
 

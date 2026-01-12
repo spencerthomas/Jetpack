@@ -491,6 +491,245 @@ async function visualizeTaskGraph() {
 }
 ```
 
+## Using the Supervisor Programmatically
+
+### Submit High-Level Requests
+
+```typescript
+import { JetpackOrchestrator } from '@jetpack/orchestrator';
+
+async function supervisorExample() {
+  const jetpack = new JetpackOrchestrator({
+    workDir: process.cwd(),
+  });
+
+  await jetpack.initialize();
+
+  // Create a supervisor with Claude
+  const supervisor = await jetpack.createSupervisor({
+    provider: 'claude',
+    model: 'claude-3-5-sonnet-20241022',
+  });
+
+  // Submit a high-level request
+  const result = await jetpack.supervise(
+    "Build a user authentication system with login, logout, and password reset"
+  );
+
+  console.log('Tasks created:', result.tasksCreated);
+  console.log('Execution time:', result.executionTime);
+  console.log('Final report:', result.report);
+
+  await jetpack.shutdown();
+}
+```
+
+### Custom Supervisor Configuration
+
+```typescript
+async function customSupervisor() {
+  const jetpack = new JetpackOrchestrator({
+    workDir: process.cwd(),
+  });
+
+  await jetpack.initialize();
+  await jetpack.startAgents(5);
+
+  // Use OpenAI instead of Claude
+  const supervisor = await jetpack.createSupervisor({
+    provider: 'openai',
+    model: 'gpt-4-turbo',
+  });
+
+  // Execute with priority
+  const result = await jetpack.supervise(
+    "Refactor the authentication module to use OAuth2",
+    { priority: 'high' }
+  );
+
+  console.log('Conflicts resolved:', result.conflictsResolved);
+  console.log('Iterations:', result.iterations);
+
+  await jetpack.shutdown();
+}
+```
+
+## Memory Dashboard Integration
+
+### Programmatic Memory Management
+
+```typescript
+import { JetpackOrchestrator } from '@jetpack/orchestrator';
+
+async function memoryDashboardExample() {
+  const jetpack = new JetpackOrchestrator({
+    workDir: process.cwd(),
+  });
+
+  await jetpack.initialize();
+  const cass = jetpack.getCASSAdapter();
+
+  // Get memory statistics (as shown in dashboard)
+  const stats = await cass.getStats();
+  console.log('Total memories:', stats.total);
+  console.log('By type:', stats.byType);
+  console.log('Avg importance:', stats.avgImportance);
+  console.log('With embeddings:', stats.withEmbeddings);
+
+  // Store different types of memories
+  await cass.store({
+    type: 'codebase_knowledge',
+    content: 'The project uses TypeScript with strict mode enabled',
+    importance: 0.9,
+  });
+
+  await cass.store({
+    type: 'agent_learning',
+    content: 'React components should use functional style with hooks',
+    importance: 0.8,
+  });
+
+  await cass.store({
+    type: 'decision_rationale',
+    content: 'Chose JWT over sessions for stateless API design',
+    importance: 0.7,
+  });
+
+  // Backfill embeddings for entries without them
+  const backfillResult = await cass.backfillEmbeddings();
+  console.log('Embeddings generated:', backfillResult.count);
+
+  // Compact low-importance memories
+  const compactResult = await cass.compact(0.3); // threshold
+  console.log('Memories removed:', compactResult);
+
+  await jetpack.shutdown();
+}
+```
+
+### Hot-Reload CASS Configuration
+
+```typescript
+async function reconfigureCASSExample() {
+  const jetpack = new JetpackOrchestrator({
+    workDir: process.cwd(),
+  });
+
+  await jetpack.initialize();
+  const cass = jetpack.getCASSAdapter();
+
+  // Check current configuration
+  const currentConfig = await cass.getConfiguration();
+  console.log('Current config:', currentConfig);
+
+  // Hot-reload with new settings (no restart required)
+  await cass.reconfigure({
+    autoGenerateEmbeddings: true,
+    embeddingModel: 'text-embedding-3-large',
+    maxEntries: 10000,
+    compactionThreshold: 0.4,
+  });
+
+  console.log('Configuration updated successfully');
+
+  await jetpack.shutdown();
+}
+```
+
+## Plan Management
+
+### Creating and Executing Plans
+
+```typescript
+import { JetpackOrchestrator } from '@jetpack/orchestrator';
+
+async function planExample() {
+  const jetpack = new JetpackOrchestrator({
+    workDir: process.cwd(),
+  });
+
+  await jetpack.initialize();
+
+  // Create a plan (template for task creation)
+  const plan = await jetpack.createPlan({
+    name: 'API Feature Template',
+    description: 'Standard workflow for new API endpoints',
+    tasks: [
+      { title: 'Design API spec', skills: ['documentation'], order: 1 },
+      { title: 'Create database schema', skills: ['database'], order: 2, dependsOn: [1] },
+      { title: 'Implement endpoint', skills: ['backend'], order: 3, dependsOn: [2] },
+      { title: 'Write tests', skills: ['testing'], order: 4, dependsOn: [3] },
+      { title: 'Update docs', skills: ['documentation'], order: 5, dependsOn: [4] },
+    ],
+    isTemplate: true,
+    tags: ['api', 'backend'],
+  });
+
+  console.log('Plan created:', plan.id);
+
+  // Execute plan (creates actual tasks)
+  const execution = await jetpack.executePlan(plan.id, {
+    priority: 'high',
+    context: { feature: 'user-profile' },
+  });
+
+  console.log('Tasks created:', execution.tasks.length);
+  console.log('Task IDs:', execution.tasks.map(t => t.id));
+
+  await jetpack.shutdown();
+}
+```
+
+### Using Plan Templates
+
+```typescript
+async function planTemplateExample() {
+  const jetpack = new JetpackOrchestrator({
+    workDir: process.cwd(),
+  });
+
+  await jetpack.initialize();
+
+  // List available templates
+  const templates = await jetpack.listPlans({ isTemplate: true });
+  console.log('Available templates:', templates.map(t => t.name));
+
+  // Find a specific template
+  const apiTemplate = templates.find(t => t.name === 'API Feature Template');
+
+  if (apiTemplate) {
+    // Execute template for a new feature
+    const execution = await jetpack.executePlan(apiTemplate.id, {
+      priority: 'medium',
+      context: {
+        feature: 'order-history',
+        endpoint: '/api/orders',
+      },
+    });
+
+    // Monitor execution
+    while (true) {
+      const status = await jetpack.getPlanStatus(execution.planId);
+
+      if (status.status === 'completed') {
+        console.log('Plan completed successfully!');
+        break;
+      }
+
+      if (status.status === 'failed') {
+        console.log('Plan failed:', status.error);
+        break;
+      }
+
+      console.log(`Progress: ${status.completedTasks}/${status.totalTasks} tasks`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+
+  await jetpack.shutdown();
+}
+```
+
 ---
 
 For more examples, see the [tests](./packages/orchestrator/test) directory.

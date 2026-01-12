@@ -119,11 +119,39 @@ jetpack supervise "Build user authentication" --llm claude --agents 5
 
 ### Web API Routes (apps/web/src/app/api/)
 
+**Tasks:**
 - `GET/POST /api/tasks` - List/create tasks
 - `PATCH/DELETE /api/tasks/[id]` - Update/delete task
+
+**Agents:**
 - `GET /api/agents` - List agents with status
-- `GET /api/status` - Full system status
+- `POST /api/agents/spawn` - Spawn new agent with config
+
+**Messages:**
 - `GET /api/messages` - MCP Mail messages
+- `POST /api/messages/[id]/ack` - Acknowledge message
+- `POST /api/messages/broadcast` - Broadcast to all agents
+- `GET /api/messages/stream` - SSE real-time updates
+
+**Plans:**
+- `GET/POST /api/plans` - List/create plans
+- `GET/PUT/DELETE /api/plans/[id]` - Plan CRUD
+- `POST /api/plans/[id]/execute` - Execute plan
+- `POST /api/plans/[id]/complete` - Mark complete
+
+**Memory (CASS):**
+- `GET /api/cass/stats` - Memory statistics
+- `GET /api/cass/memories` - Memory entries with filtering
+- `POST /api/cass/reconfigure` - Hot reload CASS config
+- `POST /api/cass/backfill` - Generate embeddings
+- `POST /api/cass/compact` - Memory cleanup
+
+**Settings:**
+- `GET/POST /api/settings` - System configuration
+
+**System:**
+- `GET /api/status` - Full system status
+- `POST /api/supervisor` - Submit supervisor request
 
 ## Agent Controller Lifecycle
 
@@ -213,4 +241,5 @@ class CustomAdapter {
 ```bash
 ANTHROPIC_API_KEY=...   # Required for Claude supervisor
 OPENAI_API_KEY=...      # Required for OpenAI supervisor
+JETPACK_WORK_DIR=...    # Override working directory (used by web UI when started via CLI)
 ```

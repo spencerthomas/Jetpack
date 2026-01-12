@@ -74,9 +74,9 @@ Jetpack has a layered architecture with three core storage adapters and an optio
 
 | Component | Purpose | Storage |
 |-----------|---------|---------|
-| **Beads** | Persistent task queue with dependency tracking | `data/beads.db` |
-| **MCP Mail** | Pub/sub messaging between agents | `data/mcp-mail.db` |
-| **CASS** | Vector-based semantic memory for context | `data/cass.db` |
+| **Beads** | Persistent task queue with dependency tracking | `.beads/tasks.jsonl` |
+| **MCP Mail** | Pub/sub messaging between agents | `.jetpack/mail/` |
+| **CASS** | Vector-based semantic memory for context | `.cass/memory.db` |
 | **Orchestrator** | Coordinates adapters and agent lifecycle | In-memory |
 | **Supervisor** | LLM-powered planning and conflict resolution | In-memory |
 
@@ -201,21 +201,26 @@ The supervisor:
 3. **Monitors** - Tracks progress and detects issues
 4. **Coordinates** - Resolves conflicts and reassigns failed tasks
 
-**Environment Variables Required:**
+**Environment Variables:**
 ```bash
 export ANTHROPIC_API_KEY=your_key   # for Claude
 export OPENAI_API_KEY=your_key      # for OpenAI
+export JETPACK_WORK_DIR=/path       # override working directory (optional)
 ```
 
 ### Web UI (Included with `jetpack start`)
 
 The web UI launches automatically at http://localhost:3002 when you run `jetpack start`.
 
-**Features:**
-- 📊 **Kanban Board** - Drag-and-drop task management across 6 status columns
-- 📬 **Inbox** - Real-time inter-agent communication viewer (MCP Mail)
-- 🤖 **Agents** - Live agent status, current tasks, and skills
-- 📁 **Projects** - Project overview and roadmap planning
+**Pages:**
+- 📊 **Board** - Kanban + hierarchical tree view with task types (Epic/Task/Sub-task/Leaf)
+- 📬 **Inbox** - 3-panel mail interface with threads, categories, and search
+- 🤖 **Agents** - Lifecycle visualization with phase tracking and harness selection
+- 📁 **Plans** - Create, execute, and template plan workflows
+- 📂 **Projects** - Project overview and progress tracking
+- 🧠 **Memory** - CASS dashboard with stats, filtering, backfill/compact actions
+- 🎯 **Supervisor** - LangGraph node visualization and request queue
+- ⚙️ **Settings** - CASS embedding config and system preferences
 - ⌨️ **Keyboard shortcuts** - Navigate with Cmd+K, G+I, G+B, etc.
 
 **Manual start (if needed):**
@@ -880,6 +885,13 @@ const jetpack = new JetpackOrchestrator({
 - [x] **Kanban Web UI** - Modern drag-and-drop interface ✅
 - [x] **MCP Mail Inbox Viewer** - Real-time message monitoring ✅
 - [x] **LangGraph Supervisor** - Intelligent full orchestration with multi-LLM support ✅
+- [x] **Memory Dashboard** - CASS stats, visualization, and management ✅
+- [x] **Plan Management** - Create, execute, and template plan workflows ✅
+- [x] **Supervisor UI** - LangGraph node visualization and request queue ✅
+- [x] **Dark Mode** - Default dark theme with cyan accent ✅
+- [x] **Agent Spawning UI** - Multi-harness support (Claude Code, Codex, Gemini) ✅
+- [x] **Inbox Redesign** - 3-panel layout with threads and categories ✅
+- [x] **Hierarchical Tasks** - Tree view with Epic/Task/Sub-task/Leaf types ✅
 - [ ] Integration with Named Tmux Manager for command orchestration
 - [ ] Ultimate Bug Scanner adapter for quality gates
 - [ ] WebSocket support for instant UI updates
