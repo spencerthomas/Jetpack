@@ -3,14 +3,21 @@ import { JetpackOrchestrator } from '@jetpack/orchestrator';
 import path from 'path';
 
 let orchestrator: JetpackOrchestrator | null = null;
+let currentWorkDir: string | null = null;
+
+function getWorkDir(): string {
+  return process.env.JETPACK_WORK_DIR || path.join(process.cwd(), '../..');
+}
 
 async function getOrchestrator() {
-  if (!orchestrator) {
+  const workDir = getWorkDir();
+  if (!orchestrator || currentWorkDir !== workDir) {
     orchestrator = new JetpackOrchestrator({
-      workDir: path.join(process.cwd(), '../..'),
+      workDir,
       autoStart: false,
     });
     await orchestrator.initialize();
+    currentWorkDir = workDir;
   }
   return orchestrator;
 }

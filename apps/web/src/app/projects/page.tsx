@@ -7,15 +7,15 @@ import Link from 'next/link';
 
 interface Plan {
   id: string;
-  name: string;
-  description: string;
-  status: 'draft' | 'approved' | 'executing' | 'completed' | 'failed';
-  plannedTasks: Array<{
+  title: string;
+  description?: string;
+  status: 'draft' | 'approved' | 'executing' | 'completed' | 'failed' | 'paused';
+  items: Array<{
     id: string;
     title: string;
-    status?: string;
+    status: string;
   }>;
-  executionHistory: Array<{
+  executionHistory?: Array<{
     status: string;
     taskResults?: Record<string, { status: string }>;
   }>;
@@ -59,6 +59,7 @@ export default function ProjectsPage() {
 
   // Calculate completed tasks for a plan
   const getCompletedCount = (plan: Plan): number => {
+    if (!plan.executionHistory || plan.executionHistory.length === 0) return 0;
     const latestExecution = plan.executionHistory[plan.executionHistory.length - 1];
     if (!latestExecution?.taskResults) return 0;
     return Object.values(latestExecution.taskResults).filter(r => r.status === 'completed').length;
@@ -139,7 +140,7 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {plans.map((plan) => {
               const completedCount = getCompletedCount(plan);
-              const taskCount = plan.plannedTasks.length;
+              const taskCount = plan.items?.length || 0;
 
               return (
                 <Link
@@ -157,7 +158,7 @@ export default function ProjectsPage() {
                   </div>
 
                   <h3 className="font-medium text-[#f7f8f8] mb-1 group-hover:text-[rgb(79,255,238)] transition-colors">
-                    {plan.name}
+                    {plan.title}
                   </h3>
                   <p className="text-sm text-[#8b8b8e] line-clamp-2 mb-4">
                     {plan.description}

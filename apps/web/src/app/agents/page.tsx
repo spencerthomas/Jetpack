@@ -144,34 +144,7 @@ export default function AgentsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Simulate agent lifecycle for demo when no real agents
-  useEffect(() => {
-    if (agents.length === 0) {
-      const phases: AgentPhase[] = ['looking', 'claiming', 'retrieving', 'executing', 'storing', 'publishing', 'complete', 'idle'];
-      let i = 0;
-      const interval = setInterval(() => {
-        setSimulatedPhase(phases[i % phases.length]);
-
-        // Add simulated logs
-        if (phases[i % phases.length] === 'retrieving') {
-          setCliLogs(prev => [...prev.slice(-20), { agentId: 'demo', line: '[CASS] Querying semantic memory...', type: 'cass', time: new Date() }]);
-        } else if (phases[i % phases.length] === 'executing') {
-          setCliLogs(prev => [...prev.slice(-20), { agentId: 'demo', line: '$ claude --print --dangerously-skip-permissions', type: 'command', time: new Date() }]);
-          setTimeout(() => {
-            setCliLogs(prev => [...prev.slice(-20), { agentId: 'demo', line: '[Claude] Analyzing task requirements...', type: 'claude', time: new Date() }]);
-          }, 800);
-        } else if (phases[i % phases.length] === 'storing') {
-          setCliLogs(prev => [...prev.slice(-20), { agentId: 'demo', line: '[Claude] ✓ Changes applied successfully', type: 'success', time: new Date() }]);
-        } else if (phases[i % phases.length] === 'publishing') {
-          setCliLogs(prev => [...prev.slice(-20), { agentId: 'demo', line: '[MCP Mail] Publishing completion event', type: 'mail', time: new Date() }]);
-        }
-
-        i++;
-      }, 1500);
-      return () => clearInterval(interval);
-    }
-    return undefined;
-  }, [agents.length]);
+  // No demo simulation - show real agent status only
 
   useEffect(() => {
     async function fetchData() {
@@ -402,17 +375,16 @@ export default function AgentsPage() {
                     <Bot className="w-8 h-8 text-[#8b8b8e]" />
                   </div>
                   <p className="text-sm text-[#f7f8f8] font-medium mb-1">No agents running</p>
-                  <p className="text-xs text-[#8b8b8e] mb-4">Demo mode active</p>
+                  <p className="text-xs text-[#8b8b8e] mb-4">Click "Spawn Agent" to start</p>
 
-                  {/* Demo lifecycle */}
+                  {/* Agent lifecycle overview */}
                   <div className="w-full space-y-1.5 text-left mt-4">
                     {PHASE_ORDER.map((p, i) => (
                       <div key={p} className="flex items-center gap-2 text-xs">
-                        <div className={`h-px transition-all duration-300 ${simulatedPhase === p ? 'bg-[rgb(79,255,238)] w-5' : 'bg-[#26262a] w-3'}`} />
-                        <span className={`transition-colors duration-300 ${simulatedPhase === p ? 'text-[#f7f8f8]' : 'text-[#8b8b8e]/50'}`}>
+                        <div className="h-px bg-[#26262a] w-3" />
+                        <span className="text-[#8b8b8e]/50">
                           {i + 1}. {p}
                         </span>
-                        {simulatedPhase === p && <span className="text-[rgb(79,255,238)] animate-pulse">●</span>}
                       </div>
                     ))}
                   </div>
