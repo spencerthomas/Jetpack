@@ -31,6 +31,9 @@ pnpm jetpack <command>
 
 # Web UI development
 cd apps/web && pnpm dev  # Runs on localhost:3000
+
+# Web UI with custom project directory
+JETPACK_WORK_DIR=/path/to/project pnpm --filter @jetpack/web dev
 ```
 
 ## Architecture Overview
@@ -273,5 +276,28 @@ class CustomAdapter {
 ```bash
 ANTHROPIC_API_KEY=...   # Required for Claude supervisor
 OPENAI_API_KEY=...      # Required for OpenAI supervisor
-JETPACK_WORK_DIR=...    # Override working directory (used by web UI when started via CLI)
+JETPACK_WORK_DIR=...    # Override working directory for all adapters
+```
+
+**JETPACK_WORK_DIR** is critical for the web UI:
+- Without it, the web UI defaults to the Jetpack repo root (`apps/web/../../`)
+- Set it to point to your target project containing `.beads/`, `.cass/`, `.jetpack/`
+- All API routes (tasks, plans, CASS memory, status) respect this variable
+- The MCP server also uses this to determine where to read/write data
+
+### Plan Item Structure
+
+When creating plans manually (JSON files in `.jetpack/plans/`), items must include:
+
+```typescript
+interface PlanItem {
+  id: string;           // e.g., "item-1"
+  title: string;        // Task title
+  description?: string; // Optional details
+  status: 'pending' | 'converted' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  skills: string[];     // Required: e.g., ["typescript", "react"]
+  dependencies: string[]; // Required: IDs of dependent items, or []
+  estimatedMinutes?: number;
+}
 ```
