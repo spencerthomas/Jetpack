@@ -69,6 +69,9 @@ importers:
       '@jetpack/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      better-sqlite3:
+        specifier: ^11.8.1
+        version: 11.10.0
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -91,6 +94,9 @@ importers:
         specifier: ^5.0.9
         version: 5.0.9(@types/react@19.2.7)(react@19.2.3)
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.12
+        version: 7.6.13
       '@types/node':
         specifier: ^22.10.5
         version: 22.19.3
@@ -131,6 +137,9 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@22.19.3)
 
   packages/cass-adapter:
     dependencies:
@@ -253,6 +262,9 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@22.19.3)
 
   packages/supervisor:
     dependencies:
@@ -290,6 +302,9 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@22.19.3)
 
 packages:
 
