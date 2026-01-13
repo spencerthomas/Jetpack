@@ -40,6 +40,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@jetpack/mcp-server": "workspace:*",
     "@jetpack/orchestrator": "workspace:*",
     "@jetpack/shared": "workspace:*",
     "commander": "^12.1.0",

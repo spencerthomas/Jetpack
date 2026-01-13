@@ -54,7 +54,8 @@ JetpackOrchestrator (packages/orchestrator)
 - `@jetpack/cass-adapter` - Memory stored in `.cass/memory.db`, supports semantic search
 - `@jetpack/mcp-mail-adapter` - Messages in `.jetpack/mail/{inbox,outbox}/*.json`
 - `@jetpack/orchestrator` - Combines adapters, manages agent pool
-- `@jetpack/cli` - Commander-based CLI (`start`, `task`, `status`, `demo`)
+- `@jetpack/mcp-server` - MCP server for Claude Code integration
+- `@jetpack/cli` - Commander-based CLI (`start`, `task`, `status`, `demo`, `mcp`)
 - `@jetpack/web` - Next.js 15 Kanban UI with React 19, dnd-kit, Tailwind
 
 ### Data Flow
@@ -76,6 +77,37 @@ JetpackOrchestrator (packages/orchestrator)
 - `.beads/` - Task storage (JSONL, git-backed)
 - `.cass/` - SQLite memory database
 - `.jetpack/mail/` - Inter-agent message queues
+- `.jetpack/plans/` - Plan storage (JSON files)
+
+### Claude Code Integration (MCP Server)
+
+The MCP server allows Claude Code to be a first-class Jetpack client, bidirectionally syncing with the web UI.
+
+**Setup** - Add to `.claude/settings.local.json`:
+```json
+{
+  "mcpServers": {
+    "jetpack": {
+      "command": "node",
+      "args": ["/path/to/Jetpack/packages/mcp-server/dist/index.js"],
+      "env": {
+        "JETPACK_WORK_DIR": "/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
+**Available Tools:**
+- `jetpack_list_plans` / `jetpack_get_plan` / `jetpack_create_plan` / `jetpack_update_plan`
+- `jetpack_list_tasks` / `jetpack_get_task` / `jetpack_create_task`
+- `jetpack_claim_task` / `jetpack_start_task` / `jetpack_complete_task` / `jetpack_fail_task`
+- `jetpack_status` / `jetpack_sync_todos`
+
+**Workflow:**
+1. Create plans in Claude Code or Jetpack UI - both see the same data
+2. Claim tasks via Claude Code or let headless agents claim them
+3. Progress visible in real-time on Jetpack dashboard (localhost:3000)
 
 ### LangGraph Supervisor (packages/supervisor)
 

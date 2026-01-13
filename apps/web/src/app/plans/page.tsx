@@ -16,31 +16,7 @@ import {
   Timer,
 } from 'lucide-react';
 import { LiveIndicator } from '@/components/ui';
-
-type PlanStatus = 'draft' | 'approved' | 'executing' | 'completed' | 'failed';
-
-interface PlannedTask {
-  id: string;
-  title: string;
-  description: string;
-  requiredSkills: string[];
-  estimatedMinutes: number;
-  dependsOn: string[];
-}
-
-interface Plan {
-  id: string;
-  name: string;
-  description?: string;
-  userRequest: string;
-  status: PlanStatus;
-  plannedTasks: PlannedTask[];
-  createdAt: string;
-  updatedAt: string;
-  estimatedDuration?: number;
-  tags: string[];
-  isTemplate: boolean;
-}
+import type { Plan, PlanStatus } from '@jetpack/shared';
 
 const STATUS_CONFIG: Record<PlanStatus, { color: string; icon: React.ReactNode; label: string }> = {
   draft: {
@@ -68,10 +44,26 @@ const STATUS_CONFIG: Record<PlanStatus, { color: string; icon: React.ReactNode; 
     icon: <AlertCircle className="w-3.5 h-3.5" />,
     label: 'Failed',
   },
+  paused: {
+    color: 'text-[#8b8b8e]',
+    icon: <Clock className="w-3.5 h-3.5" />,
+    label: 'Paused',
+  },
 };
 
+interface PlanWithStats extends Plan {
+  stats?: {
+    total: number;
+    pending: number;
+    converted: number;
+    inProgress: number;
+    completed: number;
+    failed: number;
+  };
+}
+
 export default function PlansPage() {
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans, setPlans] = useState<PlanWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'templates'>('all');
 
@@ -118,11 +110,24 @@ export default function PlansPage() {
     return date.toLocaleDateString();
   };
 
-  const formatDuration = (minutes: number) => {
+  const formatDuration = (minutes?: number) => {
+    if (!minutes) return null;
     if (minutes < 60) return `${minutes}m`;
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
+  // Count items recursively
+  const countItems = (items: Plan['items']): number => {
+    let count = 0;
+    for (const item of items) {
+      count++;
+      if (item.children) {
+        count += countItems(item.children);
+      }
+    }
+    return count;
   };
 
   if (loading) {
@@ -210,6 +215,8 @@ export default function PlansPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredPlans.map((plan) => {
               const statusConfig = STATUS_CONFIG[plan.status];
+              const itemCount = countItems(plan.items);
+              const completedCount = plan.stats?.completed || 0;
 
               return (
                 <Link
@@ -236,7 +243,7 @@ export default function PlansPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium text-[#f7f8f8] truncate group-hover:text-[rgb(79,255,238)] transition-colors">
-                            {plan.name}
+                            {plan.title}
                           </h3>
                           <p className="text-xs text-[#8b8b8e] font-mono">{plan.id}</p>
                         </div>
@@ -256,25 +263,43 @@ export default function PlansPage() {
 
                   {/* Tasks preview */}
                   <div className="px-5 py-3 border-b border-[#26262a]/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Layers className="w-3.5 h-3.5 text-[#8b8b8e]" />
-                      <span className="text-xs text-[#8b8b8e]">
-                        {plan.plannedTasks.length} task{plan.plannedTasks.length !== 1 ? 's' : ''}
-                      </span>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-3.5 h-3.5 text-[#8b8b8e]" />
+                        <span className="text-xs text-[#8b8b8e]">
+                          {itemCount} item{itemCount !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      {plan.stats && itemCount > 0 && (
+                        <span className="text-xs text-[#22c55e]">
+                          {completedCount}/{itemCount} done
+                        </span>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      {plan.plannedTasks.slice(0, 3).map((task, idx) => (
+                    {/* Progress bar */}
+                    {plan.stats && itemCount > 0 && (
+                      <div className="h-1 bg-[#26262a] rounded-full overflow-hidden">
                         <div
-                          key={task.id}
+                          className="h-full bg-[rgb(79,255,238)] transition-all duration-300"
+                          style={{
+                            width: `${Math.round((completedCount / itemCount) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1 mt-2">
+                      {plan.items.slice(0, 3).map((item, idx) => (
+                        <div
+                          key={item.id}
                           className="flex items-center gap-2 text-xs text-[#f7f8f8]/70"
                         >
                           <span className="text-[#8b8b8e]">{idx + 1}.</span>
-                          <span className="truncate">{task.title}</span>
+                          <span className="truncate">{item.title}</span>
                         </div>
                       ))}
-                      {plan.plannedTasks.length > 3 && (
+                      {plan.items.length > 3 && (
                         <div className="text-xs text-[#8b8b8e]">
-                          +{plan.plannedTasks.length - 3} more
+                          +{plan.items.length - 3} more
                         </div>
                       )}
                     </div>
@@ -304,10 +329,10 @@ export default function PlansPage() {
                       <span>{formatDate(plan.updatedAt)}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      {plan.estimatedDuration && (
+                      {plan.estimatedTotalMinutes && (
                         <div className="flex items-center gap-1.5 text-[#8b8b8e]">
                           <Timer className="w-3.5 h-3.5" />
-                          <span>~{formatDuration(plan.estimatedDuration)}</span>
+                          <span>~{formatDuration(plan.estimatedTotalMinutes)}</span>
                         </div>
                       )}
                       <ChevronRight className="w-4 h-4 text-[#8b8b8e] group-hover:text-[rgb(79,255,238)] transition-colors" />

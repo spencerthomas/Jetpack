@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Brain,
   Activity,
@@ -18,6 +19,7 @@ import {
   Terminal,
   ChevronDown,
   ChevronRight,
+  FileText,
 } from 'lucide-react';
 import { Badge, LiveIndicator } from '@/components/ui';
 
@@ -85,11 +87,13 @@ const LANGGRAPH_NODES = [
 ];
 
 export default function SupervisorPage() {
+  const router = useRouter();
   const [state, setState] = useState<SupervisorState | null>(null);
   const [loading, setLoading] = useState(true);
   const [request, setRequest] = useState('');
   const [priority, setPriority] = useState<'high' | 'normal' | 'low'>('normal');
   const [sending, setSending] = useState(false);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [activeNode, setActiveNode] = useState<string>('planner');
 
@@ -148,6 +152,32 @@ export default function SupervisorPage() {
       console.error('Failed to send request:', error);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleGeneratePlan = async () => {
+    if (!request.trim()) return;
+
+    setGeneratingPlan(true);
+    try {
+      const res = await fetch('/api/supervisor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request: request.trim(), mode: 'plan' }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.planId) {
+          setRequest('');
+          // Navigate to the plan view
+          router.push(`/plans/${data.planId}`);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to generate plan:', error);
+    } finally {
+      setGeneratingPlan(false);
     }
   };
 
@@ -348,23 +378,42 @@ export default function SupervisorPage() {
                     ))}
                   </div>
 
-                  <button
-                    onClick={handleSendRequest}
-                    disabled={sending || !request.trim()}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[rgb(79,255,238)] text-[#0d0d0f] font-medium text-sm hover:bg-[rgb(79,255,238)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {sending ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        Send Request
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleGeneratePlan}
+                      disabled={generatingPlan || !request.trim()}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[rgb(79,255,238)] text-[rgb(79,255,238)] font-medium text-sm hover:bg-[rgb(79,255,238)]/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {generatingPlan ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4" />
+                          Generate Plan
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleSendRequest}
+                      disabled={sending || !request.trim()}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[rgb(79,255,238)] text-[#0d0d0f] font-medium text-sm hover:bg-[rgb(79,255,238)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {sending ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          Execute Now
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -6,6 +6,7 @@ export * from './types/memory';
 export * from './types/user';
 export * from './types/runtime';
 export * from './types/quality';
+export * from './types/plan';
 
 // Utilities
 export * from './utils/logger';

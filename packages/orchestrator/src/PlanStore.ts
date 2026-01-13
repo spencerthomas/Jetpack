@@ -1,61 +1,37 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { AgentSkill, Logger } from '@jetpack/shared';
+import {
+  Logger,
+  Plan,
+  PlanItem,
+  PlanStatus,
+  PlanProgressEvent,
+  generatePlanId,
+  generatePlanItemId,
+  findPlanItem,
+  updatePlanItem,
+  calculatePlanStats,
+} from '@jetpack/shared';
+import { PlanParser } from './PlanParser';
 
-export type PlanStatus = 'draft' | 'approved' | 'executing' | 'completed' | 'failed';
-
-export interface PlannedTask {
-  id: string;
-  title: string;
-  description: string;
-  requiredSkills: AgentSkill[];
-  estimatedMinutes: number;
-  dependsOn: string[]; // Task IDs
-}
-
-export interface ExecutionRecord {
-  id: string;
-  planId: string;
-  startedAt: string;
-  completedAt?: string;
-  status: 'running' | 'completed' | 'failed';
-  taskResults: Record<string, {
-    status: 'pending' | 'completed' | 'failed';
-    assignedAgent?: string;
-    completedAt?: string;
-    error?: string;
-  }>;
-  actualDuration?: number;
-}
-
-export interface Plan {
-  id: string;
-  name: string;
-  description?: string;
-  userRequest: string;
-  status: PlanStatus;
-  plannedTasks: PlannedTask[];
-  createdAt: string;
-  updatedAt: string;
-  estimatedDuration?: number;
-  executionHistory: ExecutionRecord[];
-  tags: string[];
-  isTemplate: boolean;
-}
+// Re-export types for convenience
+export type { Plan, PlanItem, PlanStatus, PlanProgressEvent };
 
 export interface CreatePlanInput {
-  name: string;
+  title: string;
   description?: string;
   userRequest: string;
-  plannedTasks: PlannedTask[];
+  items: PlanItem[];
   tags?: string[];
   isTemplate?: boolean;
+  source?: 'supervisor' | 'manual' | 'template' | 'import';
+  sourceMarkdown?: string;
 }
 
 export interface UpdatePlanInput {
-  name?: string;
+  title?: string;
   description?: string;
-  plannedTasks?: PlannedTask[];
+  items?: PlanItem[];
   status?: PlanStatus;
   tags?: string[];
   isTemplate?: boolean;
@@ -75,39 +51,62 @@ export class PlanStore {
     this.logger.info('PlanStore initialized');
   }
 
-  private generatePlanId(): string {
-    const chars = '0123456789abcdef';
-    let id = 'plan-';
-    for (let i = 0; i < 8; i++) {
-      id += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return id;
-  }
-
   private getPlanPath(planId: string): string {
     return path.join(this.plansDir, `${planId}.json`);
   }
 
+  /**
+   * Create a new plan from structured input
+   */
   async create(input: CreatePlanInput): Promise<Plan> {
     const now = new Date().toISOString();
+
+    // Calculate total estimate from items
+    let estimatedTotalMinutes = 0;
+    function sumEstimates(items: PlanItem[]) {
+      for (const item of items) {
+        estimatedTotalMinutes += item.estimatedMinutes || 0;
+        if (item.children) sumEstimates(item.children);
+      }
+    }
+    sumEstimates(input.items);
+
     const plan: Plan = {
-      id: this.generatePlanId(),
-      name: input.name,
+      id: generatePlanId(),
+      title: input.title,
       description: input.description,
       userRequest: input.userRequest,
       status: 'draft',
-      plannedTasks: input.plannedTasks,
+      items: input.items,
       createdAt: now,
       updatedAt: now,
-      estimatedDuration: input.plannedTasks.reduce((sum, t) => sum + t.estimatedMinutes, 0),
-      executionHistory: [],
+      estimatedTotalMinutes,
       tags: input.tags || [],
       isTemplate: input.isTemplate || false,
+      source: input.source || 'manual',
+      sourceMarkdown: input.sourceMarkdown,
     };
 
     await this.save(plan);
-    this.logger.info(`Created plan: ${plan.id} - ${plan.name}`);
+    this.logger.info(`Created plan: ${plan.id} - ${plan.title}`);
     return plan;
+  }
+
+  /**
+   * Create a plan from markdown text
+   */
+  async createFromMarkdown(markdown: string, userRequest?: string): Promise<Plan> {
+    const plan = PlanParser.parse(markdown, userRequest);
+    await this.save(plan);
+    this.logger.info(`Created plan from markdown: ${plan.id} - ${plan.title}`);
+    return plan;
+  }
+
+  /**
+   * Export a plan to markdown format
+   */
+  toMarkdown(plan: Plan): string {
+    return PlanParser.toMarkdown(plan);
   }
 
   async save(plan: Plan): Promise<void> {
@@ -132,11 +131,20 @@ export class PlanStore {
       return null;
     }
 
-    if (input.name !== undefined) plan.name = input.name;
+    if (input.title !== undefined) plan.title = input.title;
     if (input.description !== undefined) plan.description = input.description;
-    if (input.plannedTasks !== undefined) {
-      plan.plannedTasks = input.plannedTasks;
-      plan.estimatedDuration = input.plannedTasks.reduce((sum, t) => sum + t.estimatedMinutes, 0);
+    if (input.items !== undefined) {
+      plan.items = input.items;
+      // Recalculate estimate
+      let total = 0;
+      function sum(items: PlanItem[]) {
+        for (const item of items) {
+          total += item.estimatedMinutes || 0;
+          if (item.children) sum(item.children);
+        }
+      }
+      sum(input.items);
+      plan.estimatedTotalMinutes = total;
     }
     if (input.status !== undefined) plan.status = input.status;
     if (input.tags !== undefined) plan.tags = input.tags;
@@ -145,6 +153,32 @@ export class PlanStore {
     await this.save(plan);
     this.logger.info(`Updated plan: ${planId}`);
     return plan;
+  }
+
+  /**
+   * Update a single item within a plan
+   */
+  async updateItem(
+    planId: string,
+    itemId: string,
+    updates: Partial<PlanItem>
+  ): Promise<Plan | null> {
+    const plan = await this.get(planId);
+    if (!plan) return null;
+
+    plan.items = updatePlanItem(plan.items, itemId, updates);
+    await this.save(plan);
+    this.logger.info(`Updated item ${itemId} in plan ${planId}`);
+    return plan;
+  }
+
+  /**
+   * Get stats for a plan
+   */
+  async getStats(planId: string) {
+    const plan = await this.get(planId);
+    if (!plan) return null;
+    return calculatePlanStats(plan);
   }
 
   async delete(planId: string): Promise<boolean> {
@@ -198,50 +232,46 @@ export class PlanStore {
     }
   }
 
-  async addExecutionRecord(planId: string, record: ExecutionRecord): Promise<Plan | null> {
-    const plan = await this.get(planId);
-    if (!plan) return null;
-
-    plan.executionHistory.push(record);
-    plan.status = 'executing';
-    await this.save(plan);
-    return plan;
-  }
-
-  async updateExecutionRecord(
-    planId: string,
-    executionId: string,
-    updates: Partial<ExecutionRecord>
-  ): Promise<Plan | null> {
-    const plan = await this.get(planId);
-    if (!plan) return null;
-
-    const record = plan.executionHistory.find(r => r.id === executionId);
-    if (!record) return null;
-
-    Object.assign(record, updates);
-
-    if (updates.status === 'completed') {
-      plan.status = 'completed';
-    } else if (updates.status === 'failed') {
-      plan.status = 'failed';
-    }
-
-    await this.save(plan);
-    return plan;
-  }
-
-  async clone(planId: string, newName: string): Promise<Plan | null> {
+  /**
+   * Clone a plan with a new title
+   */
+  async clone(planId: string, newTitle: string): Promise<Plan | null> {
     const original = await this.get(planId);
     if (!original) return null;
 
+    // Deep clone items and generate new IDs
+    function cloneItems(items: PlanItem[]): PlanItem[] {
+      return items.map(item => ({
+        ...item,
+        id: generatePlanItemId(),
+        status: 'pending' as const,
+        taskId: undefined,
+        assignedAgent: undefined,
+        startedAt: undefined,
+        completedAt: undefined,
+        actualMinutes: undefined,
+        error: undefined,
+        children: item.children ? cloneItems(item.children) : undefined,
+      }));
+    }
+
     return this.create({
-      name: newName,
+      title: newTitle,
       description: original.description,
       userRequest: original.userRequest,
-      plannedTasks: original.plannedTasks.map(t => ({ ...t })),
+      items: cloneItems(original.items),
       tags: original.tags,
       isTemplate: false,
+      source: 'template',
     });
+  }
+
+  /**
+   * Find an item by ID within a plan
+   */
+  async findItem(planId: string, itemId: string): Promise<PlanItem | null> {
+    const plan = await this.get(planId);
+    if (!plan) return null;
+    return findPlanItem(plan.items, itemId);
   }
 }

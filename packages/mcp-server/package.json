@@ -1,0 +1,33 @@
+{
+  "name": "@jetpack/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for Claude Code integration with Jetpack",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "jetpack-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@jetpack/shared": "workspace:*",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "typescript": "^5.8.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ATheorell/Jetpack.git",
+    "directory": "packages/mcp-server"
+  },
+  "license": "MIT"
+}

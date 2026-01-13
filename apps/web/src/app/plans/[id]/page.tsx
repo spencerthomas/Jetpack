@@ -6,70 +6,30 @@ import Link from 'next/link';
 import {
   GitBranch,
   ArrowLeft,
-  Play,
   Edit2,
   Trash2,
-  CheckCircle2,
-  AlertCircle,
   Clock,
-  Layers,
-  ChevronDown,
-  ChevronRight,
   Tag,
-  Timer,
   Save,
   X,
-  GripVertical,
   Plus,
+  RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui';
+import { PlanView } from '@/components/PlanView';
+import { usePlanProgress } from '@/hooks';
+import type { Plan, PlanStatus } from '@jetpack/shared';
 
-type PlanStatus = 'draft' | 'approved' | 'executing' | 'completed' | 'failed';
-
-interface PlannedTask {
-  id: string;
-  title: string;
-  description: string;
-  requiredSkills: string[];
-  estimatedMinutes: number;
-  dependsOn: string[];
-}
-
-interface ExecutionRecord {
-  id: string;
-  planId: string;
-  startedAt: string;
-  completedAt?: string;
-  status: 'running' | 'completed' | 'failed';
-  taskResults: Record<string, {
-    status: 'pending' | 'completed' | 'failed';
-    assignedAgent?: string;
-    completedAt?: string;
-    error?: string;
-  }>;
-}
-
-interface Plan {
-  id: string;
-  name: string;
-  description?: string;
-  userRequest: string;
-  status: PlanStatus;
-  plannedTasks: PlannedTask[];
-  createdAt: string;
-  updatedAt: string;
-  estimatedDuration?: number;
-  executionHistory: ExecutionRecord[];
-  tags: string[];
-  isTemplate: boolean;
-}
-
-const STATUS_BADGES: Record<PlanStatus, { variant: 'default' | 'primary' | 'success' | 'warning' | 'error'; label: string }> = {
+const STATUS_BADGES: Record<
+  PlanStatus,
+  { variant: 'default' | 'primary' | 'success' | 'warning' | 'error'; label: string }
+> = {
   draft: { variant: 'default', label: 'Draft' },
   approved: { variant: 'primary', label: 'Approved' },
   executing: { variant: 'warning', label: 'Executing' },
   completed: { variant: 'success', label: 'Completed' },
   failed: { variant: 'error', label: 'Failed' },
+  paused: { variant: 'default', label: 'Paused' },
 };
 
 export default function PlanDetailPage() {
@@ -79,9 +39,7 @@ export default function PlanDetailPage() {
 
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [executing, setExecuting] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [editedPlan, setEditedPlan] = useState<Plan | null>(null);
 
   const fetchPlan = useCallback(async () => {
@@ -105,27 +63,39 @@ export default function PlanDetailPage() {
     fetchPlan();
   }, [fetchPlan]);
 
-  const handleExecute = async () => {
-    if (!plan || executing) return;
+  // Subscribe to real-time progress when executing
+  const { connected } = usePlanProgress({
+    planId,
+    enabled: plan?.status === 'executing',
+    onProgress: () => {
+      // Refresh plan data when progress events come in
+      fetchPlan();
+    },
+    onComplete: () => {
+      fetchPlan();
+    },
+  });
 
-    setExecuting(true);
-    try {
-      const res = await fetch(`/api/plans/${planId}/execute`, {
+  const handleConvert = useCallback(
+    async (itemIds: string[]) => {
+      if (!plan) return;
+
+      const res = await fetch(`/api/plans/${planId}/convert`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemIds, preserveDependencies: true }),
       });
 
-      if (res.ok) {
-        // Refresh plan to show executing status
-        await fetchPlan();
-        // Optionally navigate to board to see tasks
-        router.push('/board');
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to convert items');
       }
-    } catch (error) {
-      console.error('Failed to execute plan:', error);
-    } finally {
-      setExecuting(false);
-    }
-  };
+
+      // Refresh plan to show updated status
+      await fetchPlan();
+    },
+    [plan, planId, fetchPlan]
+  );
 
   const handleSave = async () => {
     if (!editedPlan) return;
@@ -135,9 +105,8 @@ export default function PlanDetailPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: editedPlan.name,
+          title: editedPlan.title,
           description: editedPlan.description,
-          plannedTasks: editedPlan.plannedTasks,
           tags: editedPlan.tags,
         }),
       });
@@ -168,27 +137,8 @@ export default function PlanDetailPage() {
     }
   };
 
-  const toggleTaskExpanded = (taskId: string) => {
-    setExpandedTasks((prev) => {
-      const next = new Set(prev);
-      if (next.has(taskId)) {
-        next.delete(taskId);
-      } else {
-        next.add(taskId);
-      }
-      return next;
-    });
-  };
-
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString();
-  };
-
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
   if (loading) {
@@ -227,19 +177,25 @@ export default function PlanDetailPage() {
               {editing ? (
                 <input
                   type="text"
-                  value={editedPlan?.name || ''}
+                  value={editedPlan?.title || ''}
                   onChange={(e) =>
-                    setEditedPlan((p) => (p ? { ...p, name: e.target.value } : null))
+                    setEditedPlan((p) => (p ? { ...p, title: e.target.value } : null))
                   }
                   className="bg-transparent border-b border-[rgb(79,255,238)] text-[#f7f8f8] font-semibold outline-none"
                 />
               ) : (
-                <h1 className="text-[#f7f8f8] font-semibold">{plan.name}</h1>
+                <h1 className="text-[#f7f8f8] font-semibold">{plan.title}</h1>
               )}
             </div>
             <Badge variant={statusBadge.variant} size="sm" dot>
               {statusBadge.label}
             </Badge>
+            {connected && plan.status === 'executing' && (
+              <span className="flex items-center gap-1.5 text-xs text-[#22c55e]">
+                <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
+                Live
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {editing ? (
@@ -265,6 +221,13 @@ export default function PlanDetailPage() {
             ) : (
               <>
                 <button
+                  onClick={fetchPlan}
+                  className="p-2 rounded-lg text-[#8b8b8e] hover:text-[#f7f8f8] hover:bg-[#26262a] transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <button
                   onClick={handleDelete}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[#ff6467] hover:bg-[#ff6467]/10 transition-colors"
                 >
@@ -278,16 +241,6 @@ export default function PlanDetailPage() {
                   <Edit2 className="w-4 h-4" />
                   Edit
                 </button>
-                {(plan.status === 'draft' || plan.status === 'approved') && (
-                  <button
-                    onClick={handleExecute}
-                    disabled={executing}
-                    className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-[rgb(79,255,238)] text-black text-sm font-medium hover:bg-[rgb(79,255,238)]/90 transition-colors disabled:opacity-50"
-                  >
-                    <Play className="w-4 h-4" />
-                    {executing ? 'Starting...' : 'Execute Plan'}
-                  </button>
-                )}
               </>
             )}
           </div>
@@ -329,22 +282,6 @@ export default function PlanDetailPage() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-[#26262a]">
-              <div>
-                <div className="flex items-center gap-1.5 text-[#8b8b8e] text-xs mb-1">
-                  <Layers className="w-3.5 h-3.5" />
-                  Tasks
-                </div>
-                <p className="text-[#f7f8f8] font-medium">{plan.plannedTasks.length}</p>
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5 text-[#8b8b8e] text-xs mb-1">
-                  <Timer className="w-3.5 h-3.5" />
-                  Estimated
-                </div>
-                <p className="text-[#f7f8f8] font-medium">
-                  {plan.estimatedDuration ? formatDuration(plan.estimatedDuration) : '-'}
-                </p>
-              </div>
               <div>
                 <div className="flex items-center gap-1.5 text-[#8b8b8e] text-xs mb-1">
                   <Clock className="w-3.5 h-3.5" />
@@ -405,263 +342,8 @@ export default function PlanDetailPage() {
             )}
           </div>
 
-          {/* Tasks */}
-          <div className="rounded-xl bg-[#16161a]/50 border border-[#26262a] overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#26262a] flex items-center justify-between">
-              <h2 className="text-[#f7f8f8] font-semibold flex items-center gap-2">
-                <Layers className="w-5 h-5 text-[rgb(79,255,238)]" />
-                Planned Tasks
-              </h2>
-              {editing && (
-                <button
-                  onClick={() => {
-                    const newTask: PlannedTask = {
-                      id: `task-${Date.now()}`,
-                      title: 'New Task',
-                      description: '',
-                      requiredSkills: [],
-                      estimatedMinutes: 15,
-                      dependsOn: [],
-                    };
-                    setEditedPlan((p) =>
-                      p ? { ...p, plannedTasks: [...p.plannedTasks, newTask] } : null
-                    );
-                    setExpandedTasks((prev) => new Set([...prev, newTask.id]));
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-[rgb(79,255,238)] hover:bg-[rgb(79,255,238)]/10 rounded-lg transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Task
-                </button>
-              )}
-            </div>
-
-            <div className="divide-y divide-[#26262a]">
-              {currentPlan.plannedTasks.map((task, index) => {
-                const isExpanded = expandedTasks.has(task.id);
-                const executionStatus = plan.executionHistory[0]?.taskResults?.[task.id];
-
-                return (
-                  <div key={task.id} className="group">
-                    <div
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-[#1f1f24]/50 cursor-pointer"
-                      onClick={() => toggleTaskExpanded(task.id)}
-                    >
-                      {editing && (
-                        <GripVertical className="w-4 h-4 text-[#8b8b8e] opacity-0 group-hover:opacity-100" />
-                      )}
-                      <div className="w-6 h-6 rounded-full bg-[#26262a] flex items-center justify-center text-xs text-[#8b8b8e]">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        {editing ? (
-                          <input
-                            type="text"
-                            value={task.title}
-                            onChange={(e) => {
-                              setEditedPlan((p) => {
-                                if (!p) return null;
-                                const tasks = [...p.plannedTasks];
-                                tasks[index] = { ...tasks[index], title: e.target.value };
-                                return { ...p, plannedTasks: tasks };
-                              });
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full bg-transparent border-b border-[#26262a] focus:border-[rgb(79,255,238)] text-[#f7f8f8] outline-none"
-                          />
-                        ) : (
-                          <p className="text-[#f7f8f8] font-medium truncate">{task.title}</p>
-                        )}
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-[#8b8b8e]">
-                            ~{task.estimatedMinutes} min
-                          </span>
-                          {task.requiredSkills.length > 0 && (
-                            <div className="flex items-center gap-1">
-                              {task.requiredSkills.slice(0, 2).map((skill) => (
-                                <span
-                                  key={skill}
-                                  className="px-1.5 py-0.5 text-[10px] rounded bg-[#26262a] text-[#8b8b8e]"
-                                >
-                                  {skill}
-                                </span>
-                              ))}
-                              {task.requiredSkills.length > 2 && (
-                                <span className="text-[10px] text-[#8b8b8e]">
-                                  +{task.requiredSkills.length - 2}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {executionStatus && (
-                        <Badge
-                          variant={
-                            executionStatus.status === 'completed'
-                              ? 'success'
-                              : executionStatus.status === 'failed'
-                              ? 'error'
-                              : 'default'
-                          }
-                          size="sm"
-                        >
-                          {executionStatus.status}
-                        </Badge>
-                      )}
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-[#8b8b8e]" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-[#8b8b8e]" />
-                      )}
-                    </div>
-
-                    {isExpanded && (
-                      <div className="px-6 py-4 bg-[#0d0d0f]/50 border-t border-[#26262a]">
-                        <div className="pl-10 space-y-4">
-                          <div>
-                            <label className="block text-xs text-[#8b8b8e] mb-1">Description</label>
-                            {editing ? (
-                              <textarea
-                                value={task.description}
-                                onChange={(e) => {
-                                  setEditedPlan((p) => {
-                                    if (!p) return null;
-                                    const tasks = [...p.plannedTasks];
-                                    tasks[index] = { ...tasks[index], description: e.target.value };
-                                    return { ...p, plannedTasks: tasks };
-                                  });
-                                }}
-                                className="w-full bg-[#16161a] border border-[#26262a] rounded-lg p-2 text-[#f7f8f8] text-sm resize-none"
-                                rows={2}
-                              />
-                            ) : (
-                              <p className="text-[#f7f8f8] text-sm">
-                                {task.description || (
-                                  <span className="text-[#8b8b8e]">No description</span>
-                                )}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs text-[#8b8b8e] mb-1">
-                                Required Skills
-                              </label>
-                              <div className="flex flex-wrap gap-1">
-                                {task.requiredSkills.map((skill) => (
-                                  <span
-                                    key={skill}
-                                    className="px-2 py-0.5 text-xs rounded border border-[#26262a] text-[#8b8b8e]"
-                                  >
-                                    {skill}
-                                  </span>
-                                ))}
-                                {task.requiredSkills.length === 0 && (
-                                  <span className="text-xs text-[#8b8b8e]">Any agent</span>
-                                )}
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs text-[#8b8b8e] mb-1">
-                                Dependencies
-                              </label>
-                              {task.dependsOn.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {task.dependsOn.map((depId) => {
-                                    const depTask = currentPlan.plannedTasks.find(
-                                      (t) => t.id === depId
-                                    );
-                                    return (
-                                      <span
-                                        key={depId}
-                                        className="px-2 py-0.5 text-xs rounded border border-[#26262a] text-[#8b8b8e]"
-                                      >
-                                        {depTask?.title || depId}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <span className="text-xs text-[#8b8b8e]">None</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {editing && (
-                            <div className="flex justify-end">
-                              <button
-                                onClick={() => {
-                                  setEditedPlan((p) => {
-                                    if (!p) return null;
-                                    return {
-                                      ...p,
-                                      plannedTasks: p.plannedTasks.filter((_, i) => i !== index),
-                                    };
-                                  });
-                                }}
-                                className="flex items-center gap-1 px-2 py-1 text-xs text-[#ff6467] hover:bg-[#ff6467]/10 rounded transition-colors"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                                Remove Task
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Execution History */}
-          {plan.executionHistory.length > 0 && (
-            <div className="rounded-xl bg-[#16161a]/50 border border-[#26262a] overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#26262a]">
-                <h2 className="text-[#f7f8f8] font-semibold flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-[rgb(79,255,238)]" />
-                  Execution History
-                </h2>
-              </div>
-              <div className="divide-y divide-[#26262a]">
-                {plan.executionHistory.map((exec) => (
-                  <div key={exec.id} className="px-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {exec.status === 'completed' ? (
-                          <CheckCircle2 className="w-5 h-5 text-[#22c55e]" />
-                        ) : exec.status === 'failed' ? (
-                          <AlertCircle className="w-5 h-5 text-[#ff6467]" />
-                        ) : (
-                          <div className="w-5 h-5 rounded-full border-2 border-[#f59e0b] border-t-transparent animate-spin" />
-                        )}
-                        <div>
-                          <p className="text-[#f7f8f8] text-sm font-medium">
-                            Execution {exec.id.slice(-6)}
-                          </p>
-                          <p className="text-xs text-[#8b8b8e]">{formatDate(exec.startedAt)}</p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant={
-                          exec.status === 'completed'
-                            ? 'success'
-                            : exec.status === 'failed'
-                            ? 'error'
-                            : 'warning'
-                        }
-                      >
-                        {exec.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Plan View (tree with checkboxes and progress) */}
+          <PlanView plan={plan} onConvert={handleConvert} onRefresh={fetchPlan} />
         </div>
       </div>
     </div>

@@ -814,4 +814,27 @@ program
     }
   });
 
+program
+  .command('mcp')
+  .description('Start MCP server for Claude Code integration')
+  .option('--dir <path>', 'Working directory for Jetpack data', process.cwd())
+  .action(async (options) => {
+    // Set the working directory for the MCP server
+    process.env.JETPACK_WORK_DIR = options.dir;
+
+    // Import and start the MCP server
+    // The MCP server uses stdio transport, so we just need to run it
+    console.error(chalk.cyan('Starting Jetpack MCP server...'));
+    console.error(chalk.gray(`Working directory: ${options.dir}`));
+    console.error(chalk.gray('Connect Claude Code using .claude/settings.json\n'));
+
+    try {
+      // Dynamically import the MCP server (it will handle stdio)
+      await import('@jetpack/mcp-server');
+    } catch (error) {
+      console.error(chalk.red('Failed to start MCP server:'), error);
+      process.exit(1);
+    }
+  });
+
 program.parse();

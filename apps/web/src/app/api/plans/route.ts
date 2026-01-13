@@ -1,66 +1,45 @@
 import { NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import {
+  Plan,
+  PlanItem,
+  PlanStatus,
+  generatePlanId,
+  generatePlanItemId,
+  calculatePlanStats,
+} from '@jetpack/shared';
+import { PlanParser } from '@jetpack/orchestrator';
 
-interface PlannedTask {
-  id: string;
-  title: string;
-  description: string;
-  requiredSkills: string[];
-  estimatedMinutes: number;
-  dependsOn: string[];
+// Get working directory from environment variable
+function getWorkDir(): string {
+  return process.env.JETPACK_WORK_DIR || path.join(process.cwd(), '../..');
 }
 
-interface Plan {
-  id: string;
-  name: string;
-  description?: string;
-  userRequest: string;
-  status: 'draft' | 'approved' | 'executing' | 'completed' | 'failed';
-  plannedTasks: PlannedTask[];
-  createdAt: string;
-  updatedAt: string;
-  estimatedDuration?: number;
-  executionHistory: unknown[];
-  tags: string[];
-  isTemplate: boolean;
-}
-
-const plansDir = path.join(process.cwd(), '../..', '.jetpack', 'plans');
-
-function generatePlanId(): string {
-  const chars = '0123456789abcdef';
-  let id = 'plan-';
-  for (let i = 0; i < 8; i++) {
-    id += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return id;
-}
-
-function generateTaskId(): string {
-  const chars = '0123456789abcdef';
-  let id = 'task-';
-  for (let i = 0; i < 6; i++) {
-    id += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return id;
+function getPlansDir(): string {
+  return path.join(getWorkDir(), '.jetpack', 'plans');
 }
 
 async function ensurePlansDir() {
-  await fs.mkdir(plansDir, { recursive: true });
+  await fs.mkdir(getPlansDir(), { recursive: true });
 }
 
-// GET /api/plans - List all plans
+/**
+ * GET /api/plans - List all plans with optional filtering
+ * Query params: status, isTemplate, tags
+ */
 export async function GET(request: Request) {
   try {
     await ensurePlansDir();
 
     const url = new URL(request.url);
-    const status = url.searchParams.get('status');
+    const status = url.searchParams.get('status') as PlanStatus | null;
     const isTemplate = url.searchParams.get('isTemplate');
+    const tags = url.searchParams.get('tags')?.split(',').filter(Boolean);
 
+    const plansDir = getPlansDir();
     const files = await fs.readdir(plansDir);
-    const plans: Plan[] = [];
+    const plans: (Plan & { stats: ReturnType<typeof calculatePlanStats> })[] = [];
 
     for (const file of files) {
       if (!file.endsWith('.json')) continue;
@@ -74,8 +53,14 @@ export async function GET(request: Request) {
         if (status && plan.status !== status) continue;
         if (isTemplate === 'true' && !plan.isTemplate) continue;
         if (isTemplate === 'false' && plan.isTemplate) continue;
+        if (tags && tags.length > 0) {
+          const hasAllTags = tags.every(tag => plan.tags.includes(tag));
+          if (!hasAllTags) continue;
+        }
 
-        plans.push(plan);
+        // Add computed stats
+        const stats = calculatePlanStats(plan);
+        plans.push({ ...plan, stats });
       } catch (err) {
         console.warn(`Failed to parse plan file: ${file}`);
       }
@@ -91,52 +76,96 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/plans - Create a new plan
+/**
+ * POST /api/plans - Create a new plan
+ * Body: { title, description, userRequest, items, tags, isTemplate, markdown }
+ *
+ * If 'markdown' is provided, parses it to create the plan structure.
+ * Otherwise, uses 'items' directly.
+ */
 export async function POST(request: Request) {
   try {
     await ensurePlansDir();
 
     const body = await request.json();
-    const { name, description, userRequest, tasks, tags, isTemplate } = body;
+    const { title, description, userRequest, items, tags, isTemplate, markdown } = body;
 
-    if (!name || !userRequest) {
-      return NextResponse.json(
-        { error: 'name and userRequest are required' },
-        { status: 400 }
-      );
+    let plan: Plan;
+
+    if (markdown) {
+      // Parse markdown to create plan
+      plan = PlanParser.parse(markdown, userRequest || title);
+      // Override with provided values
+      if (title) plan.title = title;
+      if (description) plan.description = description;
+      if (tags) plan.tags = tags;
+      if (isTemplate !== undefined) plan.isTemplate = isTemplate;
+    } else {
+      // Create from structured input
+      if (!title || !userRequest) {
+        return NextResponse.json(
+          { error: 'title and userRequest are required (or provide markdown)' },
+          { status: 400 }
+        );
+      }
+
+      const now = new Date().toISOString();
+
+      // Generate IDs for items if not provided
+      const planItems: PlanItem[] = (items || []).map((item: Partial<PlanItem>) => ({
+        id: item.id || generatePlanItemId(),
+        title: item.title || '',
+        description: item.description,
+        status: item.status || 'pending',
+        priority: item.priority || 'medium',
+        skills: item.skills || [],
+        estimatedMinutes: item.estimatedMinutes,
+        dependencies: item.dependencies || [],
+        children: item.children?.map((child: Partial<PlanItem>) => ({
+          id: child.id || generatePlanItemId(),
+          title: child.title || '',
+          description: child.description,
+          status: child.status || 'pending',
+          priority: child.priority || 'medium',
+          skills: child.skills || [],
+          estimatedMinutes: child.estimatedMinutes,
+          dependencies: child.dependencies || [],
+        })),
+      }));
+
+      // Calculate total estimate
+      let estimatedTotalMinutes = 0;
+      function sumEstimates(items: PlanItem[]) {
+        for (const item of items) {
+          estimatedTotalMinutes += item.estimatedMinutes || 0;
+          if (item.children) sumEstimates(item.children);
+        }
+      }
+      sumEstimates(planItems);
+
+      plan = {
+        id: generatePlanId(),
+        title,
+        description,
+        userRequest,
+        status: 'draft',
+        items: planItems,
+        createdAt: now,
+        updatedAt: now,
+        estimatedTotalMinutes,
+        tags: tags || [],
+        isTemplate: isTemplate || false,
+        source: 'manual',
+      };
     }
 
-    const now = new Date().toISOString();
-
-    // Generate IDs for tasks if not provided
-    const plannedTasks: PlannedTask[] = (tasks || []).map((t: Partial<PlannedTask>) => ({
-      id: t.id || generateTaskId(),
-      title: t.title || '',
-      description: t.description || '',
-      requiredSkills: t.requiredSkills || [],
-      estimatedMinutes: t.estimatedMinutes || 15,
-      dependsOn: t.dependsOn || [],
-    }));
-
-    const plan: Plan = {
-      id: generatePlanId(),
-      name,
-      description,
-      userRequest,
-      status: 'draft',
-      plannedTasks,
-      createdAt: now,
-      updatedAt: now,
-      estimatedDuration: plannedTasks.reduce((sum, t) => sum + t.estimatedMinutes, 0),
-      executionHistory: [],
-      tags: tags || [],
-      isTemplate: isTemplate || false,
-    };
-
-    const filePath = path.join(plansDir, `${plan.id}.json`);
+    // Save plan
+    const filePath = path.join(getPlansDir(), `${plan.id}.json`);
     await fs.writeFile(filePath, JSON.stringify(plan, null, 2));
 
-    return NextResponse.json({ plan });
+    // Return with stats
+    const stats = calculatePlanStats(plan);
+    return NextResponse.json({ plan: { ...plan, stats } });
   } catch (error) {
     console.error('Failed to create plan:', error);
     return NextResponse.json({ error: 'Failed to create plan' }, { status: 500 });

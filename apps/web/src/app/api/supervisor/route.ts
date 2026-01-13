@@ -43,6 +43,8 @@ interface SupervisorQueueRequest {
   priority: 'high' | 'normal' | 'low';
   requestedAt: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
+  mode: 'execute' | 'plan';  // execute = create tasks immediately, plan = generate plan only
+  planId?: string;  // If mode=plan, the created plan ID
   error?: string;
 }
 
@@ -103,6 +105,21 @@ export async function GET() {
 
 /**
  * POST /api/supervisor - Send a request to the supervisor
+ *
+ * Body: {
+ *   request: string;          // The user request to process
+ *   priority?: 'high' | 'normal' | 'low';
+ *   mode?: 'execute' | 'plan'; // execute = immediate task creation, plan = generate plan only
+ * }
+ *
+ * When mode='plan':
+ * - Generates a plan using the supervisor's PlannerNode
+ * - Creates a Plan object that can be viewed/edited
+ * - Returns the planId for navigation to /plans/[id]
+ *
+ * When mode='execute' (default):
+ * - Queues the request for the orchestrator
+ * - Tasks are created and assigned to agents
  */
 export async function POST(request: NextRequest) {
   try {
@@ -115,13 +132,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create queue entry
+    const mode = body.mode || 'execute';
+
+    // If plan mode, generate plan immediately without queueing
+    if (mode === 'plan') {
+      return await generatePlan(body.request.trim());
+    }
+
+    // Create queue entry for execution mode
     const queueEntry: SupervisorQueueRequest = {
       id: `sup-${Date.now()}-${Math.random().toString(36).substring(7)}`,
       request: body.request.trim(),
       priority: body.priority || 'normal',
       requestedAt: new Date().toISOString(),
       status: 'pending',
+      mode: 'execute',
     };
 
     // Load and update queue
@@ -141,6 +166,92 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Generate a plan from a user request using the supervisor's planner
+ */
+async function generatePlan(userRequest: string) {
+  try {
+    // Import PlanParser and types
+    const { PlanParser } = await import('@jetpack/orchestrator');
+    const { calculatePlanStats } = await import('@jetpack/shared');
+
+    // For now, generate a basic plan structure
+    // In a full implementation, this would call the LLM-powered PlannerNode
+
+    // Generate markdown plan (simplified - real impl would use LLM)
+    const planMarkdown = generateBasicPlanMarkdown(userRequest);
+
+    // Parse markdown to plan
+    const plan = PlanParser.parse(planMarkdown, userRequest);
+
+    // Save plan
+    const plansDir = path.join(JETPACK_DIR, 'plans');
+    await fs.mkdir(plansDir, { recursive: true });
+    const planPath = path.join(plansDir, `${plan.id}.json`);
+    await fs.writeFile(planPath, JSON.stringify(plan, null, 2));
+
+    const stats = calculatePlanStats(plan);
+
+    return NextResponse.json({
+      success: true,
+      mode: 'plan',
+      planId: plan.id,
+      plan: { ...plan, stats },
+      message: 'Plan generated. Navigate to /plans/' + plan.id + ' to view and edit.',
+    });
+  } catch (error) {
+    console.error('Error generating plan:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate plan: ' + (error as Error).message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Generate a basic plan markdown from a user request
+ * This is a simplified version - the real implementation would use the LLM PlannerNode
+ */
+function generateBasicPlanMarkdown(userRequest: string): string {
+  // Extract a title from the request
+  const title = userRequest.length > 50
+    ? userRequest.substring(0, 50) + '...'
+    : userRequest;
+
+  return `# Plan: ${title}
+
+## Overview
+${userRequest}
+
+## Tasks
+
+### 1. Analyze requirements [high] [backend]
+Review the request and identify specific technical requirements.
+- Dependencies: none
+- Estimate: 15m
+
+### 2. Design solution [high] [backend, typescript]
+Create the technical design and identify files to modify.
+- Dependencies: 1
+- Estimate: 20m
+
+### 3. Implement changes [high] [typescript, backend]
+Make the necessary code changes to implement the solution.
+- Dependencies: 2
+- Estimate: 45m
+
+### 4. Test implementation [medium] [testing]
+Verify the implementation works correctly.
+- Dependencies: 3
+- Estimate: 15m
+
+### 5. Documentation [low] [documentation]
+Update documentation if needed.
+- Dependencies: 4
+- Estimate: 10m
+`;
 }
 
 /**
