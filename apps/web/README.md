@@ -289,7 +289,16 @@ System configuration interface.
 
 ## Getting Started
 
-### Development
+### With Jetpack CLI (Recommended)
+
+```bash
+# Start everything together (orchestrator + agents + web UI)
+jetpack start
+
+# Browser opens automatically to http://localhost:3002
+```
+
+### Development (Standalone)
 
 ```bash
 # From the Jetpack root directory
@@ -298,20 +307,31 @@ cd apps/web
 # Install dependencies (usually done via root pnpm install)
 pnpm install
 
-# Run development server
+# Run development server (connects to Jetpack repo's own data)
 pnpm dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000)
 
-### With Jetpack CLI (Recommended)
+### Working with External Projects
+
+To use the web UI with a different project directory, set `JETPACK_WORK_DIR`:
 
 ```bash
-# Start everything together
-jetpack start
+# Point to your project (critical for correct data loading)
+JETPACK_WORK_DIR=/path/to/your/project pnpm dev
 
-# Browser opens automatically to http://localhost:3002
+# Example
+JETPACK_WORK_DIR=/Users/tom/dev/my-app pnpm dev -p 3002
 ```
+
+**Important:** The `JETPACK_WORK_DIR` environment variable tells all API routes where to find:
+- `.beads/tasks.jsonl` - Task storage
+- `.cass/memory.db` - Agent memory database
+- `.jetpack/plans/` - Plan files
+- `.jetpack/mail/` - Agent messages
+
+Without this variable, the web UI defaults to the Jetpack repository root, which may show stale or incorrect data when working on external projects.
 
 ### Production Build
 
@@ -371,22 +391,58 @@ apps/web/
 
 ### No tasks showing
 1. Ensure Jetpack backend is running (`jetpack start`)
-2. Check `.beads/tasks.jsonl` exists
+2. Check `.beads/tasks.jsonl` exists in target project
 3. Verify API is accessible at `/api/tasks`
+4. If using standalone mode, ensure `JETPACK_WORK_DIR` is set correctly
 
 ### No agents showing
 1. Confirm agents started with `jetpack start --agents N`
 2. Check agent status with `jetpack status`
+3. Note: Agent page shows "Click 'Spawn Agent' to start" when no agents exist
 
 ### Inbox empty
-1. Verify `.jetpack/mail/` directory exists
+1. Verify `.jetpack/mail/` directory exists in target project
 2. Ensure agents are sending messages
 3. Check for message type filters
 
-### Memory page shows no data
-1. Confirm `.cass/memory.db` exists
-2. Check if any memories have been stored
-3. Verify CASS adapter is initialized
+### Memory page shows no data / shows wrong data
+1. Confirm `.cass/memory.db` exists in target project
+2. **Critical:** Set `JETPACK_WORK_DIR` if working on external project
+3. Check if any memories have been stored with `jetpack status`
+4. Restart the web server after changing `JETPACK_WORK_DIR`
+
+### Plans not appearing
+1. Check `.jetpack/plans/` directory exists
+2. Verify plan JSON files have correct structure (see Plan Structure below)
+3. Ensure `JETPACK_WORK_DIR` points to correct project
+
+### Plan Structure
+
+Plans stored in `.jetpack/plans/*.json` must have this structure:
+
+```json
+{
+  "id": "plan-timestamp",
+  "title": "Plan title",
+  "description": "Optional description",
+  "status": "draft",
+  "createdAt": "ISO date",
+  "items": [
+    {
+      "id": "item-1",
+      "title": "Task title",
+      "description": "Task description",
+      "status": "pending",
+      "priority": "high",
+      "skills": ["typescript", "backend"],
+      "dependencies": [],
+      "estimatedMinutes": 30
+    }
+  ]
+}
+```
+
+**Required item fields:** `id`, `title`, `status`, `priority`, `skills`, `dependencies`
 
 ---
 

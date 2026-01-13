@@ -172,6 +172,18 @@ jetpack task -t "Fix the login bug" -p high -s typescript
 **Option 3: Web UI**
 Use the Kanban board at http://localhost:3002
 
+### CLI Commands Reference
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `init` | Initialize Jetpack in a project | `jetpack init -a 5 -p 3005` |
+| `start` | Start orchestrator + agents + web UI | `jetpack start -a 5` |
+| `task` | Create a new task | `jetpack task -t "Fix bug" -p high` |
+| `status` | Show system status | `jetpack status` |
+| `demo` | Run guided demo workflow | `jetpack demo --agents 5` |
+| `supervise` | AI-powered task breakdown | `jetpack supervise "Build auth"` |
+| `mcp` | Start MCP server for Claude Code | `jetpack mcp --dir /path` |
+
 ### CLI Options
 
 ```bash
@@ -195,6 +207,66 @@ jetpack demo --agents 5
 jetpack supervise "Build user authentication" --agents 5
 ```
 
+---
+
+## 🔗 Claude Code Integration (MCP Server)
+
+Jetpack includes an MCP server that makes **Claude Code a first-class Jetpack client**. Plans and tasks sync bidirectionally between Claude Code and the web UI.
+
+### Quick Setup
+
+1. **Build Jetpack:**
+   ```bash
+   pnpm install && pnpm build
+   ```
+
+2. **Add to `.claude/settings.local.json`:**
+   ```json
+   {
+     "mcpServers": {
+       "jetpack": {
+         "command": "node",
+         "args": ["/path/to/Jetpack/packages/mcp-server/dist/index.js"],
+         "env": {
+           "JETPACK_WORK_DIR": "/path/to/your/project"
+         }
+       }
+     }
+   }
+   ```
+
+3. **Restart Claude Code** and verify with `/mcp`
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `jetpack_list_plans` | List all plans |
+| `jetpack_create_plan` | Create plan with task breakdown |
+| `jetpack_list_tasks` | List tasks by status |
+| `jetpack_claim_task` | Claim a task to work on |
+| `jetpack_complete_task` | Mark task completed |
+| `jetpack_sync_todos` | Sync Claude Code todos to Jetpack |
+
+### Example Workflow
+
+```
+User: "Create a plan for building user authentication"
+
+Claude: I'll use jetpack_create_plan to create a structured plan...
+
+[Plan created with items: user model, JWT service, login endpoint, tests]
+
+View in web UI: http://localhost:3002/plans
+```
+
+**Bidirectional sync means:**
+- Plans created in Claude Code appear in the Jetpack web UI
+- Tasks claimed in the web UI won't be re-claimed by Claude Code
+- Progress visible in real-time on both sides
+
+See [packages/mcp-server/README.md](packages/mcp-server/README.md) for full documentation.
+
 ### LangGraph Supervisor
 
 The supervisor uses LangGraph to provide intelligent orchestration:
@@ -217,11 +289,23 @@ The supervisor:
 4. **Coordinates** - Resolves conflicts and reassigns failed tasks
 
 **Environment Variables:**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | For Claude | Claude API key for supervisor and agents |
+| `OPENAI_API_KEY` | For OpenAI | OpenAI API key (supervisor or embeddings) |
+| `JETPACK_WORK_DIR` | For external projects | **Critical:** Points to target project directory |
+
 ```bash
 export ANTHROPIC_API_KEY=your_key   # for Claude
 export OPENAI_API_KEY=your_key      # for OpenAI
-export JETPACK_WORK_DIR=/path       # override working directory (optional)
+export JETPACK_WORK_DIR=/path       # target project directory
 ```
+
+**Note:** `JETPACK_WORK_DIR` is essential when:
+- Running the web UI on a different project
+- Using the MCP server with Claude Code
+- Agents should work on an external codebase
 
 ### Web UI (Included with `jetpack start`)
 

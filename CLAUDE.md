@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Quick Reference
+
+### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `pnpm jetpack start` | Start orchestrator + agents + web UI |
+| `pnpm jetpack start -a 5` | Start with 5 agents |
+| `pnpm jetpack task -t "Title" -p high` | Create a task |
+| `pnpm jetpack status` | Show system status |
+| `pnpm jetpack demo` | Run guided demo |
+| `pnpm jetpack supervise "request"` | AI-powered task breakdown |
+| `pnpm jetpack mcp --dir /path` | Start MCP server |
+
+### Key Files to Know
+
+| File | Purpose |
+|------|---------|
+| `packages/orchestrator/src/JetpackOrchestrator.ts` | Main coordinator |
+| `packages/orchestrator/src/AgentController.ts` | Agent lifecycle |
+| `packages/orchestrator/src/ClaudeCodeExecutor.ts` | Spawns Claude CLI |
+| `packages/shared/src/types/` | All TypeScript types |
+| `apps/web/src/app/api/` | Next.js API routes |
+| `apps/cli/src/commands/` | CLI command implementations |
+
 ## Build & Development Commands
 
 ```bash
@@ -300,4 +325,54 @@ interface PlanItem {
   dependencies: string[]; // Required: IDs of dependent items, or []
   estimatedMinutes?: number;
 }
+```
+
+## Troubleshooting
+
+### Build Issues
+
+```bash
+# Clean rebuild
+pnpm clean && pnpm install && pnpm build
+
+# Build specific package
+pnpm --filter @jetpack/orchestrator build
+```
+
+### Web UI Shows Wrong/Old Data
+
+1. Check `JETPACK_WORK_DIR` points to correct project
+2. Restart the web server after changing the env var
+3. Verify `.beads/`, `.cass/`, `.jetpack/` exist in target directory
+
+### MCP Server Not Connecting
+
+1. Ensure it's built: `pnpm build`
+2. Check path in `.claude/settings.local.json`
+3. Restart Claude Code after config changes
+4. Run `/mcp` in Claude Code to verify
+
+### Plans Not Appearing in UI
+
+1. Check `.jetpack/plans/` directory exists
+2. Verify JSON has all required fields: `id`, `title`, `status`, `items`
+3. Each item needs: `id`, `title`, `status`, `priority`, `skills`, `dependencies`
+
+### Agents Not Claiming Tasks
+
+1. Check agent skills match task `requiredSkills`
+2. Verify task status is `ready` (dependencies satisfied)
+3. Look at MCP Mail logs in `.jetpack/mail/`
+
+## Testing
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests for specific package
+pnpm --filter @jetpack/beads-adapter test
+
+# Run with coverage
+pnpm test -- --coverage
 ```
