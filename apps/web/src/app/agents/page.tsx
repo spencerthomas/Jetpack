@@ -134,7 +134,7 @@ export default function AgentsPage() {
   const [spawnError, setSpawnError] = useState<string | null>(null);
 
   // Simulated phase for demo
-  const [simulatedPhase, setSimulatedPhase] = useState<AgentPhase>('idle');
+  const [simulatedPhase, _setSimulatedPhase] = useState<AgentPhase>('idle');
 
   // Heartbeat counter
   useEffect(() => {

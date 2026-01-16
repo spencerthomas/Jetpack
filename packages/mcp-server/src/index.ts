@@ -204,6 +204,9 @@ async function createTask(params: {
       planId: params.planId,
       planItemId: params.planItemId,
     },
+    retryCount: 0,
+    maxRetries: 2,
+    targetBranches: [],
   };
 
   await appendJsonLine(TASKS_FILE, task);

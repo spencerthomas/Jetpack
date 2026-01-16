@@ -89,6 +89,10 @@ export const PlanSchema = z.object({
   // Source tracking
   source: z.enum(['supervisor', 'manual', 'template', 'import']).optional(),
   sourceMarkdown: z.string().optional(), // Original markdown if parsed
+
+  // Branch tagging for multi-branch projects
+  branch: z.string().optional(),               // Current branch when plan was created
+  targetBranches: z.array(z.string()).optional(),  // Branches this plan applies to
 });
 
 export interface Plan {
@@ -107,6 +111,10 @@ export interface Plan {
 
   source?: 'supervisor' | 'manual' | 'template' | 'import';
   sourceMarkdown?: string;
+
+  // Branch tagging for multi-branch projects
+  branch?: string;
+  targetBranches?: string[];
 }
 
 // Progress event for real-time updates

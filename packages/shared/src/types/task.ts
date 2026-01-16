@@ -37,11 +37,15 @@ export const TaskSchema = z.object({
   completedAt: z.date().optional(),
   metadata: z.record(z.unknown()).optional(),
   // Retry fields for failed task handling
-  retryCount: z.number().default(0),           // Current retry attempt (0-indexed)
-  maxRetries: z.number().default(2),           // Max allowed retries
+  retryCount: z.number().optional().default(0),           // Current retry attempt (0-indexed)
+  maxRetries: z.number().optional().default(2),           // Max allowed retries
   lastError: z.string().optional(),            // Error from last attempt
   lastAttemptAt: z.date().optional(),          // Timestamp of last attempt
   failureType: FailureTypeSchema.optional(),   // Type of failure (timeout, error, stalled)
+  // Branch tagging for multi-branch projects
+  branch: z.string().optional(),               // Current branch (e.g., "feature/auth")
+  originBranch: z.string().optional(),         // Branch where task was created
+  targetBranches: z.array(z.string()).optional().default([]),  // Branches this task applies to
 });
 
 export type Task = z.infer<typeof TaskSchema>;

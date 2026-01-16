@@ -69,6 +69,9 @@ export async function createPlannerNode(config: PlannerNodeConfig) {
           requiredSkills,
           estimatedMinutes: planned.estimatedMinutes,
           tags: ['supervisor-generated'],
+          retryCount: 0,
+          maxRetries: 2,
+          targetBranches: [],
         });
 
         createdTasks.push(task);

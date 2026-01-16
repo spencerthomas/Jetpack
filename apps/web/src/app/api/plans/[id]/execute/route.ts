@@ -3,7 +3,6 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import {
   Plan,
-  PlanItem,
   Task,
   AgentSkill,
   generateTaskId,
@@ -155,6 +154,9 @@ export async function POST(
         tags: [`plan:${plan.id}`, `execution:${executionId}`],
         createdAt: now,
         updatedAt: now,
+        retryCount: 0,
+        maxRetries: 2,
+        targetBranches: [],
       };
 
       // Append to tasks.jsonl (JSONL format for Beads adapter)

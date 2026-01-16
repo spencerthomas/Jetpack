@@ -155,6 +155,9 @@ export async function POST(
         tags: [`plan:${plan.id}`],
         createdAt: now,
         updatedAt: now,
+        retryCount: 0,
+        maxRetries: 2,
+        targetBranches: [],
       };
 
       // Append to tasks.jsonl

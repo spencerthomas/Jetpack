@@ -68,11 +68,12 @@ export async function createContinuousPlannerNode(config: ContinuousPlannerNodeC
         return {};
       }
 
-      // Optionally get relevant memories from CASS
+      // Optionally get relevant memories from CASS using semantic search
       let contextFromMemory = '';
       if (cass) {
         try {
-          const memories = await cass.search(objective.title, 5);
+          const queryText = `${objective.title} ${currentMilestone.title}`;
+          const memories = await cass.semanticSearchByQuery(queryText, 5);
           if (memories.length > 0) {
             contextFromMemory = memories.map(m => m.content).join('\n');
           }
@@ -138,6 +139,9 @@ export async function createContinuousPlannerNode(config: ContinuousPlannerNodeC
           requiredSkills,
           estimatedMinutes: planned.estimatedMinutes,
           tags: ['supervisor-generated', `milestone-${objective.currentMilestoneIndex}`],
+          retryCount: 0,
+          maxRetries: 2,
+          targetBranches: [],
         });
 
         createdTasks.push(task);

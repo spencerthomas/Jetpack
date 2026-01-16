@@ -1,6 +1,10 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { existsSync, watch, FSWatcher } from 'fs';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 import {
   Task,
   TaskPriority,
@@ -103,10 +107,34 @@ export class JetpackOrchestrator {
   private agentStartTimes: Map<string, Date> = new Map();
   private registryUpdateInterval?: NodeJS.Timeout;
   private runtimeManager?: RuntimeManager;
+  private _currentBranch: string = 'main';
 
   constructor(private config: JetpackConfig) {
     this.logger = new Logger('Jetpack');
     this.workDir = config.workDir;
+  }
+
+  /**
+   * Get the current git branch for the working directory
+   */
+  async getCurrentBranch(): Promise<string> {
+    try {
+      const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: this.workDir,
+      });
+      this._currentBranch = stdout.trim();
+      return this._currentBranch;
+    } catch {
+      this.logger.debug('Not a git repository or git not available, using default branch');
+      return this._currentBranch;
+    }
+  }
+
+  /**
+   * Get the cached current branch (synchronous)
+   */
+  get currentBranch(): string {
+    return this._currentBranch;
   }
 
   async initialize(): Promise<void> {
@@ -120,6 +148,10 @@ export class JetpackOrchestrator {
     await fs.mkdir(beadsDir, { recursive: true });
     await fs.mkdir(cassDir, { recursive: true });
     await fs.mkdir(mailDir, { recursive: true });
+
+    // Detect current git branch for branch-tagged projects
+    await this.getCurrentBranch();
+    this.logger.info(`Working on branch: ${this._currentBranch}`);
 
     // Initialize Beads adapter
     const beadsConfig: BeadsAdapterConfig = {
@@ -375,6 +407,7 @@ export class JetpackOrchestrator {
     dependencies?: string[];
     requiredSkills?: AgentSkill[];
     estimatedMinutes?: number;
+    branch?: string;  // Optional override, defaults to current branch
   }): Promise<Task> {
     const task = await this.beads.createTask({
       id: generateTaskId(),
@@ -387,6 +420,11 @@ export class JetpackOrchestrator {
       requiredSkills: params.requiredSkills || [],
       estimatedMinutes: params.estimatedMinutes,
       tags: [],
+      retryCount: 0,
+      maxRetries: 2,
+      branch: params.branch || this._currentBranch,
+      originBranch: this._currentBranch,
+      targetBranches: [],
     });
 
     this.logger.info(`Created task: ${task.id} - ${task.title}`);

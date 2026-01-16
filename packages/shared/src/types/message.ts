@@ -7,6 +7,7 @@ export const MessageTypeSchema = z.enum([
   'task.updated',
   'task.completed',
   'task.failed',
+  'task.retry_scheduled',
   'agent.started',
   'agent.stopped',
   'agent.error',

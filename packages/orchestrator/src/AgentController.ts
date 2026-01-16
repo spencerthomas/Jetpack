@@ -123,12 +123,24 @@ export class AgentController {
     await this.updateStatus('offline', undefined);
   }
 
-  private async handleTaskCreated(_message: Message): Promise<void> {
+  private async handleTaskCreated(message: Message): Promise<void> {
+    // Acknowledge receipt if required
+    if (message.ackRequired && message.id) {
+      await this.mail.acknowledge(message.id, this.agent.id);
+      this.logger.debug(`Acknowledged message ${message.id}`);
+    }
+
     this.logger.debug('New task created, checking if suitable');
     await this.lookForWork();
   }
 
   private async handleTaskUpdated(message: Message): Promise<void> {
+    // Acknowledge receipt if required
+    if (message.ackRequired && message.id) {
+      await this.mail.acknowledge(message.id, this.agent.id);
+      this.logger.debug(`Acknowledged message ${message.id}`);
+    }
+
     const taskId = message.payload.taskId as string;
     if (this.currentTask?.id === taskId) {
       this.logger.info('Current task was updated');
@@ -192,13 +204,14 @@ export class AgentController {
       timestamp: new Date(),
     });
 
-    // Retrieve relevant memories for context
-    const memories = await this.cass.search(task.title, 5);
-    this.logger.debug(`Retrieved ${memories.length} relevant memories`);
+    // Retrieve relevant memories for context using semantic search
+    const queryText = `${task.title} ${task.description || ''}`;
+    const memories = await this.cass.semanticSearchByQuery(queryText, 5);
+    this.logger.debug(`Retrieved ${memories.length} relevant memories via semantic search`);
 
     try {
-      // Execute the task using Claude Code
-      await this.executeTask(claimed, memories);
+      // Execute the task with file locking protection
+      await this.executeTaskWithLocking(claimed, memories);
 
       // Mark task as completed
       await this.beads.updateTask(task.id, {
@@ -333,6 +346,73 @@ export class AgentController {
 
       // Look for more work
       setTimeout(() => this.lookForWork(), 1000);
+    }
+  }
+
+  /**
+   * Extract file paths mentioned in task title/description for pre-locking
+   */
+  private predictFilesToModify(task: Task): string[] {
+    // Match common source file patterns
+    const filePattern = /(?:src|lib|packages|apps|test|tests)\/[\w\/.-]+\.\w+/g;
+    const mentioned = [
+      ...(task.title.match(filePattern) || []),
+      ...(task.description?.match(filePattern) || []),
+    ];
+    return [...new Set(mentioned)];
+  }
+
+  /**
+   * Execute task with file locking to prevent concurrent edits
+   */
+  private async executeTaskWithLocking(task: Task, memories: MemoryEntry[]): Promise<void> {
+    const filesToModify = this.predictFilesToModify(task);
+    const acquiredLeases: string[] = [];
+
+    try {
+      // Acquire leases for predicted files
+      for (const file of filesToModify) {
+        const acquired = await this.mail.acquireLease(file, 120000); // 2 min lease
+        if (!acquired) {
+          const status = await this.mail.isLeased(file);
+          this.logger.warn(`File ${file} locked by ${status.agentId}, cannot proceed`);
+          throw new Error(`FILE_LOCKED:${file}:${status.agentId}`);
+        }
+        acquiredLeases.push(file);
+        this.logger.debug(`Acquired lease on ${file}`);
+      }
+
+      // Broadcast lock acquisition if we have files
+      if (acquiredLeases.length > 0) {
+        await this.mail.publish({
+          id: '',
+          type: 'file.lock',
+          from: this.agent.id,
+          payload: { files: acquiredLeases, taskId: task.id },
+          timestamp: new Date(),
+        });
+      }
+
+      // Execute the actual task
+      await this.executeTask(task, memories);
+
+    } finally {
+      // Release all acquired leases
+      for (const file of acquiredLeases) {
+        await this.mail.releaseLease(file);
+        this.logger.debug(`Released lease on ${file}`);
+      }
+
+      // Broadcast unlock if we had files
+      if (acquiredLeases.length > 0) {
+        await this.mail.publish({
+          id: '',
+          type: 'file.unlock',
+          from: this.agent.id,
+          payload: { files: acquiredLeases, taskId: task.id },
+          timestamp: new Date(),
+        });
+      }
     }
   }
 

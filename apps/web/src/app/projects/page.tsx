@@ -28,6 +28,7 @@ const statusVariants = {
   draft: 'default',
   approved: 'info',
   executing: 'warning',
+  paused: 'warning',
   completed: 'success',
   failed: 'error',
 } as const;
