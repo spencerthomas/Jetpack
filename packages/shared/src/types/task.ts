@@ -12,6 +12,9 @@ export const TaskStatusSchema = z.enum([
 ]);
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
+export const FailureTypeSchema = z.enum(['timeout', 'error', 'stalled']);
+export type FailureType = z.infer<typeof FailureTypeSchema>;
+
 export const TaskPrioritySchema = z.enum(['low', 'medium', 'high', 'critical']);
 export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
 
@@ -33,6 +36,12 @@ export const TaskSchema = z.object({
   updatedAt: z.date(),
   completedAt: z.date().optional(),
   metadata: z.record(z.unknown()).optional(),
+  // Retry fields for failed task handling
+  retryCount: z.number().default(0),           // Current retry attempt (0-indexed)
+  maxRetries: z.number().default(2),           // Max allowed retries
+  lastError: z.string().optional(),            // Error from last attempt
+  lastAttemptAt: z.date().optional(),          // Timestamp of last attempt
+  failureType: FailureTypeSchema.optional(),   // Type of failure (timeout, error, stalled)
 });
 
 export type Task = z.infer<typeof TaskSchema>;

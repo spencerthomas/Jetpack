@@ -195,7 +195,8 @@ export class JetpackOrchestrator {
       ['typescript', 'testing', 'documentation'],
     ];
 
-    for (let i = 0; i < count; i++) {
+    // First, create all agent controllers (mail adapter initialization is async but lightweight)
+    const agentSetupPromises = Array.from({ length: count }, async (_, i) => {
       const agentName = `agent-${i + 1}`;
       const skills = skillSets[i % skillSets.length];
 
@@ -219,18 +220,24 @@ export class JetpackOrchestrator {
           this.handleAgentTaskFailed(agentId, taskId, error),
         onCycleComplete: () => this.handleAgentCycleComplete(),
       };
-      const agent = new AgentController(agentConfig, this.beads, mail, this.cass);
+      return new AgentController(agentConfig, this.beads, mail, this.cass);
+    });
 
-      if (this.config.autoStart !== false) {
-        await agent.start();
-      }
+    // Wait for all agent controllers to be created
+    const createdAgents = await Promise.all(agentSetupPromises);
+    this.agents = createdAgents;
 
-      this.agents.push(agent);
-
-      // Track agent start time and initialize task count
+    // Track agent start times and initialize task counts
+    for (const agent of this.agents) {
       const agentData = agent.getAgent();
       this.agentStartTimes.set(agentData.id, new Date());
       this.agentTasksCompleted.set(agentData.id, 0);
+    }
+
+    // Start all agents in parallel (this is the key performance improvement)
+    if (this.config.autoStart !== false) {
+      this.logger.info(`Starting ${count} agents in parallel...`);
+      await Promise.all(this.agents.map(agent => agent.start()));
     }
 
     this.logger.info(`Started ${count} agents successfully`);

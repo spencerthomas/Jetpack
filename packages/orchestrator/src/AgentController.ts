@@ -6,6 +6,7 @@ import {
   generateAgentId,
   Message,
   MemoryEntry,
+  FailureType,
 } from '@jetpack/shared';
 import { BeadsAdapter } from '@jetpack/beads-adapter';
 import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
@@ -236,26 +237,90 @@ export class AgentController {
         this.config.onTaskComplete(this.agent.id);
       }
     } catch (error) {
+      const errorMessage = (error as Error).message;
       this.logger.error(`Failed to execute task ${task.id}:`, error);
 
-      await this.beads.updateTask(task.id, {
-        status: 'failed',
-      });
+      // Determine failure type from error message
+      let failureType: FailureType = 'error';
+      if (errorMessage.includes('timed out')) {
+        failureType = 'timeout';
+      } else if (errorMessage.includes('stalled') || errorMessage.includes('no output')) {
+        failureType = 'stalled';
+      }
 
-      await this.mail.publish({
-        id: '',
-        type: 'task.failed',
-        from: this.agent.id,
-        payload: {
-          taskId: task.id,
-          error: (error as Error).message,
-        },
-        timestamp: new Date(),
-      });
+      // Implement retry logic with exponential backoff
+      const currentRetryCount = (task.retryCount || 0);
+      const maxRetries = task.maxRetries ?? 2;
+      const nextRetryCount = currentRetryCount + 1;
 
-      // Notify orchestrator of task failure
-      if (this.config.onTaskFailed) {
-        this.config.onTaskFailed(this.agent.id, task.id, (error as Error).message);
+      if (nextRetryCount <= maxRetries) {
+        // Calculate exponential backoff: 30s, 60s, 120s
+        const backoffMs = 30000 * Math.pow(2, currentRetryCount);
+
+        this.logger.info(
+          `Task ${task.id} failed (${failureType}), scheduling retry ${nextRetryCount}/${maxRetries} in ${backoffMs / 1000}s`
+        );
+
+        // Update task for retry - set status back to 'ready' so it can be claimed again
+        await this.beads.updateTask(task.id, {
+          status: 'ready',
+          assignedAgent: undefined, // Release the task so any agent can claim it
+          retryCount: nextRetryCount,
+          lastError: errorMessage,
+          lastAttemptAt: new Date(),
+          failureType,
+        });
+
+        // Notify about retry scheduling
+        await this.mail.publish({
+          id: '',
+          type: 'task.retry_scheduled',
+          from: this.agent.id,
+          payload: {
+            taskId: task.id,
+            retryCount: nextRetryCount,
+            maxRetries,
+            backoffMs,
+            failureType,
+          },
+          timestamp: new Date(),
+        });
+
+        // Schedule a delayed lookup for work (to handle the backoff)
+        // Note: The task is now 'ready' and any agent can pick it up
+        // This delay just gives some breathing room
+      } else {
+        // Max retries exceeded - mark as permanently failed
+        this.logger.error(
+          `Task ${task.id} permanently failed after ${maxRetries} retries: ${errorMessage}`
+        );
+
+        await this.beads.updateTask(task.id, {
+          status: 'failed',
+          retryCount: nextRetryCount,
+          lastError: `Failed after ${maxRetries} retries: ${errorMessage}`,
+          lastAttemptAt: new Date(),
+          failureType,
+        });
+
+        await this.mail.publish({
+          id: '',
+          type: 'task.failed',
+          from: this.agent.id,
+          payload: {
+            taskId: task.id,
+            error: errorMessage,
+            retryCount: nextRetryCount,
+            failureType,
+            permanent: true,
+          },
+          timestamp: new Date(),
+        });
+
+        // Notify orchestrator of permanent task failure
+        if (this.config.onTaskFailed) {
+          this.config.onTaskFailed(this.agent.id, task.id, errorMessage);
+        }
       }
     } finally {
       this.currentTask = undefined;

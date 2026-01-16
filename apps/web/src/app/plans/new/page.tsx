@@ -98,14 +98,26 @@ export default function NewPlanPage() {
 
     setSaving(true);
     try {
+      // Map local PlannedTask interface to shared PlanItem structure
+      const items = tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: 'pending' as const,
+        priority: 'medium' as const,
+        skills: task.requiredSkills,          // requiredSkills → skills
+        dependencies: task.dependsOn,          // dependsOn → dependencies
+        estimatedMinutes: task.estimatedMinutes,
+      }));
+
       const res = await fetch('/api/plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
+          title: name,                         // name → title
           description,
           userRequest,
-          plannedTasks: tasks,
+          items,                               // plannedTasks → items
           tags,
         }),
       });

@@ -364,6 +364,69 @@ pnpm --filter @jetpack/orchestrator build
 2. Verify task status is `ready` (dependencies satisfied)
 3. Look at MCP Mail logs in `.jetpack/mail/`
 
+### Running Jetpack in a Custom Directory
+
+When working on a project outside the Jetpack repo, you need to tell Jetpack where your project is:
+
+**Option 1: Use the `-d` flag (recommended)**
+```bash
+pnpm jetpack start -d /path/to/your/project
+pnpm jetpack status -d /path/to/your/project
+```
+
+**Option 2: Set JETPACK_WORK_DIR environment variable**
+```bash
+# For CLI
+JETPACK_WORK_DIR=/path/to/your/project pnpm jetpack start
+
+# For web UI development
+JETPACK_WORK_DIR=/path/to/your/project pnpm --filter @jetpack/web dev
+```
+
+**Option 3: cd to the directory first**
+```bash
+cd /path/to/your/project
+/path/to/Jetpack/apps/cli/dist/index.js start
+```
+
+**Verifying correct directory:**
+The CLI displays the working directory at startup:
+```
+Working directory: /path/to/your/project (from JETPACK_WORK_DIR)
+# or
+Working directory: /current/dir (from cwd)
+```
+
+Ensure it shows your intended project path, not the Jetpack repo.
+
+### Task Failures and Retries
+
+Tasks automatically retry on failure with exponential backoff:
+
+| Retry | Backoff |
+|-------|---------|
+| 1st   | 30 seconds |
+| 2nd   | 60 seconds |
+| 3rd+  | Task marked permanently failed |
+
+**Failure types:**
+- `timeout`: Task exceeded 30-minute timeout
+- `error`: Task threw an error during execution
+- `stalled`: No output detected for extended period
+
+**Retry fields on Task:**
+```typescript
+{
+  retryCount: number;           // Current retry attempt (0-indexed)
+  maxRetries: number;           // Max retries (default: 2)
+  lastError: string;            // Error from last attempt
+  lastAttemptAt: Date;          // Timestamp of last attempt
+  failureType: 'timeout' | 'error' | 'stalled';
+}
+```
+
+Failed tasks are released back to `ready` status so any available agent can retry them.
+
 ## Testing
 
 ```bash

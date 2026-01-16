@@ -7,6 +7,7 @@ export * from './types/user';
 export * from './types/runtime';
 export * from './types/quality';
 export * from './types/plan';
+export * from './types/execution';
 
 // Utilities
 export * from './utils/logger';

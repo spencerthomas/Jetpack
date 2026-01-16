@@ -322,7 +322,7 @@ program
   .description('Start Jetpack - launches agents, orchestrator, and web UI')
   .option('-a, --agents <number>', 'Number of agents to start')
   .option('-p, --port <number>', 'Web UI port')
-  .option('-d, --dir <path>', 'Working directory', process.cwd())
+  .option('-d, --dir <path>', 'Working directory (or set JETPACK_WORK_DIR)', process.env.JETPACK_WORK_DIR || process.cwd())
   .option('--no-browser', 'Do not open browser automatically')
   .option('--no-ui', 'Run without web UI (CLI only mode)')
   .option('--max-cycles <number>', 'Stop after N work cycles (0 = unlimited)')
@@ -423,7 +423,12 @@ program
       }
 
       console.log(chalk.bold('  💻 Working Directory'));
-      console.log(chalk.gray(`     ${options.dir}`));
+      const workDirSource = process.env.JETPACK_WORK_DIR
+        ? '(from JETPACK_WORK_DIR)'
+        : options.dir !== process.cwd()
+          ? '(from --dir)'
+          : '(current directory)';
+      console.log(chalk.gray(`     ${options.dir} ${workDirSource}`));
       console.log('');
 
       console.log(chalk.bold('  🤖 Agents'));
@@ -523,7 +528,7 @@ program
   .option('-p, --priority <priority>', 'Task priority (low, medium, high, critical)', 'medium')
   .option('-s, --skills <skills>', 'Required skills (comma-separated)')
   .option('-e, --estimate <minutes>', 'Estimated time in minutes')
-  .option('--dir <path>', 'Working directory', process.cwd())
+  .option('--dir <path>', 'Working directory (or set JETPACK_WORK_DIR)', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (options) => {
     const spinner = ora('Creating task...').start();
 
@@ -567,7 +572,7 @@ program
 program
   .command('status')
   .description('Show current status of Jetpack system')
-  .option('--dir <path>', 'Working directory', process.cwd())
+  .option('--dir <path>', 'Working directory (or set JETPACK_WORK_DIR)', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (options) => {
     const spinner = ora('Loading status...').start();
 
@@ -620,7 +625,7 @@ program
   .command('demo')
   .description('Run a demo workflow with multiple tasks')
   .option('-a, --agents <number>', 'Number of agents', '5')
-  .option('--dir <path>', 'Working directory', process.cwd())
+  .option('--dir <path>', 'Working directory (or set JETPACK_WORK_DIR)', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (options) => {
     console.log(chalk.bold.cyan('\n🚀 Jetpack Multi-Agent Swarm Demo\n'));
 
@@ -751,7 +756,7 @@ program
   .option('-a, --agents <number>', 'Number of agents to start', '5')
   .option('-l, --llm <provider>', 'LLM provider (claude, openai, ollama)', 'claude')
   .option('-m, --model <model>', 'LLM model name', 'claude-3-5-sonnet-20241022')
-  .option('--dir <path>', 'Working directory', process.cwd())
+  .option('--dir <path>', 'Working directory (or set JETPACK_WORK_DIR)', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (request: string, options) => {
     console.log(chalk.bold.cyan('\n🧠 Jetpack LangGraph Supervisor\n'));
     console.log(chalk.gray(`Request: "${request}"`));
@@ -817,7 +822,7 @@ program
 program
   .command('mcp')
   .description('Start MCP server for Claude Code integration')
-  .option('--dir <path>', 'Working directory for Jetpack data', process.cwd())
+  .option('--dir <path>', 'Working directory for Jetpack data (or set JETPACK_WORK_DIR)', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (options) => {
     // Set the working directory for the MCP server
     process.env.JETPACK_WORK_DIR = options.dir;

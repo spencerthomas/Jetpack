@@ -212,7 +212,27 @@ export class MCPMailAdapter implements MessageBus {
 
         const filePath = path.join(this.inboxDir, file);
         const content = await fs.readFile(filePath, 'utf-8');
-        const message = JSON.parse(content) as Message;
+
+        // Defensive JSON parsing - skip empty or malformed files
+        if (!content || content.trim() === '') {
+          this.logger.debug(`Skipping empty inbox file: ${file}`);
+          continue;
+        }
+
+        let message: Message;
+        try {
+          message = JSON.parse(content) as Message;
+        } catch (parseError) {
+          this.logger.warn(`Skipping malformed inbox file: ${file}`);
+          // Move malformed file to archive to prevent repeated parsing attempts
+          const archivePath = path.join(this.archiveDir, `malformed-${file}`);
+          try {
+            await fs.rename(filePath, archivePath);
+          } catch {
+            // Ignore if we can't move it
+          }
+          continue;
+        }
 
         // Convert timestamp back to Date
         message.timestamp = new Date(message.timestamp);
@@ -249,7 +269,20 @@ export class MCPMailAdapter implements MessageBus {
 
         const filePath = path.join(this.outboxDir, file);
         const content = await fs.readFile(filePath, 'utf-8');
-        const message = JSON.parse(content) as Message;
+
+        // Defensive JSON parsing - skip empty or malformed files
+        if (!content || content.trim() === '') {
+          this.logger.debug(`Skipping empty broadcast file: ${file}`);
+          continue;
+        }
+
+        let message: Message;
+        try {
+          message = JSON.parse(content) as Message;
+        } catch (parseError) {
+          this.logger.warn(`Skipping malformed broadcast file: ${file}`);
+          continue;
+        }
 
         // Don't process our own broadcasts
         if (message.from === this.config.agentId) continue;

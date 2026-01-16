@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { Plan } from '@jetpack/shared';
 
+// Extended Plan type with execution tracking (not in shared types yet)
 interface ExecutionRecord {
   id: string;
   planId: string;
@@ -17,36 +19,32 @@ interface ExecutionRecord {
   actualDuration?: number;
 }
 
-interface Plan {
-  id: string;
-  name: string;
-  description?: string;
-  userRequest: string;
-  status: 'draft' | 'approved' | 'executing' | 'completed' | 'failed';
-  plannedTasks: unknown[];
-  createdAt: string;
-  updatedAt: string;
-  estimatedDuration?: number;
-  executionHistory: ExecutionRecord[];
-  tags: string[];
-  isTemplate: boolean;
+interface PlanWithExecution extends Plan {
+  executionHistory?: ExecutionRecord[];
 }
 
-const plansDir = path.join(process.cwd(), '../..', '.jetpack', 'plans');
+// Get working directory from environment variable
+function getWorkDir(): string {
+  return process.env.JETPACK_WORK_DIR || path.join(process.cwd(), '../..');
+}
 
-async function getPlan(planId: string): Promise<Plan | null> {
+function getPlansDir(): string {
+  return path.join(getWorkDir(), '.jetpack', 'plans');
+}
+
+async function getPlan(planId: string): Promise<PlanWithExecution | null> {
   try {
-    const filePath = path.join(plansDir, `${planId}.json`);
+    const filePath = path.join(getPlansDir(), `${planId}.json`);
     const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as Plan;
+    return JSON.parse(content) as PlanWithExecution;
   } catch {
     return null;
   }
 }
 
-async function savePlan(plan: Plan): Promise<void> {
+async function savePlan(plan: PlanWithExecution): Promise<void> {
   plan.updatedAt = new Date().toISOString();
-  const filePath = path.join(plansDir, `${plan.id}.json`);
+  const filePath = path.join(getPlansDir(), `${plan.id}.json`);
   await fs.writeFile(filePath, JSON.stringify(plan, null, 2));
 }
 
@@ -70,19 +68,21 @@ export async function POST(
       );
     }
 
-    // Find the running execution and mark it complete
-    const runningExec = plan.executionHistory.find(e => e.status === 'running');
-    if (runningExec) {
-      runningExec.status = 'completed';
-      runningExec.completedAt = new Date().toISOString();
-      runningExec.actualDuration = Math.round(
-        (new Date(runningExec.completedAt).getTime() - new Date(runningExec.startedAt).getTime()) / 1000
-      );
+    // Find the running execution and mark it complete (if execution history exists)
+    if (plan.executionHistory) {
+      const runningExec = plan.executionHistory.find(e => e.status === 'running');
+      if (runningExec) {
+        runningExec.status = 'completed';
+        runningExec.completedAt = new Date().toISOString();
+        runningExec.actualDuration = Math.round(
+          (new Date(runningExec.completedAt).getTime() - new Date(runningExec.startedAt).getTime()) / 1000
+        );
 
-      // Mark all task results as completed
-      for (const taskId of Object.keys(runningExec.taskResults)) {
-        runningExec.taskResults[taskId].status = 'completed';
-        runningExec.taskResults[taskId].completedAt = runningExec.completedAt;
+        // Mark all task results as completed
+        for (const taskId of Object.keys(runningExec.taskResults)) {
+          runningExec.taskResults[taskId].status = 'completed';
+          runningExec.taskResults[taskId].completedAt = runningExec.completedAt;
+        }
       }
     }
 

@@ -24,7 +24,7 @@ export interface ExecutorConfig {
   gracefulShutdownMs?: number;
 }
 
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (increased from 5 minutes for complex tasks)
 const DEFAULT_GRACEFUL_SHUTDOWN_MS = 10 * 1000; // 10 seconds
 
 export class ClaudeCodeExecutor {
@@ -176,6 +176,8 @@ When done, provide a brief summary of what you accomplished.
           ...process.env,
           // Ensure Claude Code uses the same environment
           FORCE_COLOR: '0',  // Disable colors for cleaner output
+          // Propagate JETPACK_WORK_DIR so Claude Code knows the project directory
+          JETPACK_WORK_DIR: workDir,
         },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
