@@ -18,7 +18,10 @@ import {
 import { LiveIndicator } from '@/components/ui';
 import type { Plan, PlanStatus } from '@jetpack/shared';
 
-const STATUS_CONFIG: Record<PlanStatus, { color: string; icon: React.ReactNode; label: string }> = {
+// Extended type to include legacy "active" status for backward compatibility
+type ExtendedPlanStatus = PlanStatus | 'active';
+
+const STATUS_CONFIG: Record<ExtendedPlanStatus, { color: string; icon: React.ReactNode; label: string }> = {
   draft: {
     color: 'text-[#8b8b8e]',
     icon: <FileText className="w-3.5 h-3.5" />,
@@ -48,6 +51,12 @@ const STATUS_CONFIG: Record<PlanStatus, { color: string; icon: React.ReactNode; 
     color: 'text-[#8b8b8e]',
     icon: <Clock className="w-3.5 h-3.5" />,
     label: 'Paused',
+  },
+  // Legacy status - treat "active" same as "executing"
+  active: {
+    color: 'text-[#f59e0b]',
+    icon: <Play className="w-3.5 h-3.5" />,
+    label: 'Active',
   },
 };
 
@@ -214,7 +223,7 @@ export default function PlansPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredPlans.map((plan) => {
-              const statusConfig = STATUS_CONFIG[plan.status];
+              const statusConfig = STATUS_CONFIG[plan.status] || STATUS_CONFIG.draft;
               const itemCount = countItems(plan.items);
               const completedCount = plan.stats?.completed || 0;
 

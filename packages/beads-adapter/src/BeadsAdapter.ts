@@ -1,4 +1,5 @@
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as path from 'path';
 import { simpleGit, SimpleGit } from 'simple-git';
 import { Task, TaskStatus, TaskGraph, Logger } from '@jetpack/shared';
@@ -7,6 +8,7 @@ export interface BeadsAdapterConfig {
   beadsDir: string;
   autoCommit: boolean;
   gitEnabled: boolean;
+  watchForChanges?: boolean; // Enable file watching for external task creation (default: true)
 }
 
 export class BeadsAdapter {
@@ -14,6 +16,9 @@ export class BeadsAdapter {
   private logger: Logger;
   private tasksFile: string;
   private tasks: Map<string, Task> = new Map();
+  private fileWatcher?: fsSync.FSWatcher;
+  private lastFileSize: number = 0;
+  private reloadDebounceTimer?: NodeJS.Timeout;
 
   constructor(private config: BeadsAdapterConfig) {
     this.logger = new Logger('BeadsAdapter');
@@ -45,6 +50,64 @@ export class BeadsAdapter {
 
     // Load existing tasks
     await this.loadTasks();
+
+    // Start file watching if enabled (default: true)
+    if (this.config.watchForChanges !== false) {
+      this.startFileWatcher();
+    }
+  }
+
+  /**
+   * Start watching tasks.jsonl for external changes (e.g., from CLI)
+   */
+  private startFileWatcher(): void {
+    try {
+      // Get initial file size
+      const stats = fsSync.statSync(this.tasksFile);
+      this.lastFileSize = stats.size;
+
+      this.fileWatcher = fsSync.watch(this.tasksFile, (eventType) => {
+        if (eventType === 'change') {
+          // Debounce reloads to avoid multiple reloads for rapid changes
+          if (this.reloadDebounceTimer) {
+            clearTimeout(this.reloadDebounceTimer);
+          }
+          this.reloadDebounceTimer = setTimeout(() => {
+            this.checkAndReloadTasks().catch(err => {
+              this.logger.error('Error reloading tasks:', err);
+            });
+          }, 100);
+        }
+      });
+
+      this.logger.info('File watcher enabled for tasks.jsonl');
+    } catch (error) {
+      this.logger.warn('Could not start file watcher:', error);
+    }
+  }
+
+  /**
+   * Check if tasks file has grown and reload new tasks
+   */
+  private async checkAndReloadTasks(): Promise<void> {
+    try {
+      const stats = await fs.stat(this.tasksFile);
+
+      // Only reload if file has grown (new tasks added)
+      if (stats.size > this.lastFileSize) {
+        this.logger.debug(`Tasks file grew from ${this.lastFileSize} to ${stats.size} bytes, reloading...`);
+        const previousCount = this.tasks.size;
+        await this.loadTasks();
+        const newCount = this.tasks.size - previousCount;
+        if (newCount > 0) {
+          this.logger.info(`Detected ${newCount} new task(s) from external source`);
+        }
+      }
+
+      this.lastFileSize = stats.size;
+    } catch (error) {
+      this.logger.debug('Error checking tasks file:', error);
+    }
   }
 
   private async loadTasks(): Promise<void> {
@@ -462,5 +525,20 @@ export class BeadsAdapter {
     }
 
     return bySkill;
+  }
+
+  /**
+   * Clean up resources
+   */
+  async close(): Promise<void> {
+    if (this.fileWatcher) {
+      this.fileWatcher.close();
+      this.fileWatcher = undefined;
+      this.logger.debug('File watcher closed');
+    }
+    if (this.reloadDebounceTimer) {
+      clearTimeout(this.reloadDebounceTimer);
+      this.reloadDebounceTimer = undefined;
+    }
   }
 }
