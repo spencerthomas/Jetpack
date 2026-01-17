@@ -12,7 +12,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { Plan, Task, TaskPriority, TaskStatus } from '@jetpack/shared';
+import type { Plan, PlanItem, Task, TaskPriority, TaskStatus } from '@jetpack/shared';
 
 // Determine working directory - check env var or use cwd
 const WORK_DIR = process.env.JETPACK_WORK_DIR || process.cwd();
@@ -153,6 +153,143 @@ async function updatePlan(planId: string, updates: Partial<Plan>): Promise<Plan 
 
   await writeJsonFile(path.join(PLANS_DIR, `${planId}.json`), updated);
   return updated;
+}
+
+/**
+ * Flatten nested plan items into a single array
+ */
+function flattenPlanItems(items: PlanItem[]): PlanItem[] {
+  const result: PlanItem[] = [];
+  function flatten(itemList: PlanItem[]) {
+    for (const item of itemList) {
+      result.push(item);
+      if (item.children) {
+        flatten(item.children);
+      }
+    }
+  }
+  flatten(items);
+  return result;
+}
+
+/**
+ * Find a plan item by ID and update it
+ */
+function updatePlanItemInTree(
+  items: PlanItem[],
+  itemId: string,
+  updates: Partial<PlanItem>
+): PlanItem[] {
+  return items.map((item) => {
+    if (item.id === itemId) {
+      return { ...item, ...updates };
+    }
+    if (item.children) {
+      return {
+        ...item,
+        children: updatePlanItemInTree(item.children, itemId, updates),
+      };
+    }
+    return item;
+  });
+}
+
+/**
+ * Convert selected plan items to tasks
+ */
+async function convertPlanItemsToTasks(
+  planId: string,
+  itemIds: string[] | 'all',
+  preserveDependencies = true
+): Promise<{ tasks: Task[]; mappings: Record<string, string> }> {
+  const plan = await getPlan(planId);
+  if (!plan) {
+    throw new Error(`Plan not found: ${planId}`);
+  }
+
+  const allItems = flattenPlanItems(plan.items);
+  let itemsToConvert: PlanItem[];
+
+  if (itemIds === 'all' || !itemIds) {
+    // Convert all pending items
+    itemsToConvert = allItems.filter((item) => item.status === 'pending');
+  } else {
+    // Convert specified items only
+    itemsToConvert = allItems.filter(
+      (item) => itemIds.includes(item.id) && item.status === 'pending'
+    );
+  }
+
+  if (itemsToConvert.length === 0) {
+    return { tasks: [], mappings: {} };
+  }
+
+  // Create mapping of plan item ID → task ID
+  const mappings: Record<string, string> = {};
+  const createdTasks: Task[] = [];
+
+  // First pass: generate task IDs
+  for (const item of itemsToConvert) {
+    const taskId = `bd-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    mappings[item.id] = taskId;
+  }
+
+  // Second pass: create tasks with resolved dependencies
+  for (const item of itemsToConvert) {
+    const taskId = mappings[item.id];
+
+    // Resolve dependencies
+    let dependencies: string[] = [];
+    if (preserveDependencies && item.dependencies.length > 0) {
+      dependencies = item.dependencies
+        .map((depId) => {
+          // Check if this dependency is being converted
+          if (mappings[depId]) return mappings[depId];
+          // Check if it was already converted
+          const depItem = allItems.find((i) => i.id === depId);
+          if (depItem?.taskId) return depItem.taskId;
+          return null;
+        })
+        .filter((id): id is string => id !== null);
+    }
+
+    const now = new Date();
+    const task: Task = {
+      id: taskId,
+      title: item.title,
+      description: item.description || '',
+      status: 'pending',
+      priority: item.priority,
+      dependencies,
+      blockers: [],
+      requiredSkills: item.skills as string[],
+      estimatedMinutes: item.estimatedMinutes,
+      tags: [`plan:${plan.id}`],
+      createdAt: now,
+      updatedAt: now,
+      retryCount: 0,
+      maxRetries: 2,
+      targetBranches: [],
+    };
+
+    await appendJsonLine(TASKS_FILE, task);
+    createdTasks.push(task);
+
+    // Update plan item status
+    plan.items = updatePlanItemInTree(plan.items, item.id, {
+      status: 'converted',
+      taskId,
+    });
+  }
+
+  // Update plan status
+  if (createdTasks.length > 0) {
+    plan.status = 'executing';
+  }
+  plan.updatedAt = new Date().toISOString();
+  await writeJsonFile(path.join(PLANS_DIR, `${plan.id}.json`), plan);
+
+  return { tasks: createdTasks, mappings };
 }
 
 // ============================================================================
@@ -357,6 +494,60 @@ server.tool(
     return {
       content: [{ type: 'text', text: `Updated plan: ${plan.id}` }],
     };
+  }
+);
+
+server.tool(
+  'jetpack_convert_plan_items',
+  'Convert selected plan items to executable tasks. Supports selective execution - choose specific items or convert all pending items.',
+  {
+    planId: z.string().describe('The plan ID to convert items from'),
+    itemIds: z
+      .union([z.array(z.string()), z.literal('all')])
+      .optional()
+      .describe('Array of item IDs to convert, or "all" for all pending items. Default: all'),
+    preserveDependencies: z
+      .boolean()
+      .optional()
+      .describe('Maintain dependency graph between tasks. Default: true'),
+  },
+  async ({ planId, itemIds, preserveDependencies = true }) => {
+    try {
+      const result = await convertPlanItemsToTasks(
+        planId,
+        itemIds ?? 'all',
+        preserveDependencies
+      );
+
+      if (result.tasks.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'No items to convert. All items may already be converted or no matching items found.',
+            },
+          ],
+        };
+      }
+
+      const taskList = result.tasks
+        .map((t) => `  - ${t.id}: ${t.title}`)
+        .join('\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Converted ${result.tasks.length} plan items to tasks:\n${taskList}\n\nPlan status updated to "executing".`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [{ type: 'text', text: `Error: ${(error as Error).message}` }],
+        isError: true,
+      };
+    }
   }
 );
 
