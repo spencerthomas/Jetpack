@@ -1,33 +1,46 @@
 import { NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import {
+  JetpackSettingsSchema,
+  type JetpackSettings,
+  DEFAULT_SETTINGS as SHARED_DEFAULTS,
+} from '@jetpack/shared';
 
-// Settings file structure
-export interface JetpackSettings {
-  cass: {
-    autoGenerateEmbeddings: boolean;
-    embeddingConfig: {
-      apiKey?: string;
-      model: 'text-embedding-3-small' | 'text-embedding-3-large' | 'text-embedding-ada-002';
-      dimensions: number;
-    };
-    compactionThreshold: number;
-    maxEntries: number;
+// CASS-specific settings (separate from JetpackSettings)
+interface CASSSettings {
+  autoGenerateEmbeddings: boolean;
+  embeddingConfig: {
+    apiKey?: string;
+    model: 'text-embedding-3-small' | 'text-embedding-3-large' | 'text-embedding-ada-002';
+    dimensions: number;
   };
+  compactionThreshold: number;
+  maxEntries: number;
 }
 
-// Default settings
-const DEFAULT_SETTINGS: JetpackSettings = {
-  cass: {
-    autoGenerateEmbeddings: false,
-    embeddingConfig: {
-      apiKey: '',
-      model: 'text-embedding-3-small',
-      dimensions: 1536,
-    },
-    compactionThreshold: 0.3,
-    maxEntries: 10000,
+// Combined settings stored in file (CASS + Jetpack runtime settings)
+interface StoredSettings {
+  cass: CASSSettings;
+  jetpack: JetpackSettings;
+}
+
+// Default CASS settings
+const DEFAULT_CASS: CASSSettings = {
+  autoGenerateEmbeddings: false,
+  embeddingConfig: {
+    apiKey: '',
+    model: 'text-embedding-3-small',
+    dimensions: 1536,
   },
+  compactionThreshold: 0.3,
+  maxEntries: 10000,
+};
+
+// Combined defaults
+const DEFAULT_SETTINGS: StoredSettings = {
+  cass: DEFAULT_CASS,
+  jetpack: SHARED_DEFAULTS,
 };
 
 function getSettingsPath(): string {
@@ -41,25 +54,27 @@ function maskApiKey(key: string | undefined): string {
 }
 
 // Load settings from file, falling back to defaults
-async function loadSettings(): Promise<JetpackSettings> {
+async function loadSettings(): Promise<StoredSettings> {
   const settingsPath = getSettingsPath();
 
   try {
     const content = await fs.readFile(settingsPath, 'utf-8');
-    const settings = JSON.parse(content) as JetpackSettings;
+    const settings = JSON.parse(content) as Partial<StoredSettings>;
 
     // Merge with defaults to ensure all fields exist
     return {
-      ...DEFAULT_SETTINGS,
-      ...settings,
       cass: {
-        ...DEFAULT_SETTINGS.cass,
+        ...DEFAULT_CASS,
         ...settings.cass,
         embeddingConfig: {
-          ...DEFAULT_SETTINGS.cass.embeddingConfig,
+          ...DEFAULT_CASS.embeddingConfig,
           ...settings.cass?.embeddingConfig,
         },
       },
+      jetpack: JetpackSettingsSchema.parse({
+        ...SHARED_DEFAULTS,
+        ...settings.jetpack,
+      }),
     };
   } catch {
     // File doesn't exist - return defaults
@@ -68,7 +83,7 @@ async function loadSettings(): Promise<JetpackSettings> {
 }
 
 // Save settings to file
-async function saveSettings(settings: JetpackSettings): Promise<void> {
+async function saveSettings(settings: StoredSettings): Promise<void> {
   const settingsPath = getSettingsPath();
   const dir = path.dirname(settingsPath);
 
@@ -107,6 +122,8 @@ export async function GET() {
           hasApiKey: resolvedKey.length > 0,
         },
       },
+      // Include Jetpack runtime settings
+      jetpack: settings.jetpack,
     });
   } catch (error) {
     console.error('Failed to load settings:', error);
@@ -122,9 +139,8 @@ export async function POST(request: Request) {
     // Load current settings
     const current = await loadSettings();
 
-    // Merge with updates (deep merge for cass settings)
-    const updated: JetpackSettings = {
-      ...current,
+    // Merge with updates (deep merge for both cass and jetpack settings)
+    const updated: StoredSettings = {
       cass: {
         ...current.cass,
         ...body.cass,
@@ -133,6 +149,18 @@ export async function POST(request: Request) {
           ...body.cass?.embeddingConfig,
         },
       },
+      jetpack: body.jetpack
+        ? JetpackSettingsSchema.parse({
+            ...current.jetpack,
+            ...body.jetpack,
+            // Deep merge nested objects
+            runtime: { ...current.jetpack.runtime, ...body.jetpack?.runtime },
+            agents: { ...current.jetpack.agents, ...body.jetpack?.agents },
+            browserValidation: { ...current.jetpack.browserValidation, ...body.jetpack?.browserValidation },
+            quality: { ...current.jetpack.quality, ...body.jetpack?.quality },
+            supervisor: { ...current.jetpack.supervisor, ...body.jetpack?.supervisor },
+          })
+        : current.jetpack,
     };
 
     // Save to file

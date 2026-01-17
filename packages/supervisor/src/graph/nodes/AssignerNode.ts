@@ -73,9 +73,10 @@ export async function createAssignerNode(config: AssignerNodeConfig) {
 
         const previousAgent = state.assignments[assignment.taskId];
 
-        // Update task in Beads
+        // Update task in Beads - just set assignedAgent, don't change status
+        // The actual AgentController will change status to 'claimed' when it picks up the task
+        // Setting to 'claimed' here would hide the task from getReadyTasks() and prevent agents from seeing it
         await beads.updateTask(assignment.taskId, {
-          status: 'claimed',
           assignedAgent: assignment.agentId,
         });
 
@@ -121,9 +122,8 @@ export async function createAssignerNode(config: AssignerNodeConfig) {
       return {
         assignments: newAssignments,
         reassignments: reassignments.length > 0 ? reassignments : undefined,
-        taskStatuses: Object.fromEntries(
-          Object.keys(newAssignments).map(id => [id, 'claimed'])
-        ),
+        // Don't update taskStatuses - leave as ready so agents can claim
+        // The MonitorNode will pick up actual status changes from Beads
       };
     } catch (error) {
       logger.error('Assignment failed:', error);

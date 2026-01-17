@@ -1,9 +1,15 @@
-import { Logger } from '@jetpack/shared';
+import { Logger, Task } from '@jetpack/shared';
 import { BeadsAdapter } from '@jetpack/beads-adapter';
 import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
 import { LLMProvider } from '../../llm';
-import { COORDINATOR_SYSTEM_PROMPT, COORDINATOR_USER_PROMPT, CoordinatorOutputSchema } from '../../prompts/coordinator';
+import {
+  COORDINATOR_SYSTEM_PROMPT,
+  COORDINATOR_USER_PROMPT,
+  CoordinatorOutputSchema,
+  ConflictContext,
+} from '../../prompts/coordinator';
 import { SupervisorState, Conflict, Reassignment } from '../state';
+import { randomUUID } from 'crypto';
 
 export interface CoordinatorNodeConfig {
   llm: LLMProvider;
@@ -37,10 +43,25 @@ export async function createCoordinatorNode(config: CoordinatorNodeConfig) {
         status: a.status,
       }));
 
+      // Build conflict context for better decision-making (Enhancement 8)
+      const conflictContexts: Record<string, ConflictContext> = {};
+      for (const conflict of unresolvedConflicts) {
+        const task = await beads.getTask(conflict.taskId);
+        if (task) {
+          conflictContexts[conflict.id] = {
+            taskTitle: task.title,
+            taskDescription: task.description,
+            requiredSkills: task.requiredSkills,
+            retryCount: (task.metadata?.retryCount as number) ?? 0,
+            errorMessage: conflict.description,
+          };
+        }
+      }
+
       const output = await llm.structuredOutput(
         [
           { role: 'system', content: COORDINATOR_SYSTEM_PROMPT },
-          { role: 'user', content: COORDINATOR_USER_PROMPT(unresolvedConflicts, agentData, state.taskStatuses) },
+          { role: 'user', content: COORDINATOR_USER_PROMPT(unresolvedConflicts, agentData, state.taskStatuses, conflictContexts) },
         ],
         CoordinatorOutputSchema,
         'conflict_resolution'
@@ -116,6 +137,103 @@ export async function createCoordinatorNode(config: CoordinatorNodeConfig) {
           case 'escalate':
             // Log escalation - in real system, would notify humans
             logger.warn(`ESCALATION REQUIRED: ${conflict.taskId} - ${resolution.reason}`);
+            break;
+
+          case 'decompose':
+            // Decompose complex task into subtasks (Enhancement 8)
+            if (resolution.subtasks && resolution.subtasks.length > 0) {
+              logger.info(`Decomposing task ${conflict.taskId} into ${resolution.subtasks.length} subtasks`);
+
+              // Mark original task as decomposed/failed
+              await beads.updateTask(conflict.taskId, {
+                status: 'failed',
+                metadata: {
+                  decomposed: true,
+                  decomposedInto: [] as string[],
+                  reason: resolution.reason,
+                },
+              });
+
+              // Create subtasks with proper dependencies
+              const subtaskIds: string[] = [];
+              const originalTask = await beads.getTask(conflict.taskId);
+
+              for (let i = 0; i < resolution.subtasks.length; i++) {
+                const subtask = resolution.subtasks[i];
+                const subtaskId = `bd-${randomUUID().slice(0, 8)}`;
+                subtaskIds.push(subtaskId);
+
+                // Build dependencies - include original task's dependencies and inter-subtask dependencies
+                const dependencies: string[] = [];
+                if (subtask.dependsOnIndex !== undefined && subtask.dependsOnIndex < i) {
+                  dependencies.push(subtaskIds[subtask.dependsOnIndex]);
+                }
+
+                const newTask: Task = {
+                  id: subtaskId,
+                  title: subtask.title,
+                  description: subtask.description,
+                  status: 'pending',
+                  priority: originalTask?.priority ?? 'medium',
+                  requiredSkills: subtask.skills,
+                  dependencies,
+                  blockers: [],
+                  tags: originalTask?.tags ?? [],
+                  estimatedMinutes: subtask.estimatedMinutes,
+                  retryCount: 0,
+                  maxRetries: 2,
+                  targetBranches: originalTask?.targetBranches ?? [],
+                  metadata: {
+                    parentTaskId: conflict.taskId,
+                    subtaskIndex: i,
+                  },
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                };
+
+                await beads.createTask(newTask);
+                logger.debug(`Created subtask ${subtaskId}: ${subtask.title}`);
+              }
+
+              // Update original task with subtask references
+              await beads.updateTask(conflict.taskId, {
+                metadata: {
+                  decomposed: true,
+                  decomposedInto: subtaskIds,
+                  reason: resolution.reason,
+                },
+              });
+
+              // Broadcast subtask creation events
+              for (const subtaskId of subtaskIds) {
+                const task = await beads.getTask(subtaskId);
+                if (task) {
+                  // Notify all agents about new subtasks
+                  for (const agent of state.agents) {
+                    const mail = getAgentMail(agent.id);
+                    if (mail) {
+                      await mail.publish({
+                        id: '',
+                        type: 'task.created',
+                        from: 'supervisor',
+                        payload: {
+                          taskId: subtaskId,
+                          title: task.title,
+                          description: task.description,
+                          requiredSkills: task.requiredSkills,
+                          fromDecomposition: true,
+                          originalTaskId: conflict.taskId,
+                        },
+                        timestamp: new Date(),
+                      });
+                    }
+                  }
+                }
+              }
+            } else {
+              logger.warn(`Decompose action for ${conflict.taskId} had no subtasks, falling back to retry`);
+              await beads.updateTask(conflict.taskId, { status: 'ready' });
+            }
             break;
         }
 

@@ -12,6 +12,7 @@ import {
   AgentSkill,
   Logger,
   generateTaskId,
+  generateAgentId,
   RuntimeLimits,
   RuntimeStats,
   EndState,
@@ -92,6 +93,14 @@ export interface JetpackConfig {
   enableQualityMetrics?: boolean;
   /** Callback when quality regressions are detected */
   onQualityRegression?: (summary: RegressionSummary) => void;
+  /** Quality check settings (which checks to run: build, tests, lint) */
+  qualitySettings?: {
+    enabled?: boolean;
+    checkBuild?: boolean;
+    checkTests?: boolean;
+    checkLint?: boolean;
+    detectRegressions?: boolean;
+  };
 }
 
 export interface AgentRegistryEntry {
@@ -352,13 +361,15 @@ export class JetpackOrchestrator extends EventEmitter {
       const skills = skillSets[i % skillSets.length];
 
       // Create MCP Mail adapter for this agent
+      // Use the generated agent ID (not name) for consistent lookups
+      const agentId = generateAgentId(agentName);
       const mailConfig: MCPMailConfig = {
         mailDir: path.join(this.workDir, '.jetpack', 'mail'),
-        agentId: agentName,
+        agentId: agentId,  // Use ID for mail identity
       };
       const mail = new MCPMailAdapter(mailConfig);
       await mail.initialize();
-      this.agentMails.set(agentName, mail);
+      this.agentMails.set(agentId, mail);  // Store by ID for supervisor lookup
 
       // Create agent controller with status change callback
       const agentConfig: AgentControllerConfig = {
@@ -379,6 +390,8 @@ export class JetpackOrchestrator extends EventEmitter {
               await this.recordQualitySnapshot(taskId, agentId, metrics);
             }
           : undefined,
+        // Quality check settings (which checks to run)
+        qualitySettings: this.config.qualitySettings,
       };
       return new AgentController(agentConfig, this.beads, mail, this.cass);
     });

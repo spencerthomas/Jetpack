@@ -300,15 +300,15 @@ describe('RuntimeManager', () => {
         ...defaultConfig,
         limits: {
           ...defaultConfig.limits,
-          maxRuntimeMs: 150,
-          checkIntervalMs: 50,
+          maxRuntimeMs: 250, // Allow time for check interval
+          checkIntervalMs: 100, // Minimum allowed by schema
         },
       });
 
       await limitedManager.start();
 
-      // Wait for runtime to exceed limit
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait for runtime to exceed limit + check interval
+      await new Promise(resolve => setTimeout(resolve, 400));
 
       expect(limitedManager.isRunning()).toBe(false);
       expect(limitedManager.getEndState()).toBe('max_runtime_reached');
@@ -321,16 +321,16 @@ describe('RuntimeManager', () => {
         ...defaultConfig,
         limits: {
           ...defaultConfig.limits,
-          idleTimeoutMs: 100,
-          checkIntervalMs: 50,
+          idleTimeoutMs: 150, // Allow time for check interval
+          checkIntervalMs: 100, // Minimum allowed by schema
         },
       });
 
       await limitedManager.start();
       limitedManager.recordCycle(); // Set lastWorkAt
 
-      // Wait for idle timeout
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait for idle timeout + check interval
+      await new Promise(resolve => setTimeout(resolve, 350));
 
       expect(limitedManager.isRunning()).toBe(false);
       expect(limitedManager.getEndState()).toBe('idle_timeout');
@@ -420,14 +420,31 @@ describe('RuntimeManager', () => {
   });
 
   describe('state persistence', () => {
-    it('should resume from previous state', async () => {
+    it('should resume from previous state when endState is null (crash recovery)', async () => {
       await manager.start();
       manager.recordCycle();
       manager.recordCycle();
       manager.recordTaskComplete('task-1');
-      await manager.stop();
 
-      // Create new manager and start it
+      // Simulate a crash by manually writing state file with null endState
+      // (normally stop() would set endState, preventing resume)
+      const stateDir = `${TEST_WORK_DIR}/.jetpack`;
+      const stateFile = `${stateDir}/runtime-state.json`;
+      await fs.mkdir(stateDir, { recursive: true });
+      const crashState = {
+        cycleCount: 2,
+        startedAt: new Date().toISOString(),
+        tasksCompleted: 1,
+        tasksFailed: 0,
+        consecutiveFailures: 0,
+        endState: null, // Crash scenario - not properly stopped
+      };
+      await fs.writeFile(stateFile, JSON.stringify(crashState));
+
+      // Force stop without saving (simulating process termination)
+      (manager as unknown as { running: boolean }).running = false;
+
+      // Create new manager and start it - should resume
       const newManager = new RuntimeManager(defaultConfig);
       await newManager.start();
 

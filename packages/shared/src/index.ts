@@ -5,6 +5,7 @@ export * from './types/message';
 export * from './types/memory';
 export * from './types/user';
 export * from './types/runtime';
+export * from './types/settings';
 export * from './types/quality';
 export * from './types/plan';
 export * from './types/execution';

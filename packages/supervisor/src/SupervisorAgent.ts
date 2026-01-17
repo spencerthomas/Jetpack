@@ -70,7 +70,7 @@ export class SupervisorAgent {
       llm: this.llm,
       beads: this.config.beads,
       getAgentMail: this.config.getAgentMail,
-      pollIntervalMs: this.config.pollIntervalMs ?? 2000,
+      pollIntervalMs: this.config.pollIntervalMs ?? 15000, // 15s between checks to give agents time
       maxIterations: this.config.maxIterations ?? 100,
     });
 
@@ -104,9 +104,16 @@ export class SupervisorAgent {
       };
 
       // Run the graph with streaming updates
+      // Set recursionLimit higher than maxIterations to allow for the full run
+      // Each iteration goes: assigner -> monitor, so we need 2x maxIterations + some buffer
+      const maxIterations = this.config.maxIterations ?? 100;
+      const recursionLimit = maxIterations * 3; // Plenty of headroom
+
       let finalState: SupervisorState | undefined;
 
-      for await (const update of await this.graph.stream(initialState)) {
+      for await (const update of await this.graph.stream(initialState, {
+        recursionLimit,
+      })) {
         // Log updates from each node
         for (const [nodeName, nodeState] of Object.entries(update)) {
           this.logger.debug(`Node ${nodeName} update:`, Object.keys(nodeState as object));
@@ -132,27 +139,33 @@ export class SupervisorAgent {
         };
       }
 
+      // Ensure arrays have defaults (safety against undefined state)
+      const completedTaskIds = finalState.completedTaskIds || [];
+      const failedTaskIds = finalState.failedTaskIds || [];
+      const conflicts = finalState.conflicts || [];
+      const createdTasks = finalState.createdTasks || [];
+
       // Store execution summary in CASS memory
       await this.config.cass.store({
         type: 'agent_learning',
-        content: `Supervisor executed: "${userRequest}". Completed ${finalState.completedTaskIds.length} tasks, ${finalState.failedTaskIds.length} failed, ${finalState.conflicts.length} conflicts handled.`,
+        content: `Supervisor executed: "${userRequest}". Completed ${completedTaskIds.length} tasks, ${failedTaskIds.length} failed, ${conflicts.length} conflicts handled.`,
         importance: 0.7,
         metadata: {
           userRequest,
-          completedTasks: finalState.completedTaskIds,
-          failedTasks: finalState.failedTaskIds,
+          completedTasks: completedTaskIds,
+          failedTasks: failedTaskIds,
           iterations: finalState.iteration,
         },
       });
 
-      const success = finalState.completedTaskIds.length === finalState.createdTasks.length && !finalState.error;
+      const success = completedTaskIds.length === createdTasks.length && !finalState.error;
 
       const result: SupervisorResult = {
         success,
-        completedTasks: finalState.completedTaskIds,
-        failedTasks: finalState.failedTaskIds,
-        conflicts: finalState.conflicts.length,
-        iterations: finalState.iteration,
+        completedTasks: completedTaskIds,
+        failedTasks: failedTaskIds,
+        conflicts: conflicts.length,
+        iterations: finalState.iteration || 0,
         finalReport: this.generateFinalReport(finalState),
         error: finalState.error,
       };
@@ -168,36 +181,43 @@ export class SupervisorAgent {
    * Generate a human-readable final report
    */
   private generateFinalReport(state: SupervisorState): string {
+    // Add null safety for all array accesses
+    const createdTasks = state.createdTasks || [];
+    const completedTaskIds = state.completedTaskIds || [];
+    const failedTaskIds = state.failedTaskIds || [];
+    const conflicts = state.conflicts || [];
+    const assignments = state.assignments || {};
+
     const lines: string[] = [
       '=== Supervisor Execution Report ===',
       '',
       `Request: "${state.userRequest}"`,
       '',
-      `Tasks Created: ${state.createdTasks.length}`,
-      `Tasks Completed: ${state.completedTaskIds.length}`,
-      `Tasks Failed: ${state.failedTaskIds.length}`,
-      `Conflicts Handled: ${state.conflicts.length}`,
-      `Iterations: ${state.iteration}`,
+      `Tasks Created: ${createdTasks.length}`,
+      `Tasks Completed: ${completedTaskIds.length}`,
+      `Tasks Failed: ${failedTaskIds.length}`,
+      `Conflicts Handled: ${conflicts.length}`,
+      `Iterations: ${state.iteration || 0}`,
       '',
     ];
 
-    if (state.createdTasks.length > 0) {
+    if (createdTasks.length > 0) {
       lines.push('Tasks:');
-      for (const task of state.createdTasks) {
-        const status = state.completedTaskIds.includes(task.id)
+      for (const task of createdTasks) {
+        const status = completedTaskIds.includes(task.id)
           ? '✓'
-          : state.failedTaskIds.includes(task.id)
+          : failedTaskIds.includes(task.id)
             ? '✗'
             : '○';
-        const agent = state.assignments[task.id] || 'unassigned';
+        const agent = assignments[task.id] || 'unassigned';
         lines.push(`  ${status} ${task.id}: ${task.title} (${agent})`);
       }
       lines.push('');
     }
 
-    if (state.conflicts.length > 0) {
+    if (conflicts.length > 0) {
       lines.push('Conflicts:');
-      for (const conflict of state.conflicts) {
+      for (const conflict of conflicts) {
         const status = conflict.resolved ? '✓' : '○';
         lines.push(`  ${status} ${conflict.type}: ${conflict.description}`);
         if (conflict.resolution) {

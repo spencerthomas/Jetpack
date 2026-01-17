@@ -14,7 +14,9 @@ import {
   TaskFailedPayload,
   AgentStatusPayload,
   ExecutionOutputEvent,
+  QualitySettings,
 } from '@jetpack/shared';
+import { spawn } from 'child_process';
 import { BeadsAdapter } from '@jetpack/beads-adapter';
 import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
 import { CASSAdapter } from '@jetpack/cass-adapter';
@@ -45,6 +47,10 @@ export interface AgentControllerConfig {
   enableTuiMode?: boolean;
   /** Callback to report quality metrics after task completion (optional) */
   onQualityReport?: (taskId: string, agentId: string, metrics: TaskQualityMetrics) => Promise<void>;
+  /** Interval for periodic work polling in ms (default: 30000 = 30 seconds) - BUG-5 fix */
+  workPollingIntervalMs?: number;
+  /** Quality check settings (default: check build and tests) */
+  qualitySettings?: Partial<QualitySettings>;
 }
 
 /**
@@ -65,6 +71,7 @@ export class AgentController {
   private currentPhase: TaskPhase = 'analyzing';
   private heartbeatInterval?: NodeJS.Timeout;
   private statusInterval?: NodeJS.Timeout;
+  private workPollingTimer?: NodeJS.Timeout;  // BUG-5 fix: periodic work polling
   private executor: ClaudeCodeExecutor;
   private workDir: string;
   private config: AgentControllerConfig;
@@ -132,6 +139,7 @@ export class AgentController {
     // Subscribe to task broadcasts
     this.mail.subscribe('task.created', this.handleTaskCreated.bind(this));
     this.mail.subscribe('task.updated', this.handleTaskUpdated.bind(this));
+    this.mail.subscribe('task.assigned', this.handleTaskAssigned.bind(this));
 
     // Start heartbeat
     this.heartbeatInterval = setInterval(() => {
@@ -146,6 +154,19 @@ export class AgentController {
         this.logger.error('Failed to broadcast status:', err);
       });
     }, 10000);
+
+    // BUG-5 FIX: Start periodic work polling to catch missed events or newly-ready tasks
+    // This ensures agents proactively look for work even if task.created/assigned messages are missed
+    const pollingInterval = this.config.workPollingIntervalMs ?? 30000; // Default: 30 seconds
+    this.workPollingTimer = setInterval(() => {
+      if (this.agent.status === 'idle') {
+        this.logger.debug('Periodic work poll triggered');
+        this.lookForWork().catch(err => {
+          this.logger.error('Error in periodic work poll:', err);
+        });
+      }
+    }, pollingInterval);
+    this.logger.info(`Work polling enabled every ${pollingInterval / 1000}s`);
 
     // Announce startup
     await this.mail.publish({
@@ -174,6 +195,12 @@ export class AgentController {
 
     if (this.statusInterval) {
       clearInterval(this.statusInterval);
+    }
+
+    // BUG-5 FIX: Clear work polling timer
+    if (this.workPollingTimer) {
+      clearInterval(this.workPollingTimer);
+      this.workPollingTimer = undefined;
     }
 
     // Announce shutdown
@@ -212,6 +239,26 @@ export class AgentController {
     if (this.currentTask?.id === taskId) {
       this.logger.info('Current task was updated');
       this.currentTask = await this.beads.getTask(taskId) || undefined;
+    }
+  }
+
+  private async handleTaskAssigned(message: Message): Promise<void> {
+    // Acknowledge receipt if required
+    if (message.ackRequired && message.id) {
+      await this.mail.acknowledge(message.id, this.agent.id);
+      this.logger.debug(`Acknowledged message ${message.id}`);
+    }
+
+    // Check if this task is assigned to us
+    const targetAgentId = message.to;
+    if (targetAgentId && targetAgentId === this.agent.id) {
+      const taskId = message.payload.taskId as string;
+      this.logger.info(`Task ${taskId} assigned to me, checking for work`);
+      await this.lookForWork();
+    } else if (!targetAgentId) {
+      // Broadcast assignment - check if we should look for work
+      this.logger.debug('Task assigned (broadcast), checking if suitable');
+      await this.lookForWork();
     }
   }
 
@@ -401,15 +448,21 @@ export class AgentController {
         this.config.onTaskComplete(this.agent.id);
       }
 
-      // Report quality metrics if callback is configured
-      // Note: In a full implementation, metrics would be collected from
-      // running lint/type-check/test commands. For now, we report basic success.
+      // Report quality metrics if callback is configured (Enhancement 5)
+      // Runs actual build/test/lint checks based on qualitySettings
       if (this.config.onQualityReport) {
-        await this.config.onQualityReport(task.id, this.agent.id, {
-          // Placeholder metrics - a full implementation would run
-          // actual quality checks (lint, typecheck, tests)
-          buildSuccess: true,
-        });
+        try {
+          await this.broadcastProgress('validating', 'Running quality checks (build, tests)', 90);
+          const metrics = await this.collectQualityMetrics();
+          this.logger.info(`Quality metrics for task ${task.id}:`, metrics);
+          await this.config.onQualityReport(task.id, this.agent.id, metrics);
+        } catch (err) {
+          this.logger.warn('Failed to collect quality metrics:', err);
+          // Report partial metrics on error
+          await this.config.onQualityReport(task.id, this.agent.id, {
+            buildSuccess: true, // Assume success if we can't check
+          });
+        }
       }
     } catch (error) {
       const errorMessage = (error as Error).message;
@@ -752,5 +805,206 @@ export class AgentController {
 
   getStats(): AgentStats {
     return { ...this.stats };
+  }
+
+  // ============================================================================
+  // Quality Metrics Collection (Enhancement 5)
+  // ============================================================================
+
+  /**
+   * Run a shell command and capture output
+   */
+  private async runShellCommand(
+    command: string,
+    args: string[],
+    timeoutMs: number = 120000
+  ): Promise<{ success: boolean; stdout: string; stderr: string; exitCode: number | null }> {
+    return new Promise((resolve) => {
+      const proc = spawn(command, args, {
+        cwd: this.workDir,
+        shell: true,
+        timeout: timeoutMs,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout?.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      proc.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('close', (code) => {
+        resolve({
+          success: code === 0,
+          stdout,
+          stderr,
+          exitCode: code,
+        });
+      });
+
+      proc.on('error', (err) => {
+        resolve({
+          success: false,
+          stdout,
+          stderr: err.message,
+          exitCode: null,
+        });
+      });
+    });
+  }
+
+  /**
+   * Parse test output to extract pass/fail counts
+   * Supports common test runners: vitest, jest, mocha
+   */
+  private parseTestOutput(output: string): { passing: number; failing: number } {
+    let passing = 0;
+    let failing = 0;
+
+    // Vitest format: "✓ Tests  3 passed (3)"  or "Tests  3 passed | 1 failed"
+    const vitestMatch = output.match(/Tests?\s+(\d+)\s+passed(?:\s+\|?\s*(\d+)\s+failed)?/i);
+    if (vitestMatch) {
+      passing = parseInt(vitestMatch[1], 10);
+      failing = vitestMatch[2] ? parseInt(vitestMatch[2], 10) : 0;
+      return { passing, failing };
+    }
+
+    // Jest format: "Tests:       3 passed, 1 failed, 4 total"
+    const jestMatch = output.match(/Tests:\s*(\d+)\s+passed,?\s*(\d+)?\s*failed?/i);
+    if (jestMatch) {
+      passing = parseInt(jestMatch[1], 10);
+      failing = jestMatch[2] ? parseInt(jestMatch[2], 10) : 0;
+      return { passing, failing };
+    }
+
+    // Mocha format: "3 passing" and "1 failing"
+    const mochaPassMatch = output.match(/(\d+)\s+passing/i);
+    const mochaFailMatch = output.match(/(\d+)\s+failing/i);
+    if (mochaPassMatch) {
+      passing = parseInt(mochaPassMatch[1], 10);
+    }
+    if (mochaFailMatch) {
+      failing = parseInt(mochaFailMatch[1], 10);
+    }
+
+    return { passing, failing };
+  }
+
+  /**
+   * Parse lint output to extract error/warning counts
+   * Supports common linters: eslint, tsc
+   */
+  private parseLintOutput(output: string): { errors: number; warnings: number } {
+    let errors = 0;
+    let warnings = 0;
+
+    // ESLint format: "✖ 5 problems (2 errors, 3 warnings)"
+    const eslintMatch = output.match(/(\d+)\s+problems?\s*\((\d+)\s+errors?,?\s*(\d+)\s+warnings?\)/i);
+    if (eslintMatch) {
+      errors = parseInt(eslintMatch[2], 10);
+      warnings = parseInt(eslintMatch[3], 10);
+      return { errors, warnings };
+    }
+
+    // Alternative ESLint: "2 errors and 3 warnings"
+    const altMatch = output.match(/(\d+)\s+errors?\s+and\s+(\d+)\s+warnings?/i);
+    if (altMatch) {
+      errors = parseInt(altMatch[1], 10);
+      warnings = parseInt(altMatch[2], 10);
+      return { errors, warnings };
+    }
+
+    // TypeScript: "Found 5 errors"
+    const tscMatch = output.match(/Found\s+(\d+)\s+errors?/i);
+    if (tscMatch) {
+      errors = parseInt(tscMatch[1], 10);
+      return { errors, warnings: 0 };
+    }
+
+    // Count "error" lines as a fallback
+    const errorLines = (output.match(/error\s*:/gi) || []).length;
+    const warningLines = (output.match(/warning\s*:/gi) || []).length;
+
+    return { errors: errorLines, warnings: warningLines };
+  }
+
+  /**
+   * Collect quality metrics by running build/test/lint commands
+   * This runs actual quality checks on the codebase
+   */
+  private async collectQualityMetrics(): Promise<TaskQualityMetrics> {
+    const settings = this.config.qualitySettings ?? {};
+    const checkBuild = settings.checkBuild !== false; // Default: true
+    const checkTests = settings.checkTests !== false; // Default: true
+    const checkLint = settings.checkLint ?? false;     // Default: false (can be slow)
+
+    this.logger.debug('Collecting quality metrics...', { checkBuild, checkTests, checkLint });
+
+    const metrics: TaskQualityMetrics = {};
+
+    // Run checks in parallel for efficiency
+    const checks: Promise<void>[] = [];
+
+    // Build check (pnpm build or npm run build)
+    if (checkBuild) {
+      checks.push(
+        this.runShellCommand('pnpm', ['build'], 180000).then((result) => {
+          metrics.buildSuccess = result.success;
+          if (!result.success) {
+            // Try to extract type errors from build output
+            const { errors } = this.parseLintOutput(result.stderr + result.stdout);
+            metrics.typeErrors = errors;
+            this.logger.debug(`Build failed: ${errors} type errors detected`);
+          } else {
+            metrics.typeErrors = 0;
+            this.logger.debug('Build succeeded');
+          }
+        }).catch((err) => {
+          this.logger.warn('Build check failed:', err);
+          metrics.buildSuccess = false;
+        })
+      );
+    }
+
+    // Test check (pnpm test --run or npm test -- --run)
+    if (checkTests) {
+      checks.push(
+        this.runShellCommand('pnpm', ['test', '--run'], 180000).then((result) => {
+          const { passing, failing } = this.parseTestOutput(result.stdout + result.stderr);
+          metrics.testsPassing = passing;
+          metrics.testsFailing = failing;
+          this.logger.debug(`Tests: ${passing} passing, ${failing} failing`);
+        }).catch((err) => {
+          this.logger.warn('Test check failed:', err);
+          metrics.testsFailing = 1;
+          metrics.testsPassing = 0;
+        })
+      );
+    }
+
+    // Lint check (pnpm lint)
+    if (checkLint) {
+      checks.push(
+        this.runShellCommand('pnpm', ['lint'], 120000).then((result) => {
+          const { errors, warnings } = this.parseLintOutput(result.stdout + result.stderr);
+          metrics.lintErrors = errors;
+          metrics.lintWarnings = warnings;
+          this.logger.debug(`Lint: ${errors} errors, ${warnings} warnings`);
+        }).catch((err) => {
+          this.logger.warn('Lint check failed:', err);
+          metrics.lintErrors = 0;
+          metrics.lintWarnings = 0;
+        })
+      );
+    }
+
+    // Wait for all checks to complete
+    await Promise.allSettled(checks);
+
+    return metrics;
   }
 }

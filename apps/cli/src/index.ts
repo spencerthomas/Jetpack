@@ -436,7 +436,7 @@ program
 
           // Default models based on provider
           const defaultModel = llmProvider === 'claude'
-            ? 'claude-3-5-sonnet-20241022'
+            ? 'claude-sonnet-4-20250514'
             : llmProvider === 'openai'
               ? 'gpt-4o-mini'
               : 'llama3.2';
@@ -842,7 +842,7 @@ program
   .action(async (request: string, options) => {
     // Set default model based on provider (use cheaper options by default)
     const defaultModels: Record<string, string> = {
-      claude: 'claude-3-5-sonnet-20241022',
+      claude: 'claude-sonnet-4-20250514',
       openai: 'gpt-4o-mini', // Cheaper than gpt-4
       ollama: 'llama3.2', // Free local model
     };
@@ -1073,7 +1073,7 @@ program
 
     // Determine model based on provider
     const defaultModels: Record<string, string> = {
-      claude: 'claude-3-5-sonnet-20241022',
+      claude: 'claude-sonnet-4-20250514',
       openai: 'gpt-4o-mini',
       ollama: 'llama3.2',
     };

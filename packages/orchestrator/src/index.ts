@@ -4,6 +4,7 @@ export * from './ClaudeCodeExecutor';
 export * from './PlanStore';
 export * from './PlanParser';
 export * from './RuntimeManager';
+export * from './prompts/agent-system';
 
 // Re-export supervisor types for convenience
 export { SupervisorAgent, SupervisorResult, LLMProviderConfigInput } from '@jetpack/supervisor';

@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
-import { Task, Logger, MemoryEntry, ExecutionOutputEvent } from '@jetpack/shared';
+import { Task, Logger, MemoryEntry, ExecutionOutputEvent, AgentSkill } from '@jetpack/shared';
+import { buildAgentPrompt, getSkillSpecificInstructions } from './prompts/agent-system';
 
 export interface ExecutionResult {
   success: boolean;
@@ -20,16 +21,29 @@ export interface ExecutionContext {
 }
 
 export interface ExecutorConfig {
-  /** Maximum execution time in ms (default: 5 minutes) */
+  /** Maximum execution time in ms (default: 30 minutes) - used as fallback if task has no estimate */
   timeoutMs?: number;
-  /** Time to wait after SIGTERM before sending SIGKILL (default: 10 seconds) */
+  /** Time to wait after SIGTERM before sending SIGKILL (default: 30 seconds) */
   gracefulShutdownMs?: number;
   /** Emit events for TUI consumption instead of writing to stdout directly */
   emitOutputEvents?: boolean;
+  // BUG-6 FIX: Dynamic timeout configuration
+  /** Multiplier for task.estimatedMinutes to calculate timeout (default: 2.0) */
+  timeoutMultiplier?: number;
+  /** Minimum timeout in ms regardless of estimate (default: 5 minutes) */
+  minTimeoutMs?: number;
+  /** Maximum timeout in ms regardless of estimate (default: 2 hours) */
+  maxTimeoutMs?: number;
+  /** Enable TDD-biased system prompt (default: true) - Enhancement 6 */
+  enableTddPrompt?: boolean;
 }
 
-const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (increased from 5 minutes for complex tasks)
-const DEFAULT_GRACEFUL_SHUTDOWN_MS = 10 * 1000; // 10 seconds
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (fallback for tasks without estimates)
+const DEFAULT_GRACEFUL_SHUTDOWN_MS = 30 * 1000; // 30 seconds (BUG-7 FIX: increased from 10s)
+// BUG-6 FIX: Dynamic timeout constants
+const DEFAULT_TIMEOUT_MULTIPLIER = 2.0; // Task gets 2x estimated time
+const DEFAULT_MIN_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes minimum
+const DEFAULT_MAX_TIMEOUT_MS = 120 * 60 * 1000; // 2 hours maximum
 
 export class ClaudeCodeExecutor extends EventEmitter {
   private logger: Logger;
@@ -39,8 +53,15 @@ export class ClaudeCodeExecutor extends EventEmitter {
   private gracefulShutdownMs: number;
   private executionTimeout?: NodeJS.Timeout;
   private killTimeout?: NodeJS.Timeout;
+  private sigintTimeout?: NodeJS.Timeout; // BUG-7 FIX: For 3-stage termination
   private emitOutputEvents: boolean;
   private currentContext?: ExecutionContext;
+  // BUG-6 FIX: Dynamic timeout config
+  private timeoutMultiplier: number;
+  private minTimeoutMs: number;
+  private maxTimeoutMs: number;
+  // Enhancement 6: TDD-biased prompt
+  private enableTddPrompt: boolean;
 
   constructor(workDir: string, config: ExecutorConfig = {}) {
     super();
@@ -48,7 +69,52 @@ export class ClaudeCodeExecutor extends EventEmitter {
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.gracefulShutdownMs = config.gracefulShutdownMs ?? DEFAULT_GRACEFUL_SHUTDOWN_MS;
     this.emitOutputEvents = config.emitOutputEvents ?? false;
+    // BUG-6 FIX: Dynamic timeout configuration
+    this.timeoutMultiplier = config.timeoutMultiplier ?? DEFAULT_TIMEOUT_MULTIPLIER;
+    this.minTimeoutMs = config.minTimeoutMs ?? DEFAULT_MIN_TIMEOUT_MS;
+    this.maxTimeoutMs = config.maxTimeoutMs ?? DEFAULT_MAX_TIMEOUT_MS;
+    // Enhancement 6: TDD-biased prompt (enabled by default)
+    this.enableTddPrompt = config.enableTddPrompt ?? true;
     this.logger = new Logger('ClaudeCodeExecutor');
+  }
+
+  /**
+   * BUG-6 FIX: Calculate dynamic timeout based on task.estimatedMinutes
+   * Uses multiplier to give tasks breathing room (default: 2x estimate)
+   */
+  private calculateTimeout(task: Task): number {
+    // If task has an estimate, use it with multiplier
+    if (task.estimatedMinutes && task.estimatedMinutes > 0) {
+      const calculated = task.estimatedMinutes * 60 * 1000 * this.timeoutMultiplier;
+      const timeout = Math.max(this.minTimeoutMs, Math.min(this.maxTimeoutMs, calculated));
+      this.logger.debug(
+        `Task ${task.id}: estimated ${task.estimatedMinutes}m × ${this.timeoutMultiplier} = ${Math.round(timeout / 60000)}m timeout`
+      );
+      return timeout;
+    }
+
+    // Fallback: heuristic based on task complexity indicators
+    let baseTimeout = this.timeoutMs;
+    const descLength = task.description?.length ?? 0;
+    const skillCount = task.requiredSkills?.length ?? 0;
+
+    // Longer descriptions suggest more complex tasks
+    if (descLength > 1000) {
+      baseTimeout *= 1.5;
+    } else if (descLength > 500) {
+      baseTimeout *= 1.25;
+    }
+
+    // More required skills suggest more complex tasks
+    if (skillCount > 3) {
+      baseTimeout *= 1.25;
+    }
+
+    const finalTimeout = Math.min(this.maxTimeoutMs, baseTimeout);
+    this.logger.debug(
+      `Task ${task.id}: no estimate, using heuristic timeout of ${Math.round(finalTimeout / 60000)}m`
+    );
+    return finalTimeout;
   }
 
   /**
@@ -62,18 +128,21 @@ export class ClaudeCodeExecutor extends EventEmitter {
     // Store context for event emission
     this.currentContext = context;
 
+    // BUG-6 FIX: Calculate dynamic timeout based on task estimate
+    const taskTimeout = this.calculateTimeout(context.task);
+
     this.logger.info(`Executing task: ${context.task.title}`);
-    this.logger.debug(`Prompt length: ${prompt.length} chars, timeout: ${this.timeoutMs}ms`);
+    this.logger.debug(`Prompt length: ${prompt.length} chars, timeout: ${Math.round(taskTimeout / 60000)}m`);
 
     // Create a timeout promise that will abort the execution
     let timedOut = false;
     const timeoutPromise = new Promise<never>((_, reject) => {
       this.executionTimeout = setTimeout(() => {
         timedOut = true;
-        this.logger.warn(`Task execution timed out after ${this.timeoutMs}ms`);
+        this.logger.warn(`Task execution timed out after ${Math.round(taskTimeout / 60000)} minutes`);
         this.abort();
-        reject(new Error(`Task execution timed out after ${this.timeoutMs}ms`));
-      }, this.timeoutMs);
+        reject(new Error(`Task execution timed out after ${Math.round(taskTimeout / 60000)} minutes`));
+      }, taskTimeout);
     });
 
     try {
@@ -123,14 +192,40 @@ export class ClaudeCodeExecutor extends EventEmitter {
       clearTimeout(this.killTimeout);
       this.killTimeout = undefined;
     }
+    // BUG-7 FIX: Also clear SIGINT timeout
+    if (this.sigintTimeout) {
+      clearTimeout(this.sigintTimeout);
+      this.sigintTimeout = undefined;
+    }
   }
 
   /**
    * Build a prompt for Claude Code from task context
+   * Enhancement 6: Now uses TDD-biased prompt builder
    */
   private buildPrompt(context: ExecutionContext): string {
     const { task, memories, agentName, agentSkills } = context;
 
+    // Use the new TDD-biased prompt builder if enabled
+    if (this.enableTddPrompt) {
+      let prompt = buildAgentPrompt({
+        task,
+        agentName,
+        agentSkills: agentSkills as AgentSkill[],
+        memories,
+        includeTddPrompt: true,
+      });
+
+      // Add skill-specific guidelines
+      const skillInstructions = getSkillSpecificInstructions(agentSkills as AgentSkill[]);
+      if (skillInstructions) {
+        prompt += '\n' + skillInstructions;
+      }
+
+      return prompt;
+    }
+
+    // Legacy prompt (fallback if TDD prompt is disabled)
     let prompt = `You are ${agentName}, an AI agent with skills in: ${agentSkills.join(', ')}.
 
 ## Task
@@ -265,7 +360,10 @@ When done, provide a brief summary of what you accomplished.
 
   /**
    * Kill the current Claude Code process if running.
-   * First sends SIGTERM for graceful shutdown, then SIGKILL after timeout.
+   * BUG-7 FIX: Uses 3-stage termination for graceful shutdown:
+   * 1. SIGINT (5s) - Allow Claude to save state
+   * 2. SIGTERM (gracefulShutdownMs) - Standard shutdown request
+   * 3. SIGKILL - Force kill if unresponsive
    */
   abort(): void {
     if (!this.currentProcess) {
@@ -275,31 +373,55 @@ When done, provide a brief summary of what you accomplished.
     const proc = this.currentProcess;
     const pid = proc.pid;
 
-    this.logger.warn(`Aborting Claude Code execution (pid: ${pid})`);
+    this.logger.warn(`Aborting Claude Code execution (pid: ${pid}) - starting 3-stage termination`);
 
-    // First try graceful termination
-    proc.kill('SIGTERM');
+    // Stage 1: SIGINT - Allow Claude to save state (like Ctrl+C)
+    this.logger.debug(`Stage 1: Sending SIGINT to process ${pid}`);
+    try {
+      proc.kill('SIGINT');
+    } catch (error) {
+      this.logger.debug(`SIGINT failed (process may have already exited):`, error);
+      return;
+    }
 
-    // Set up SIGKILL fallback if process doesn't terminate
-    this.killTimeout = setTimeout(() => {
-      // Check if process is still running
+    // Stage 2: SIGTERM after 5 seconds if still running
+    this.sigintTimeout = setTimeout(() => {
       if (proc.killed) {
-        this.logger.debug(`Process ${pid} already terminated`);
+        this.logger.debug(`Process ${pid} terminated after SIGINT`);
         return;
       }
 
-      this.logger.warn(`Process ${pid} did not terminate after ${this.gracefulShutdownMs}ms, sending SIGKILL`);
-
+      this.logger.debug(`Stage 2: Sending SIGTERM to process ${pid}`);
       try {
-        proc.kill('SIGKILL');
+        proc.kill('SIGTERM');
       } catch (error) {
-        // Process might have already exited
-        this.logger.debug(`SIGKILL failed (process likely already exited):`, error);
+        this.logger.debug(`SIGTERM failed:`, error);
+        return;
       }
-    }, this.gracefulShutdownMs);
 
-    // Also listen for exit to clear the kill timeout
+      // Stage 3: SIGKILL after gracefulShutdownMs if still running
+      this.killTimeout = setTimeout(() => {
+        if (proc.killed) {
+          this.logger.debug(`Process ${pid} terminated after SIGTERM`);
+          return;
+        }
+
+        this.logger.warn(`Stage 3: Process ${pid} did not terminate after ${this.gracefulShutdownMs}ms, sending SIGKILL`);
+        try {
+          proc.kill('SIGKILL');
+        } catch (error) {
+          this.logger.debug(`SIGKILL failed (process likely already exited):`, error);
+        }
+      }, this.gracefulShutdownMs);
+
+    }, 5000); // 5 seconds for SIGINT stage
+
+    // Listen for exit to clear all timeouts
     proc.once('exit', () => {
+      if (this.sigintTimeout) {
+        clearTimeout(this.sigintTimeout);
+        this.sigintTimeout = undefined;
+      }
       if (this.killTimeout) {
         clearTimeout(this.killTimeout);
         this.killTimeout = undefined;

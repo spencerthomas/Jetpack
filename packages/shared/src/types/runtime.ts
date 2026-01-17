@@ -1,6 +1,18 @@
 import { z } from 'zod';
 
 /**
+ * Runtime modes for autonomous operation
+ * Controls how the supervisor decides when to continue or stop
+ */
+export const RuntimeModeSchema = z.enum([
+  'infinite',        // Never stops, generates work continuously
+  'idle-pause',      // Pauses when no work available, resumes on new tasks
+  'objective-based', // Runs until specific objective achieved
+  'iteration-limit', // Original behavior with max iterations
+]);
+export type RuntimeMode = z.infer<typeof RuntimeModeSchema>;
+
+/**
  * End states for autonomous operation
  * These indicate why Jetpack stopped running
  */

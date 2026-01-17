@@ -65,6 +65,7 @@ export const TaskPhaseSchema = z.enum([
   'planning',     // Deciding approach
   'executing',    // Making changes
   'testing',      // Running tests
+  'validating',   // Running quality checks (build, lint, type-check)
   'reviewing',    // Self-review
   'finalizing',   // Cleanup/completion
 ]);

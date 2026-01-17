@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Moon, Bell, Keyboard, Terminal, Brain, Loader2, Check, AlertCircle, Users, Plus, X } from 'lucide-react';
+import { Moon, Bell, Keyboard, Terminal, Brain, Loader2, Check, AlertCircle, Users, Plus, X, Play, Clock, Target, Repeat, Globe, Shield } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
+import type { JetpackSettings, RuntimeSettings } from '@jetpack/shared';
 
 interface CASSSettings {
   autoGenerateEmbeddings: boolean;
@@ -48,6 +49,43 @@ interface AgentConfig {
   presets: AgentPreset[];
 }
 
+// Default Jetpack settings for initial state
+const DEFAULT_JETPACK_SETTINGS: JetpackSettings = {
+  runtime: {
+    mode: 'iteration-limit',
+    maxIterations: 100,
+    idleTimeoutMs: 300000,
+    objectiveCheckIntervalMs: 60000,
+  },
+  agents: {
+    workPollingIntervalMs: 30000,
+    timeoutMultiplier: 2.0,
+    minTimeoutMs: 300000,
+    maxTimeoutMs: 7200000,
+    gracefulShutdownMs: 30000,
+  },
+  browserValidation: {
+    enabled: false,
+    devServerUrl: 'http://localhost:3000',
+    pageLoadTimeoutMs: 30000,
+    captureScreenshots: true,
+  },
+  quality: {
+    enabled: true,
+    checkBuild: true,
+    checkTests: true,
+    checkLint: false,
+    detectRegressions: true,
+  },
+  supervisor: {
+    provider: 'claude',
+    model: 'claude-sonnet-4-20250514',
+    enableFailureAnalysis: true,
+    autoDecompose: true,
+  },
+  agentCount: 3,
+};
+
 export default function SettingsPage() {
   // CASS settings state
   const [cassSettings, setCassSettings] = useState<CASSSettings | null>(null);
@@ -55,6 +93,9 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Jetpack runtime settings state (Enhancement 9)
+  const [jetpackSettings, setJetpackSettings] = useState<JetpackSettings>(DEFAULT_JETPACK_SETTINGS);
 
   // Agent config state
   const [agentConfig, setAgentConfig] = useState<AgentConfig>({
@@ -76,6 +117,10 @@ export default function SettingsPage() {
           setCassSettings(data.cass);
           if (data.agents) {
             setAgentConfig(data.agents);
+          }
+          // Load Jetpack runtime settings (Enhancement 9)
+          if (data.jetpack) {
+            setJetpackSettings(data.jetpack);
           }
         }
       } catch (err) {
@@ -108,6 +153,8 @@ export default function SettingsPage() {
           maxEntries: cassSettings.maxEntries,
         },
         agents: agentConfig,
+        // Include Jetpack runtime settings (Enhancement 9)
+        jetpack: jetpackSettings,
       };
 
       // Save settings
@@ -461,6 +508,385 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* Runtime Mode (Enhancement 9) */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Play className="w-5 h-5 text-secondary" />
+              <h2 className="text-base font-medium text-primary">Runtime Mode</h2>
+            </div>
+            <div className="space-y-4 pl-7">
+              {/* Mode Selection */}
+              <div>
+                <p className="text-sm font-medium text-primary mb-3">Operation Mode</p>
+                <div className="space-y-2">
+                  {[
+                    { value: 'infinite', label: 'Infinite', desc: 'Run continuously until manually stopped', icon: Repeat },
+                    { value: 'idle-pause', label: 'Idle-Pause', desc: 'Pause when no work available, resume on new tasks', icon: Clock },
+                    { value: 'objective-based', label: 'Objective-Based', desc: 'Run until a specific goal is achieved', icon: Target },
+                    { value: 'iteration-limit', label: 'Iteration Limit', desc: 'Stop after a set number of iterations (default)', icon: Play },
+                  ].map(({ value, label, desc, icon: Icon }) => (
+                    <label
+                      key={value}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        jetpackSettings.runtime.mode === value
+                          ? 'border-accent-purple bg-accent-purple/10'
+                          : 'border-default hover:border-subtle'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="runtimeMode"
+                        value={value}
+                        checked={jetpackSettings.runtime.mode === value}
+                        onChange={(e) =>
+                          setJetpackSettings((prev) => ({
+                            ...prev,
+                            runtime: { ...prev.runtime, mode: e.target.value as RuntimeSettings['mode'] },
+                          }))
+                        }
+                        className="mt-1 w-4 h-4 text-accent-purple focus:ring-accent-purple"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Icon className="w-4 h-4 text-secondary" />
+                          <span className="text-sm font-medium text-primary">{label}</span>
+                        </div>
+                        <p className="text-xs text-muted mt-0.5">{desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Iteration Limit (shown only for iteration-limit mode) */}
+              {jetpackSettings.runtime.mode === 'iteration-limit' && (
+                <div>
+                  <p className="text-sm font-medium text-primary mb-2">Max Iterations</p>
+                  <Input
+                    type="number"
+                    value={jetpackSettings.runtime.maxIterations}
+                    onChange={(e) =>
+                      setJetpackSettings((prev) => ({
+                        ...prev,
+                        runtime: { ...prev.runtime, maxIterations: parseInt(e.target.value) || 100 },
+                      }))
+                    }
+                    min="1"
+                    max="10000"
+                    className="w-32"
+                  />
+                  <p className="text-xs text-muted mt-1.5">
+                    Supervisor will stop after this many iterations
+                  </p>
+                </div>
+              )}
+
+              {/* Idle Timeout (shown only for idle-pause mode) */}
+              {jetpackSettings.runtime.mode === 'idle-pause' && (
+                <div>
+                  <p className="text-sm font-medium text-primary mb-2">Idle Timeout (seconds)</p>
+                  <Input
+                    type="number"
+                    value={Math.round(jetpackSettings.runtime.idleTimeoutMs / 1000)}
+                    onChange={(e) =>
+                      setJetpackSettings((prev) => ({
+                        ...prev,
+                        runtime: { ...prev.runtime, idleTimeoutMs: (parseInt(e.target.value) || 300) * 1000 },
+                      }))
+                    }
+                    min="30"
+                    max="3600"
+                    className="w-32"
+                  />
+                  <p className="text-xs text-muted mt-1.5">
+                    How long to wait before pausing when no work is available
+                  </p>
+                </div>
+              )}
+
+              {/* Objective (shown only for objective-based mode) */}
+              {jetpackSettings.runtime.mode === 'objective-based' && (
+                <div>
+                  <p className="text-sm font-medium text-primary mb-2">Objective</p>
+                  <textarea
+                    value={jetpackSettings.runtime.objective || ''}
+                    onChange={(e) =>
+                      setJetpackSettings((prev) => ({
+                        ...prev,
+                        runtime: { ...prev.runtime, objective: e.target.value },
+                      }))
+                    }
+                    placeholder="Describe the goal to achieve..."
+                    rows={3}
+                    className="w-full px-3 py-2 text-sm bg-surface border border-default rounded-md text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent-purple resize-none"
+                  />
+                  <p className="text-xs text-muted mt-1.5">
+                    The LLM will periodically check if this objective has been achieved
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Agent Execution Settings (Enhancement 9) */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="w-5 h-5 text-secondary" />
+              <h2 className="text-base font-medium text-primary">Agent Execution</h2>
+            </div>
+            <div className="space-y-4 pl-7">
+              {/* Work Polling Interval */}
+              <div>
+                <p className="text-sm font-medium text-primary mb-2">Work Polling Interval (seconds)</p>
+                <Input
+                  type="number"
+                  value={Math.round(jetpackSettings.agents.workPollingIntervalMs / 1000)}
+                  onChange={(e) =>
+                    setJetpackSettings((prev) => ({
+                      ...prev,
+                      agents: { ...prev.agents, workPollingIntervalMs: (parseInt(e.target.value) || 30) * 1000 },
+                    }))
+                  }
+                  min="5"
+                  max="300"
+                  className="w-32"
+                />
+                <p className="text-xs text-muted mt-1.5">
+                  How often agents check for new work (fixes BUG-5)
+                </p>
+              </div>
+
+              {/* Timeout Multiplier */}
+              <div>
+                <p className="text-sm font-medium text-primary mb-2">Timeout Multiplier</p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    step="0.5"
+                    value={jetpackSettings.agents.timeoutMultiplier}
+                    onChange={(e) =>
+                      setJetpackSettings((prev) => ({
+                        ...prev,
+                        agents: { ...prev.agents, timeoutMultiplier: parseFloat(e.target.value) },
+                      }))
+                    }
+                    className="flex-1 h-2 bg-hover rounded-lg appearance-none cursor-pointer accent-accent-purple"
+                  />
+                  <span className="text-sm font-mono text-secondary w-12 text-right">
+                    {jetpackSettings.agents.timeoutMultiplier.toFixed(1)}x
+                  </span>
+                </div>
+                <p className="text-xs text-muted mt-1.5">
+                  Task timeout = estimatedMinutes × multiplier (fixes BUG-6)
+                </p>
+              </div>
+
+              {/* Graceful Shutdown */}
+              <div>
+                <p className="text-sm font-medium text-primary mb-2">Graceful Shutdown (seconds)</p>
+                <Input
+                  type="number"
+                  value={Math.round(jetpackSettings.agents.gracefulShutdownMs / 1000)}
+                  onChange={(e) =>
+                    setJetpackSettings((prev) => ({
+                      ...prev,
+                      agents: { ...prev.agents, gracefulShutdownMs: (parseInt(e.target.value) || 30) * 1000 },
+                    }))
+                  }
+                  min="5"
+                  max="120"
+                  className="w-32"
+                />
+                <p className="text-xs text-muted mt-1.5">
+                  Time to wait for graceful termination (fixes BUG-7)
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Browser Validation (Enhancement 9) */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Globe className="w-5 h-5 text-secondary" />
+              <h2 className="text-base font-medium text-primary">Browser Validation</h2>
+            </div>
+            <div className="space-y-4 pl-7">
+              {/* Enable Toggle */}
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-primary">Enable browser validation</p>
+                  <p className="text-xs text-muted mt-0.5">
+                    Validate UI changes with headless browser tests
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={jetpackSettings.browserValidation.enabled}
+                  onChange={(e) =>
+                    setJetpackSettings((prev) => ({
+                      ...prev,
+                      browserValidation: { ...prev.browserValidation, enabled: e.target.checked },
+                    }))
+                  }
+                  className="w-4 h-4 rounded border-default bg-surface checked:bg-accent-purple focus:ring-accent-purple focus:ring-offset-base"
+                />
+              </label>
+
+              {jetpackSettings.browserValidation.enabled && (
+                <>
+                  {/* Dev Server URL */}
+                  <div>
+                    <p className="text-sm font-medium text-primary mb-2">Dev Server URL</p>
+                    <Input
+                      type="url"
+                      value={jetpackSettings.browserValidation.devServerUrl}
+                      onChange={(e) =>
+                        setJetpackSettings((prev) => ({
+                          ...prev,
+                          browserValidation: { ...prev.browserValidation, devServerUrl: e.target.value },
+                        }))
+                      }
+                      placeholder="http://localhost:3000"
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted mt-1.5">
+                      URL of the development server to validate against
+                    </p>
+                  </div>
+
+                  {/* Capture Screenshots */}
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <p className="text-sm font-medium text-primary">Capture screenshots</p>
+                      <p className="text-xs text-muted mt-0.5">
+                        Save screenshots during validation
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={jetpackSettings.browserValidation.captureScreenshots}
+                      onChange={(e) =>
+                        setJetpackSettings((prev) => ({
+                          ...prev,
+                          browserValidation: { ...prev.browserValidation, captureScreenshots: e.target.checked },
+                        }))
+                      }
+                      className="w-4 h-4 rounded border-default bg-surface checked:bg-accent-purple focus:ring-accent-purple focus:ring-offset-base"
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Quality Checks (Enhancement 9) */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="w-5 h-5 text-secondary" />
+              <h2 className="text-base font-medium text-primary">Quality Checks</h2>
+            </div>
+            <div className="space-y-4 pl-7">
+              {/* Enable Toggle */}
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-primary">Enable quality metrics</p>
+                  <p className="text-xs text-muted mt-0.5">
+                    Collect quality metrics after task completion
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={jetpackSettings.quality.enabled}
+                  onChange={(e) =>
+                    setJetpackSettings((prev) => ({
+                      ...prev,
+                      quality: { ...prev.quality, enabled: e.target.checked },
+                    }))
+                  }
+                  className="w-4 h-4 rounded border-default bg-surface checked:bg-accent-purple focus:ring-accent-purple focus:ring-offset-base"
+                />
+              </label>
+
+              {jetpackSettings.quality.enabled && (
+                <>
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <p className="text-sm font-medium text-primary">Check build</p>
+                      <p className="text-xs text-muted mt-0.5">Run build after task completion</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={jetpackSettings.quality.checkBuild}
+                      onChange={(e) =>
+                        setJetpackSettings((prev) => ({
+                          ...prev,
+                          quality: { ...prev.quality, checkBuild: e.target.checked },
+                        }))
+                      }
+                      className="w-4 h-4 rounded border-default bg-surface checked:bg-accent-purple focus:ring-accent-purple focus:ring-offset-base"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <p className="text-sm font-medium text-primary">Check tests</p>
+                      <p className="text-xs text-muted mt-0.5">Run tests after task completion</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={jetpackSettings.quality.checkTests}
+                      onChange={(e) =>
+                        setJetpackSettings((prev) => ({
+                          ...prev,
+                          quality: { ...prev.quality, checkTests: e.target.checked },
+                        }))
+                      }
+                      className="w-4 h-4 rounded border-default bg-surface checked:bg-accent-purple focus:ring-accent-purple focus:ring-offset-base"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <p className="text-sm font-medium text-primary">Check lint</p>
+                      <p className="text-xs text-muted mt-0.5">Run linter after task completion</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={jetpackSettings.quality.checkLint}
+                      onChange={(e) =>
+                        setJetpackSettings((prev) => ({
+                          ...prev,
+                          quality: { ...prev.quality, checkLint: e.target.checked },
+                        }))
+                      }
+                      className="w-4 h-4 rounded border-default bg-surface checked:bg-accent-purple focus:ring-accent-purple focus:ring-offset-base"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <p className="text-sm font-medium text-primary">Detect regressions</p>
+                      <p className="text-xs text-muted mt-0.5">Compare metrics to detect quality regressions</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={jetpackSettings.quality.detectRegressions}
+                      onChange={(e) =>
+                        setJetpackSettings((prev) => ({
+                          ...prev,
+                          quality: { ...prev.quality, detectRegressions: e.target.checked },
+                        }))
+                      }
+                      className="w-4 h-4 rounded border-default bg-surface checked:bg-accent-purple focus:ring-accent-purple focus:ring-offset-base"
+                    />
+                  </label>
+                </>
+              )}
             </div>
           </section>
 

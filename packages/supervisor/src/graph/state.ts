@@ -135,13 +135,13 @@ export const SupervisorStateAnnotation = Annotation.Root({
   // Planning phase
   plannedTasks: Annotation<PlannedTask[]>({
     default: () => [],
-    reducer: (_, newTasks) => newTasks,
+    reducer: (_, newTasks) => newTasks || [],
   }),
 
   // Created tasks (after Beads integration)
   createdTasks: Annotation<Task[]>({
     default: () => [],
-    reducer: (existing, newTasks) => [...existing, ...newTasks],
+    reducer: (existing, newTasks) => [...existing, ...(newTasks || [])],
   }),
 
   // Available agents
@@ -165,25 +165,25 @@ export const SupervisorStateAnnotation = Annotation.Root({
   // Conflicts to resolve
   conflicts: Annotation<Conflict[]>({
     default: () => [],
-    reducer: (existing, newConflicts) => [...existing, ...newConflicts],
+    reducer: (existing, newConflicts) => [...existing, ...(newConflicts || [])],
   }),
 
   // Reassignment history
   reassignments: Annotation<Reassignment[]>({
     default: () => [],
-    reducer: (existing, newReassignments) => [...existing, ...newReassignments],
+    reducer: (existing, newReassignments) => [...existing, ...(newReassignments || [])],
   }),
 
   // Completed task IDs
   completedTaskIds: Annotation<string[]>({
     default: () => [],
-    reducer: (existing, newIds) => [...new Set([...existing, ...newIds])],
+    reducer: (existing, newIds) => [...new Set([...existing, ...(newIds || [])])],
   }),
 
   // Failed task IDs
   failedTaskIds: Annotation<string[]>({
     default: () => [],
-    reducer: (existing, newIds) => [...new Set([...existing, ...newIds])],
+    reducer: (existing, newIds) => [...new Set([...existing, ...(newIds || [])])],
   }),
 
   // Current iteration count (for loop detection)
@@ -250,6 +250,30 @@ export const SupervisorStateAnnotation = Annotation.Root({
   } | undefined>({
     default: () => undefined,
     reducer: (_, result) => result,
+  }),
+
+  // === Runtime mode extensions ===
+
+  // Whether the objective has been met (for objective-based mode)
+  objectiveMet: Annotation<boolean>({
+    default: () => false,
+    reducer: (_, met) => met,
+  }),
+
+  // Current runtime settings
+  runtimeSettings: Annotation<{
+    mode: 'infinite' | 'idle-pause' | 'objective-based' | 'iteration-limit';
+    maxIterations: number;
+    objective?: string;
+  } | undefined>({
+    default: () => undefined,
+    reducer: (_, settings) => settings,
+  }),
+
+  // Pause reason when in idle state
+  pauseReason: Annotation<string | undefined>({
+    default: () => undefined,
+    reducer: (_, reason) => reason,
   }),
 });
 
