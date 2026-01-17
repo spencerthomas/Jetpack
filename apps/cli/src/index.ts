@@ -826,13 +826,50 @@ program
   .argument('<request>', 'High-level request to execute (e.g., "Build user authentication")')
   .option('-a, --agents <number>', 'Number of agents to start', '5')
   .option('-l, --llm <provider>', 'LLM provider (claude, openai, ollama)', 'claude')
-  .option('-m, --model <model>', 'LLM model name', 'claude-3-5-sonnet-20241022')
+  .option('-m, --model <model>', 'LLM model name')
   .option('--dir <path>', 'Working directory (or set JETPACK_WORK_DIR)', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (request: string, options) => {
+    // Set default model based on provider (use cheaper options by default)
+    const defaultModels: Record<string, string> = {
+      claude: 'claude-3-5-sonnet-20241022',
+      openai: 'gpt-4o-mini', // Cheaper than gpt-4
+      ollama: 'llama3.2', // Free local model
+    };
+    const llmProvider = options.llm as 'claude' | 'openai' | 'ollama';
+    const model = options.model || defaultModels[llmProvider] || defaultModels.claude;
+
     console.log(chalk.bold.cyan('\n🧠 Jetpack LangGraph Supervisor\n'));
     console.log(chalk.gray(`Request: "${request}"`));
-    console.log(chalk.gray(`LLM: ${options.llm} (${options.model})`));
+    console.log(chalk.gray(`LLM: ${llmProvider} (${model})`));
     console.log(chalk.gray(`Agents: ${options.agents}\n`));
+
+    // Early API key validation BEFORE starting agents
+    if (llmProvider === 'claude' && !process.env.ANTHROPIC_API_KEY) {
+      console.error(chalk.red('\n❌ Error: ANTHROPIC_API_KEY environment variable is required for Claude supervisor'));
+      console.error(chalk.yellow('\nAlternatives (no Anthropic key needed):'));
+      console.error(chalk.gray('  1. Use OpenAI: --llm openai (requires OPENAI_API_KEY, uses gpt-4o-mini by default)'));
+      console.error(chalk.gray('  2. Use Ollama (FREE, runs locally): --llm ollama'));
+      console.error(chalk.cyan('\n📦 Ollama setup (free, local LLM):'));
+      console.error(chalk.gray('     brew install ollama'));
+      console.error(chalk.gray('     ollama pull llama3.2'));
+      console.error(chalk.gray('     ollama serve'));
+      console.error(chalk.gray('     pnpm jetpack supervise "your request" --llm ollama'));
+      process.exit(1);
+    }
+    if (llmProvider === 'openai' && !process.env.OPENAI_API_KEY) {
+      console.error(chalk.red('\n❌ Error: OPENAI_API_KEY environment variable is required for OpenAI supervisor'));
+      console.error(chalk.yellow('\nAlternatives:'));
+      console.error(chalk.gray('  1. Set OPENAI_API_KEY: export OPENAI_API_KEY=your_key'));
+      console.error(chalk.gray('  2. Use Ollama (FREE, runs locally): --llm ollama'));
+      console.error(chalk.cyan('\n📦 Ollama setup (free, local LLM):'));
+      console.error(chalk.gray('     brew install ollama && ollama pull llama3.2 && ollama serve'));
+      process.exit(1);
+    }
+    if (llmProvider === 'ollama') {
+      const ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+      console.log(chalk.cyan(`📦 Using Ollama (free, local) at: ${ollamaUrl}`));
+      console.log(chalk.gray('   Tip: Run "ollama serve" if not running\n'));
+    }
 
     const spinner = ora('Initializing Jetpack...').start();
 
@@ -849,8 +886,8 @@ program
       spinner.text = 'Initializing supervisor...';
 
       await jetpack.createSupervisor({
-        provider: options.llm as 'claude' | 'openai' | 'ollama',
-        model: options.model,
+        provider: llmProvider,
+        model: model,
       });
 
       spinner.succeed('Supervisor ready');

@@ -131,6 +131,8 @@ export class JetpackOrchestrator extends EventEmitter {
   private _tuiMode: boolean = false;
   private quality?: QualityMetricsAdapter;
   private regressionDetector?: RegressionDetector;
+  /** Standalone mail adapter for broadcasting (works even without agents) */
+  private broadcastMail?: MCPMailAdapter;
 
   constructor(private config: JetpackConfig) {
     super();
@@ -299,6 +301,14 @@ export class JetpackOrchestrator extends EventEmitter {
       this.regressionDetector = new RegressionDetector();
       this.logger.info('Quality metrics tracking initialized');
     }
+
+    // Initialize standalone broadcast mail adapter (for task creation without agents)
+    const broadcastMailConfig: MCPMailConfig = {
+      mailDir: path.join(this.workDir, '.jetpack', 'mail'),
+      agentId: 'orchestrator',
+    };
+    this.broadcastMail = new MCPMailAdapter(broadcastMailConfig);
+    await this.broadcastMail.initialize();
 
     this.logger.info('Jetpack orchestrator initialized');
   }
@@ -547,11 +557,10 @@ export class JetpackOrchestrator extends EventEmitter {
 
     this.logger.info(`Created task: ${task.id} - ${task.title}`);
 
-    // Broadcast to agents
-    // Since we have multiple mail adapters, broadcast from the first agent
-    if (this.agentMails.size > 0) {
-      const firstMail = this.agentMails.values().next().value as MCPMailAdapter;
-      await firstMail.publish({
+    // Broadcast to agents via MCP Mail
+    // Use the standalone broadcastMail adapter (always available after initialize())
+    if (this.broadcastMail) {
+      await this.broadcastMail.publish({
         id: '',
         type: 'task.created',
         from: 'orchestrator',
@@ -559,9 +568,12 @@ export class JetpackOrchestrator extends EventEmitter {
           taskId: task.id,
           title: task.title,
           requiredSkills: task.requiredSkills,
+          priority: task.priority,
+          branch: task.branch,
         },
         timestamp: new Date(),
       });
+      this.logger.debug(`Broadcast task.created for ${task.id}`);
     }
 
     return task;
@@ -627,6 +639,11 @@ export class JetpackOrchestrator extends EventEmitter {
     // Close quality metrics adapter
     if (this.quality) {
       await this.quality.close();
+    }
+
+    // Close broadcast mail adapter
+    if (this.broadcastMail) {
+      await this.broadcastMail.shutdown();
     }
 
     this.logger.info('Jetpack shut down complete');

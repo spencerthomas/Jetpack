@@ -1,6 +1,6 @@
 export { LLMProvider, LLMProviderConfig, LLMProviderConfigInput, LLMProviderConfigSchema, ChatMessage, toBaseMessages } from './LLMProvider';
 export { ClaudeProvider } from './ClaudeProvider';
-export { OpenAIProvider } from './OpenAIProvider';
+export { OpenAIProvider, OpenAIProviderConfig } from './OpenAIProvider';
 
 import { LLMProvider, LLMProviderConfigInput } from './LLMProvider';
 import { ClaudeProvider } from './ClaudeProvider';
@@ -27,12 +27,14 @@ export function createLLMProvider(config: LLMProviderConfigInput): LLMProvider {
       });
     case 'ollama':
       // For Ollama, we use OpenAI-compatible API with custom base URL
-      // This requires setting OLLAMA_BASE_URL environment variable
+      // Ollama exposes an OpenAI-compatible endpoint at /v1
+      const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
       return new OpenAIProvider({
         model: config.model,
         apiKey: 'ollama', // Ollama doesn't require API key
         temperature: config.temperature,
         maxTokens: config.maxTokens,
+        baseURL: `${ollamaBaseUrl}/v1`,
       });
     default:
       throw new Error(`Unsupported LLM provider: ${config.provider}`);
