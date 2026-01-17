@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
+import prompts from 'prompts';
 import { spawn, ChildProcess, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -70,6 +71,10 @@ interface JetpackConfig {
   version?: string;
   agents?: number;
   port?: number;
+  llmProvider?: 'claude' | 'openai' | 'ollama';
+  llmModel?: string;
+  supervisorEnabled?: boolean;
+  supervisorInterval?: number;
 }
 
 function loadConfig(workDir: string): JetpackConfig {
@@ -162,23 +167,24 @@ program
 
   Commands:
     init [path]                Initialize Jetpack in a directory
+    config                     Interactive setup wizard
     start                      Start orchestrator, agents, supervisor, and web UI
     task                       Create a new task for agents
     status                     Show current system status
     demo                       Run demo with sample tasks
     supervise <request>        LLM-powered task orchestration
 
-  Examples:
+  Quick Start:
     jetpack init .             Initialize in current directory
-    jetpack start              Start everything with auto-supervisor
+    jetpack config             Configure LLM provider (includes free Ollama)
+    jetpack start              Start everything with saved config
+
+  Examples:
     jetpack start -a 5         Start with 5 agents
-    jetpack start --no-supervisor  Disable background supervisor
-    jetpack start --supervisor-interval 60000  Monitor every 60s
+    jetpack start --llm ollama Use free local Ollama
     jetpack start --no-ui      CLI only, no web UI
     jetpack task -t "Title"    Create a task
-    jetpack status             Check system status
-    jetpack demo               Run demo workflow
-    jetpack supervise "Build auth" --llm claude
+    jetpack supervise "Build auth" --llm ollama
 
   Create tasks via:
     • Web UI at http://localhost:3002
@@ -347,6 +353,11 @@ program
     const port = options.port ? parseInt(options.port) : (config.port || 3002);
     const url = `http://localhost:${port}`;
 
+    // LLM config from file or CLI
+    const llmProvider = options.llm || config.llmProvider || 'claude';
+    const llmModel = options.model || config.llmModel;
+    const supervisorIntervalMs = options.supervisorInterval ? parseInt(options.supervisorInterval) : (config.supervisorInterval || 30000);
+
     const spinner = ora('Initializing orchestrator...').start();
 
     try {
@@ -409,13 +420,14 @@ program
       await jetpack.startAgents(numAgents);
       spinner.succeed(chalk.green(`${numAgents} agents started`));
 
-      // 3. Start supervisor (unless --no-supervisor)
+      // 3. Start supervisor (unless --no-supervisor or config disabled)
       let supervisor: SupervisorAgent | undefined;
-      if (options.supervisor !== false) {
+      const supervisorEnabled = options.supervisor !== false && config.supervisorEnabled !== false;
+      if (supervisorEnabled) {
         // Check if API key is available for the selected provider
-        const hasApiKey = options.llm === 'claude'
+        const hasApiKey = llmProvider === 'claude'
           ? !!process.env.ANTHROPIC_API_KEY
-          : options.llm === 'openai'
+          : llmProvider === 'openai'
             ? !!process.env.OPENAI_API_KEY
             : true; // Ollama doesn't need API key
 
@@ -423,30 +435,29 @@ program
           spinner.start('Starting supervisor...');
 
           // Default models based on provider
-          const defaultModel = options.llm === 'claude'
+          const defaultModel = llmProvider === 'claude'
             ? 'claude-3-5-sonnet-20241022'
-            : options.llm === 'openai'
-              ? 'gpt-4'
-              : 'llama2';
-
-          const intervalMs = parseInt(options.supervisorInterval);
+            : llmProvider === 'openai'
+              ? 'gpt-4o-mini'
+              : 'llama3.2';
 
           supervisor = await jetpack.createSupervisor(
             {
-              provider: options.llm as 'claude' | 'openai' | 'ollama',
-              model: options.model || defaultModel,
+              provider: llmProvider as 'claude' | 'openai' | 'ollama',
+              model: llmModel || defaultModel,
             },
             {
-              backgroundMonitorIntervalMs: intervalMs,
+              backgroundMonitorIntervalMs: supervisorIntervalMs,
             }
           );
 
           // Start background monitoring
           supervisor.startBackgroundMonitoring();
 
-          spinner.succeed(chalk.green(`Supervisor started (monitoring every ${intervalMs / 1000}s)`));
+          spinner.succeed(chalk.green(`Supervisor started (monitoring every ${supervisorIntervalMs / 1000}s)`));
         } else {
-          spinner.warn(chalk.yellow(`Supervisor disabled: ${options.llm.toUpperCase()}_API_KEY not set`));
+          spinner.warn(chalk.yellow(`Supervisor disabled: ${llmProvider.toUpperCase()}_API_KEY not set`));
+          console.log(chalk.gray('  Tip: Run `jetpack config` to set up Ollama (free, no API key needed)\n'));
         }
       }
 
@@ -488,12 +499,12 @@ program
         console.log(chalk.bold('  🧠 Supervisor'));
         const llmInfo = supervisor.getLLMInfo();
         console.log(chalk.gray(`     ${llmInfo.name} (${llmInfo.model})`));
-        console.log(chalk.gray(`     Monitoring every ${parseInt(options.supervisorInterval) / 1000}s`));
+        console.log(chalk.gray(`     Monitoring every ${supervisorIntervalMs / 1000}s`));
         console.log(chalk.gray('     Auto-reassigns failed tasks, detects stalled agents'));
         console.log('');
-      } else if (options.supervisor === false) {
+      } else if (!supervisorEnabled) {
         console.log(chalk.bold('  🧠 Supervisor'));
-        console.log(chalk.gray('     Disabled (use --supervisor to enable)'));
+        console.log(chalk.gray('     Disabled (run `jetpack config` to enable)'));
         console.log('');
       }
 
@@ -948,6 +959,181 @@ program
       console.error(chalk.red('Failed to start MCP server:'), error);
       process.exit(1);
     }
+  });
+
+program
+  .command('config')
+  .description('Interactive setup wizard to configure Jetpack')
+  .option('--dir <path>', 'Working directory (or set JETPACK_WORK_DIR)', process.env.JETPACK_WORK_DIR || process.cwd())
+  .action(async (options) => {
+    console.log(chalk.bold.cyan('\n⚙️  Jetpack Configuration Wizard\n'));
+
+    const workDir = options.dir;
+
+    // Check if Jetpack is initialized
+    const jetpackDir = path.join(workDir, '.jetpack');
+    if (!fs.existsSync(jetpackDir)) {
+      console.log(chalk.yellow('Jetpack not initialized in this directory.'));
+      const { shouldInit } = await prompts({
+        type: 'confirm',
+        name: 'shouldInit',
+        message: 'Would you like to initialize Jetpack first?',
+        initial: true,
+      });
+
+      if (shouldInit) {
+        // Initialize directories
+        const dirs = [
+          path.join(workDir, '.beads'),
+          path.join(workDir, '.beads', 'tasks'),
+          path.join(workDir, '.cass'),
+          path.join(workDir, '.jetpack'),
+          path.join(workDir, '.jetpack', 'mail'),
+        ];
+        for (const dir of dirs) {
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+        }
+        console.log(chalk.green('\n✓ Jetpack directories created\n'));
+      } else {
+        console.log(chalk.gray('\nRun `jetpack init` first, then `jetpack config`\n'));
+        return;
+      }
+    }
+
+    // Load existing config
+    const existingConfig = loadConfig(workDir);
+
+    // Interactive prompts
+    console.log(chalk.gray('Configure your Jetpack setup. Press Enter to accept defaults.\n'));
+
+    const response = await prompts([
+      {
+        type: 'select',
+        name: 'llmProvider',
+        message: 'Which LLM provider do you want to use?',
+        choices: [
+          {
+            title: 'Ollama (Free, Local)',
+            value: 'ollama',
+            description: 'Runs locally, no API key needed'
+          },
+          {
+            title: 'Claude (Anthropic)',
+            value: 'claude',
+            description: 'Requires ANTHROPIC_API_KEY'
+          },
+          {
+            title: 'OpenAI',
+            value: 'openai',
+            description: 'Requires OPENAI_API_KEY, uses gpt-4o-mini'
+          },
+        ],
+        initial: existingConfig.llmProvider === 'claude' ? 1 :
+                 existingConfig.llmProvider === 'openai' ? 2 : 0,
+      },
+      {
+        type: 'number',
+        name: 'agents',
+        message: 'How many agents do you want to run?',
+        initial: existingConfig.agents || 3,
+        min: 1,
+        max: 20,
+      },
+      {
+        type: 'number',
+        name: 'port',
+        message: 'What port should the web UI use?',
+        initial: existingConfig.port || 3002,
+        min: 1000,
+        max: 65535,
+      },
+      {
+        type: 'confirm',
+        name: 'supervisorEnabled',
+        message: 'Enable background supervisor for auto-monitoring?',
+        initial: existingConfig.supervisorEnabled !== false,
+      },
+      {
+        type: (prev: boolean) => prev ? 'number' : null,
+        name: 'supervisorInterval',
+        message: 'Supervisor monitoring interval (seconds)?',
+        initial: (existingConfig.supervisorInterval || 30000) / 1000,
+        min: 10,
+        max: 300,
+      },
+    ]);
+
+    // Handle cancellation
+    if (!response.llmProvider) {
+      console.log(chalk.yellow('\nConfiguration cancelled.\n'));
+      return;
+    }
+
+    // Determine model based on provider
+    const defaultModels: Record<string, string> = {
+      claude: 'claude-3-5-sonnet-20241022',
+      openai: 'gpt-4o-mini',
+      ollama: 'llama3.2',
+    };
+
+    // Build config object
+    const newConfig: JetpackConfig = {
+      version: DEFAULT_CONFIG.version,
+      agents: response.agents,
+      port: response.port,
+      llmProvider: response.llmProvider,
+      llmModel: defaultModels[response.llmProvider],
+      supervisorEnabled: response.supervisorEnabled,
+      supervisorInterval: response.supervisorInterval ? response.supervisorInterval * 1000 : 30000,
+    };
+
+    // Save config
+    const configPath = path.join(jetpackDir, 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2));
+
+    console.log(chalk.green('\n✓ Configuration saved!\n'));
+
+    // Display summary
+    console.log(chalk.bold('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
+    console.log(chalk.bold('  📋 Configuration Summary\n'));
+    console.log(chalk.gray(`  LLM Provider:  `) + chalk.cyan(response.llmProvider));
+    console.log(chalk.gray(`  LLM Model:     `) + chalk.cyan(defaultModels[response.llmProvider]));
+    console.log(chalk.gray(`  Agents:        `) + chalk.cyan(response.agents));
+    console.log(chalk.gray(`  Web UI Port:   `) + chalk.cyan(response.port));
+    console.log(chalk.gray(`  Supervisor:    `) + chalk.cyan(response.supervisorEnabled ? 'Enabled' : 'Disabled'));
+    if (response.supervisorEnabled && response.supervisorInterval) {
+      console.log(chalk.gray(`  Monitor Freq:  `) + chalk.cyan(`${response.supervisorInterval}s`));
+    }
+    console.log('');
+
+    // Provider-specific instructions
+    if (response.llmProvider === 'ollama') {
+      console.log(chalk.bold('  📦 Ollama Setup (if not installed):\n'));
+      console.log(chalk.gray('     brew install ollama'));
+      console.log(chalk.gray('     ollama pull llama3.2'));
+      console.log(chalk.gray('     ollama serve'));
+      console.log('');
+    } else if (response.llmProvider === 'claude') {
+      if (!process.env.ANTHROPIC_API_KEY) {
+        console.log(chalk.yellow('  ⚠️  ANTHROPIC_API_KEY not set\n'));
+        console.log(chalk.gray('     export ANTHROPIC_API_KEY=your_key'));
+        console.log('');
+      }
+    } else if (response.llmProvider === 'openai') {
+      if (!process.env.OPENAI_API_KEY) {
+        console.log(chalk.yellow('  ⚠️  OPENAI_API_KEY not set\n'));
+        console.log(chalk.gray('     export OPENAI_API_KEY=your_key'));
+        console.log('');
+      }
+    }
+
+    console.log(chalk.bold('  🚀 Next Steps:\n'));
+    console.log(chalk.cyan('     jetpack start     ') + chalk.gray('Launch with saved config'));
+    console.log(chalk.cyan('     jetpack supervise ') + chalk.gray('"Build X" - AI-powered orchestration'));
+    console.log('');
+    console.log(chalk.bold('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
   });
 
 program.parse();
