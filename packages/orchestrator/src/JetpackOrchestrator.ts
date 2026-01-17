@@ -67,6 +67,7 @@ import { MCPMailAdapter, MCPMailConfig } from '@jetpack/mcp-mail-adapter';
 import { CASSAdapter, CASSConfig } from '@jetpack/cass-adapter';
 import { SupervisorAgent, SupervisorResult, LLMProviderConfigInput } from '@jetpack/supervisor';
 import { AgentController, AgentControllerConfig } from './AgentController';
+import { SkillDetector } from './SkillDetector';
 
 export interface JetpackConfig {
   workDir: string;
@@ -108,6 +109,8 @@ export class JetpackOrchestrator {
   private registryUpdateInterval?: NodeJS.Timeout;
   private runtimeManager?: RuntimeManager;
   private _currentBranch: string = 'main';
+  private _skillDetector!: SkillDetector;
+  private _projectSkills: string[] = [];
 
   constructor(private config: JetpackConfig) {
     this.logger = new Logger('Jetpack');
@@ -137,6 +140,20 @@ export class JetpackOrchestrator {
     return this._currentBranch;
   }
 
+  /**
+   * Get the skill detector for dynamic skill analysis
+   */
+  get skillDetector(): SkillDetector {
+    return this._skillDetector;
+  }
+
+  /**
+   * Get detected project skills
+   */
+  get projectSkills(): string[] {
+    return this._projectSkills;
+  }
+
   async initialize(): Promise<void> {
     this.logger.info('Initializing Jetpack orchestrator');
 
@@ -152,6 +169,13 @@ export class JetpackOrchestrator {
     // Detect current git branch for branch-tagged projects
     await this.getCurrentBranch();
     this.logger.info(`Working on branch: ${this._currentBranch}`);
+
+    // Initialize skill detection for dynamic skills marketplace
+    this._skillDetector = new SkillDetector(this.workDir);
+    this._projectSkills = await this._skillDetector.getDetectedSkillIds();
+    if (this._projectSkills.length > 0) {
+      this.logger.info(`Detected project skills: ${this._projectSkills.join(', ')}`);
+    }
 
     // Initialize Beads adapter
     const beadsConfig: BeadsAdapterConfig = {

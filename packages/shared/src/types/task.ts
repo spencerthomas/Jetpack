@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { AgentSkillSchema } from './agent';
 
 export const TaskStatusSchema = z.enum([
   'pending',
@@ -27,7 +26,8 @@ export const TaskSchema = z.object({
   priority: TaskPrioritySchema.default('medium'),
   dependencies: z.array(z.string()).default([]), // Task IDs
   blockers: z.array(z.string()).default([]),
-  requiredSkills: z.array(AgentSkillSchema).default([]),
+  // Flexible skill strings - validated via SkillRegistry at runtime
+  requiredSkills: z.array(z.string()).default([]),
   assignedAgent: z.string().optional(),
   estimatedMinutes: z.number().optional(),
   actualMinutes: z.number().optional(),

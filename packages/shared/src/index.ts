@@ -8,6 +8,10 @@ export * from './types/runtime';
 export * from './types/quality';
 export * from './types/plan';
 export * from './types/execution';
+export * from './types/skill';
+
+// Services
+export * from './services/SkillRegistry';
 
 // Utilities
 export * from './utils/logger';

@@ -7,6 +7,7 @@ import {
   Message,
   MemoryEntry,
   FailureType,
+  getSkillRegistry,
 } from '@jetpack/shared';
 import { BeadsAdapter } from '@jetpack/beads-adapter';
 import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
@@ -46,6 +47,7 @@ export class AgentController {
       name: config.name,
       status: 'idle',
       skills: config.skills,
+      acquiredSkills: [],  // Dynamically acquired skills during runtime
       createdAt: new Date(),
       lastActive: new Date(),
     };
@@ -154,28 +156,61 @@ export class AgentController {
     }
 
     const readyTasks = await this.beads.getReadyTasks();
+    const registry = getSkillRegistry();
 
-    // Find tasks that match our skills
-    const suitableTasks = readyTasks.filter(task => {
+    // Score and filter tasks based on skill matching
+    const scoredTasks = readyTasks.map(task => {
       // If task has no required skills, anyone can do it
-      if (task.requiredSkills.length === 0) return true;
+      if (task.requiredSkills.length === 0) {
+        return { task, score: 1, canAcquire: false, missingSkills: [] };
+      }
 
-      // Check if we have at least one of the required skills
-      return task.requiredSkills.some(skill => this.agent.skills.includes(skill));
+      // Calculate match score using registry
+      const score = registry.calculateMatchScore(this.agent.skills, task.requiredSkills);
+
+      // Identify missing skills that could be acquired
+      const missingSkills = registry.suggestSkillsToAcquire(
+        this.agent.skills,
+        task.requiredSkills
+      );
+
+      // Consider task if we have partial match (score > 0) or can acquire all missing skills
+      const canAcquire = missingSkills.length > 0 && score < 1;
+
+      return { task, score, canAcquire, missingSkills };
     });
+
+    // Filter to tasks with at least partial match (score > 0) or acquirable skills
+    const suitableTasks = scoredTasks.filter(
+      ({ score, canAcquire }) => score > 0 || canAcquire
+    );
 
     if (suitableTasks.length === 0) {
       this.logger.debug('No suitable tasks available');
       return;
     }
 
-    // Sort by priority and pick the first one
+    // Sort by priority first, then by skill match score
     suitableTasks.sort((a, b) => {
       const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
-      return priorityOrder[b.priority] - priorityOrder[a.priority];
+      const priorityDiff = priorityOrder[b.task.priority] - priorityOrder[a.task.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+      return b.score - a.score;  // Higher score first
     });
 
-    const task = suitableTasks[0];
+    const { task, missingSkills } = suitableTasks[0];
+
+    // Dynamically acquire missing skills if needed
+    if (missingSkills.length > 0) {
+      this.logger.info(`Acquiring skills for task: ${missingSkills.join(', ')}`);
+      this.agent.skills.push(...missingSkills);
+      if (!this.agent.acquiredSkills) {
+        this.agent.acquiredSkills = [];
+      }
+      this.agent.acquiredSkills.push(...missingSkills);
+      registry.normalizeSkills(this.agent.skills);  // Normalize to canonical IDs
+    }
+
     await this.claimAndExecuteTask(task);
   }
 

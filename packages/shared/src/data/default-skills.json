@@ -1,0 +1,534 @@
+{
+  "skills": [
+    {
+      "id": "typescript",
+      "label": "TypeScript",
+      "category": "language",
+      "description": "TypeScript language and type system expertise",
+      "aliases": ["ts", "TS"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "tsconfig.json", "weight": 1 },
+        { "type": "file_exists", "pattern": "tsconfig.*.json", "weight": 0.8 },
+        { "type": "package_json", "pattern": "devDependencies.typescript", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["javascript"]
+    },
+    {
+      "id": "javascript",
+      "label": "JavaScript",
+      "category": "language",
+      "description": "JavaScript/ECMAScript expertise",
+      "aliases": ["js", "JS", "ecmascript"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "package.json", "weight": 0.7 },
+        { "type": "file_exists", "pattern": "*.js", "weight": 0.5 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["typescript", "nodejs"]
+    },
+    {
+      "id": "python",
+      "label": "Python",
+      "category": "language",
+      "description": "Python programming expertise",
+      "aliases": ["py"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "requirements.txt", "weight": 1 },
+        { "type": "file_exists", "pattern": "pyproject.toml", "weight": 1 },
+        { "type": "file_exists", "pattern": "setup.py", "weight": 0.9 },
+        { "type": "file_exists", "pattern": "Pipfile", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["fastapi", "django", "ml"]
+    },
+    {
+      "id": "rust",
+      "label": "Rust",
+      "category": "language",
+      "description": "Rust systems programming",
+      "aliases": ["rs"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "Cargo.toml", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["backend", "security"]
+    },
+    {
+      "id": "go",
+      "label": "Go",
+      "category": "language",
+      "description": "Go/Golang programming",
+      "aliases": ["golang"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "go.mod", "weight": 1 },
+        { "type": "file_exists", "pattern": "go.sum", "weight": 0.9 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["backend", "devops"]
+    },
+    {
+      "id": "java",
+      "label": "Java",
+      "category": "language",
+      "description": "Java programming and JVM ecosystem",
+      "aliases": [],
+      "detectors": [
+        { "type": "file_exists", "pattern": "pom.xml", "weight": 1 },
+        { "type": "file_exists", "pattern": "build.gradle", "weight": 1 },
+        { "type": "file_exists", "pattern": "build.gradle.kts", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["backend", "spring"]
+    },
+    {
+      "id": "ruby",
+      "label": "Ruby",
+      "category": "language",
+      "description": "Ruby programming",
+      "aliases": ["rb"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "Gemfile", "weight": 1 },
+        { "type": "file_exists", "pattern": "*.gemspec", "weight": 0.9 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["rails"]
+    },
+    {
+      "id": "php",
+      "label": "PHP",
+      "category": "language",
+      "description": "PHP programming",
+      "aliases": [],
+      "detectors": [
+        { "type": "file_exists", "pattern": "composer.json", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["laravel", "backend"]
+    },
+    {
+      "id": "csharp",
+      "label": "C#",
+      "category": "language",
+      "description": "C# and .NET programming",
+      "aliases": ["cs", "dotnet", ".net"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "*.csproj", "weight": 1 },
+        { "type": "file_exists", "pattern": "*.sln", "weight": 0.9 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["backend"]
+    },
+    {
+      "id": "react",
+      "label": "React",
+      "category": "framework",
+      "description": "React UI library and ecosystem",
+      "aliases": ["reactjs", "react.js"],
+      "detectors": [
+        { "type": "package_json", "pattern": "dependencies.react", "weight": 1 },
+        { "type": "package_json", "pattern": "devDependencies.react", "weight": 1 }
+      ],
+      "prerequisites": ["javascript"],
+      "relatedSkills": ["frontend", "typescript", "nextjs"]
+    },
+    {
+      "id": "vue",
+      "label": "Vue.js",
+      "category": "framework",
+      "description": "Vue.js framework",
+      "aliases": ["vuejs", "vue.js"],
+      "detectors": [
+        { "type": "package_json", "pattern": "dependencies.vue", "weight": 1 },
+        { "type": "file_exists", "pattern": "vue.config.js", "weight": 0.9 },
+        { "type": "file_exists", "pattern": "nuxt.config.js", "weight": 0.8 }
+      ],
+      "prerequisites": ["javascript"],
+      "relatedSkills": ["frontend", "nuxt"]
+    },
+    {
+      "id": "angular",
+      "label": "Angular",
+      "category": "framework",
+      "description": "Angular framework",
+      "aliases": [],
+      "detectors": [
+        { "type": "file_exists", "pattern": "angular.json", "weight": 1 },
+        { "type": "package_json", "pattern": "dependencies.@angular/core", "weight": 1 }
+      ],
+      "prerequisites": ["typescript"],
+      "relatedSkills": ["frontend"]
+    },
+    {
+      "id": "svelte",
+      "label": "Svelte",
+      "category": "framework",
+      "description": "Svelte framework",
+      "aliases": [],
+      "detectors": [
+        { "type": "file_exists", "pattern": "svelte.config.js", "weight": 1 },
+        { "type": "package_json", "pattern": "dependencies.svelte", "weight": 1 }
+      ],
+      "prerequisites": ["javascript"],
+      "relatedSkills": ["frontend", "sveltekit"]
+    },
+    {
+      "id": "nextjs",
+      "label": "Next.js",
+      "category": "framework",
+      "description": "Next.js React framework",
+      "aliases": ["next", "next.js"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "next.config.js", "weight": 1 },
+        { "type": "file_exists", "pattern": "next.config.mjs", "weight": 1 },
+        { "type": "file_exists", "pattern": "next.config.ts", "weight": 1 },
+        { "type": "package_json", "pattern": "dependencies.next", "weight": 1 }
+      ],
+      "prerequisites": ["react"],
+      "relatedSkills": ["frontend", "fullstack"]
+    },
+    {
+      "id": "express",
+      "label": "Express.js",
+      "category": "framework",
+      "description": "Express.js Node.js web framework",
+      "aliases": ["expressjs"],
+      "detectors": [
+        { "type": "package_json", "pattern": "dependencies.express", "weight": 1 }
+      ],
+      "prerequisites": ["javascript"],
+      "relatedSkills": ["backend", "nodejs", "api"]
+    },
+    {
+      "id": "fastapi",
+      "label": "FastAPI",
+      "category": "framework",
+      "description": "FastAPI Python framework",
+      "aliases": [],
+      "detectors": [
+        { "type": "file_content", "pattern": "from fastapi import", "weight": 1 },
+        { "type": "file_content", "pattern": "requirements.txt:fastapi", "weight": 1 }
+      ],
+      "prerequisites": ["python"],
+      "relatedSkills": ["backend", "api"]
+    },
+    {
+      "id": "django",
+      "label": "Django",
+      "category": "framework",
+      "description": "Django Python framework",
+      "aliases": [],
+      "detectors": [
+        { "type": "file_exists", "pattern": "manage.py", "weight": 0.8 },
+        { "type": "file_content", "pattern": "requirements.txt:django", "weight": 1 }
+      ],
+      "prerequisites": ["python"],
+      "relatedSkills": ["backend", "fullstack"]
+    },
+    {
+      "id": "rails",
+      "label": "Ruby on Rails",
+      "category": "framework",
+      "description": "Ruby on Rails framework",
+      "aliases": ["ror"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "config/routes.rb", "weight": 1 },
+        { "type": "file_content", "pattern": "Gemfile:rails", "weight": 1 }
+      ],
+      "prerequisites": ["ruby"],
+      "relatedSkills": ["backend", "fullstack"]
+    },
+    {
+      "id": "backend",
+      "label": "Backend Development",
+      "category": "domain",
+      "description": "Server-side development expertise",
+      "aliases": ["server-side", "server"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "src/server/**/*", "weight": 0.7 },
+        { "type": "file_exists", "pattern": "server/**/*", "weight": 0.7 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["api", "database"]
+    },
+    {
+      "id": "frontend",
+      "label": "Frontend Development",
+      "category": "domain",
+      "description": "Client-side development expertise",
+      "aliases": ["client-side", "ui"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "src/components/**/*", "weight": 0.8 },
+        { "type": "file_exists", "pattern": "public/**/*", "weight": 0.5 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["react", "vue", "css"]
+    },
+    {
+      "id": "fullstack",
+      "label": "Full Stack Development",
+      "category": "domain",
+      "description": "Combined frontend and backend expertise",
+      "aliases": ["full-stack"],
+      "detectors": [],
+      "prerequisites": ["frontend", "backend"],
+      "relatedSkills": ["nextjs", "rails"]
+    },
+    {
+      "id": "devops",
+      "label": "DevOps",
+      "category": "domain",
+      "description": "DevOps and infrastructure expertise",
+      "aliases": ["ops", "infrastructure"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "Dockerfile", "weight": 0.8 },
+        { "type": "file_exists", "pattern": "docker-compose.yml", "weight": 0.8 },
+        { "type": "file_exists", "pattern": ".github/workflows/*.yml", "weight": 0.9 },
+        { "type": "file_exists", "pattern": "terraform/**/*", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["docker", "kubernetes", "ci-cd"]
+    },
+    {
+      "id": "database",
+      "label": "Database",
+      "category": "domain",
+      "description": "Database design and management",
+      "aliases": ["db"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "prisma/schema.prisma", "weight": 1 },
+        { "type": "file_exists", "pattern": "migrations/**/*", "weight": 0.8 },
+        { "type": "file_exists", "pattern": "drizzle.config.ts", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["sql", "nosql"]
+    },
+    {
+      "id": "testing",
+      "label": "Testing",
+      "category": "domain",
+      "description": "Software testing and QA",
+      "aliases": ["qa", "test"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "jest.config.*", "weight": 1 },
+        { "type": "file_exists", "pattern": "vitest.config.*", "weight": 1 },
+        { "type": "file_exists", "pattern": "cypress.config.*", "weight": 1 },
+        { "type": "file_exists", "pattern": "playwright.config.*", "weight": 1 },
+        { "type": "file_exists", "pattern": "**/*.test.*", "weight": 0.7 },
+        { "type": "file_exists", "pattern": "**/*.spec.*", "weight": 0.7 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": []
+    },
+    {
+      "id": "documentation",
+      "label": "Documentation",
+      "category": "domain",
+      "description": "Technical documentation writing",
+      "aliases": ["docs", "doc"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "docs/**/*", "weight": 0.8 },
+        { "type": "file_exists", "pattern": "README.md", "weight": 0.3 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": []
+    },
+    {
+      "id": "docker",
+      "label": "Docker",
+      "category": "tool",
+      "description": "Docker containerization",
+      "aliases": [],
+      "detectors": [
+        { "type": "file_exists", "pattern": "Dockerfile", "weight": 1 },
+        { "type": "file_exists", "pattern": "docker-compose.yml", "weight": 1 },
+        { "type": "file_exists", "pattern": "docker-compose.yaml", "weight": 1 },
+        { "type": "file_exists", "pattern": ".dockerignore", "weight": 0.8 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["devops", "kubernetes"]
+    },
+    {
+      "id": "kubernetes",
+      "label": "Kubernetes",
+      "category": "tool",
+      "description": "Kubernetes orchestration",
+      "aliases": ["k8s"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "k8s/**/*", "weight": 1 },
+        { "type": "file_exists", "pattern": "kubernetes/**/*", "weight": 1 },
+        { "type": "file_exists", "pattern": "helm/**/*", "weight": 0.9 }
+      ],
+      "prerequisites": ["docker"],
+      "relatedSkills": ["devops"]
+    },
+    {
+      "id": "git",
+      "label": "Git",
+      "category": "tool",
+      "description": "Git version control",
+      "aliases": [],
+      "detectors": [
+        { "type": "file_exists", "pattern": ".git", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": []
+    },
+    {
+      "id": "ci-cd",
+      "label": "CI/CD",
+      "category": "tool",
+      "description": "Continuous integration and deployment",
+      "aliases": ["ci", "cd", "github-actions"],
+      "detectors": [
+        { "type": "file_exists", "pattern": ".github/workflows/*.yml", "weight": 1 },
+        { "type": "file_exists", "pattern": ".gitlab-ci.yml", "weight": 1 },
+        { "type": "file_exists", "pattern": "Jenkinsfile", "weight": 1 },
+        { "type": "file_exists", "pattern": ".circleci/config.yml", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["devops"]
+    },
+    {
+      "id": "sql",
+      "label": "SQL",
+      "category": "domain",
+      "description": "SQL database querying",
+      "aliases": ["postgres", "postgresql", "mysql", "sqlite"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "**/*.sql", "weight": 0.7 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["database"]
+    },
+    {
+      "id": "nosql",
+      "label": "NoSQL",
+      "category": "domain",
+      "description": "NoSQL databases (MongoDB, Redis, etc.)",
+      "aliases": ["mongodb", "redis", "dynamodb"],
+      "detectors": [
+        { "type": "package_json", "pattern": "dependencies.mongodb", "weight": 1 },
+        { "type": "package_json", "pattern": "dependencies.redis", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["database"]
+    },
+    {
+      "id": "data",
+      "label": "Data Engineering",
+      "category": "domain",
+      "description": "Data processing and pipelines",
+      "aliases": ["data-engineering"],
+      "detectors": [],
+      "prerequisites": [],
+      "relatedSkills": ["sql", "python", "ml"]
+    },
+    {
+      "id": "ml",
+      "label": "Machine Learning",
+      "category": "domain",
+      "description": "Machine learning and AI",
+      "aliases": ["machine-learning", "ai", "deep-learning"],
+      "detectors": [
+        { "type": "file_content", "pattern": "requirements.txt:torch", "weight": 1 },
+        { "type": "file_content", "pattern": "requirements.txt:tensorflow", "weight": 1 },
+        { "type": "file_content", "pattern": "requirements.txt:sklearn", "weight": 0.9 },
+        { "type": "package_json", "pattern": "dependencies.@tensorflow/tfjs", "weight": 1 }
+      ],
+      "prerequisites": ["python"],
+      "relatedSkills": ["data"]
+    },
+    {
+      "id": "api",
+      "label": "API Development",
+      "category": "domain",
+      "description": "REST and GraphQL API design",
+      "aliases": ["rest", "restful"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "openapi.yaml", "weight": 1 },
+        { "type": "file_exists", "pattern": "swagger.json", "weight": 1 },
+        { "type": "file_exists", "pattern": "src/api/**/*", "weight": 0.7 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["backend", "graphql"]
+    },
+    {
+      "id": "graphql",
+      "label": "GraphQL",
+      "category": "domain",
+      "description": "GraphQL API development",
+      "aliases": ["gql"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "**/*.graphql", "weight": 1 },
+        { "type": "package_json", "pattern": "dependencies.graphql", "weight": 1 },
+        { "type": "package_json", "pattern": "dependencies.@apollo/client", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["api"]
+    },
+    {
+      "id": "security",
+      "label": "Security",
+      "category": "domain",
+      "description": "Application security",
+      "aliases": ["appsec", "infosec"],
+      "detectors": [],
+      "prerequisites": [],
+      "relatedSkills": []
+    },
+    {
+      "id": "mobile",
+      "label": "Mobile Development",
+      "category": "domain",
+      "description": "Mobile app development",
+      "aliases": ["ios", "android"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "ios/**/*", "weight": 0.9 },
+        { "type": "file_exists", "pattern": "android/**/*", "weight": 0.9 },
+        { "type": "package_json", "pattern": "dependencies.react-native", "weight": 1 },
+        { "type": "file_exists", "pattern": "expo.json", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["react"]
+    },
+    {
+      "id": "aws",
+      "label": "AWS",
+      "category": "tool",
+      "description": "Amazon Web Services",
+      "aliases": ["amazon"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "serverless.yml", "weight": 0.9 },
+        { "type": "file_exists", "pattern": "cdk.json", "weight": 1 },
+        { "type": "file_exists", "pattern": "samconfig.toml", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["devops"]
+    },
+    {
+      "id": "gcp",
+      "label": "Google Cloud",
+      "category": "tool",
+      "description": "Google Cloud Platform",
+      "aliases": ["google-cloud"],
+      "detectors": [
+        { "type": "file_exists", "pattern": "app.yaml", "weight": 0.7 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["devops"]
+    },
+    {
+      "id": "azure",
+      "label": "Azure",
+      "category": "tool",
+      "description": "Microsoft Azure",
+      "aliases": [],
+      "detectors": [
+        { "type": "file_exists", "pattern": "azure-pipelines.yml", "weight": 1 }
+      ],
+      "prerequisites": [],
+      "relatedSkills": ["devops"]
+    }
+  ]
+}
