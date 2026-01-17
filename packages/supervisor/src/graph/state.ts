@@ -42,7 +42,13 @@ export const ReassignmentSchema = z.object({
 export type Reassignment = z.infer<typeof ReassignmentSchema>;
 
 /**
- * Task breakdown from planner with dependencies
+ * Plan item type - hierarchical structure (Epic > Task > Subtask)
+ */
+export const PlanItemTypeSchema = z.enum(['epic', 'task', 'subtask', 'leaf']);
+export type PlanItemType = z.infer<typeof PlanItemTypeSchema>;
+
+/**
+ * Task breakdown from planner with dependencies and hierarchy info
  */
 export const PlannedTaskSchema = z.object({
   title: z.string(),
@@ -50,6 +56,10 @@ export const PlannedTaskSchema = z.object({
   requiredSkills: z.array(z.string()),
   estimatedMinutes: z.number(),
   dependsOn: z.array(z.string()), // titles of other tasks
+  // Hierarchy information (all optional for backwards compatibility)
+  type: PlanItemTypeSchema.optional(), // Defaults to 'task' if not specified
+  parentTitle: z.string().optional(), // Title of parent epic/task
+  executable: z.boolean().optional(), // Defaults to true if not specified
 });
 export type PlannedTask = z.infer<typeof PlannedTaskSchema>;
 

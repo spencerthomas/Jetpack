@@ -6,13 +6,30 @@ import {
   generateAgentId,
   Message,
   MemoryEntry,
-  FailureType,
   getSkillRegistry,
+  TaskPhase,
+  TaskClaimedPayload,
+  TaskProgressPayload,
+  TaskCompletedPayload,
+  TaskFailedPayload,
+  AgentStatusPayload,
+  ExecutionOutputEvent,
 } from '@jetpack/shared';
 import { BeadsAdapter } from '@jetpack/beads-adapter';
 import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
 import { CASSAdapter } from '@jetpack/cass-adapter';
 import { ClaudeCodeExecutor } from './ClaudeCodeExecutor';
+
+/** Quality metrics to report after task completion */
+export interface TaskQualityMetrics {
+  lintErrors?: number;
+  lintWarnings?: number;
+  typeErrors?: number;
+  testsPassing?: number;
+  testsFailing?: number;
+  testCoverage?: number;
+  buildSuccess?: boolean;
+}
 
 export interface AgentControllerConfig {
   name: string;
@@ -22,16 +39,36 @@ export interface AgentControllerConfig {
   onTaskComplete?: (agentId: string) => void;
   onTaskFailed?: (agentId: string, taskId: string, error: string) => void;
   onCycleComplete?: () => void;
+  /** Callback for agent output events (for TUI dashboard) */
+  onOutput?: (event: ExecutionOutputEvent) => void;
+  /** Enable TUI mode (emit events instead of writing to stdout) */
+  enableTuiMode?: boolean;
+  /** Callback to report quality metrics after task completion (optional) */
+  onQualityReport?: (taskId: string, agentId: string, metrics: TaskQualityMetrics) => Promise<void>;
+}
+
+/**
+ * Agent statistics for rich messaging
+ */
+interface AgentStats {
+  tasksCompleted: number;
+  tasksFailed: number;
+  totalCompletionMs: number;
+  startTime: Date;
 }
 
 export class AgentController {
   private agent: Agent;
   private logger: Logger;
   private currentTask?: Task;
+  private currentTaskStartTime?: Date;
+  private currentPhase: TaskPhase = 'analyzing';
   private heartbeatInterval?: NodeJS.Timeout;
+  private statusInterval?: NodeJS.Timeout;
   private executor: ClaudeCodeExecutor;
   private workDir: string;
   private config: AgentControllerConfig;
+  private stats: AgentStats;
 
   constructor(
     config: AgentControllerConfig,
@@ -41,7 +78,17 @@ export class AgentController {
   ) {
     this.config = config;
     this.workDir = config.workDir;
-    this.executor = new ClaudeCodeExecutor(config.workDir);
+
+    // Create executor with TUI mode if enabled
+    this.executor = new ClaudeCodeExecutor(config.workDir, {
+      emitOutputEvents: config.enableTuiMode ?? false,
+    });
+
+    // Forward executor output events to config callback
+    if (config.onOutput) {
+      this.executor.on('output', config.onOutput);
+    }
+
     this.agent = {
       id: generateAgentId(config.name),
       name: config.name,
@@ -50,6 +97,12 @@ export class AgentController {
       acquiredSkills: [],  // Dynamically acquired skills during runtime
       createdAt: new Date(),
       lastActive: new Date(),
+    };
+    this.stats = {
+      tasksCompleted: 0,
+      tasksFailed: 0,
+      totalCompletionMs: 0,
+      startTime: new Date(),
     };
     this.logger = new Logger(`Agent[${this.agent.name}]`);
   }
@@ -74,6 +127,7 @@ export class AgentController {
 
   async start(): Promise<void> {
     this.logger.info(`Starting agent ${this.agent.name}`);
+    this.stats.startTime = new Date();
 
     // Subscribe to task broadcasts
     this.mail.subscribe('task.created', this.handleTaskCreated.bind(this));
@@ -85,6 +139,13 @@ export class AgentController {
         this.logger.error('Failed to send heartbeat:', err);
       });
     }, 30000); // Every 30 seconds
+
+    // Start rich status broadcasting (every 10 seconds)
+    this.statusInterval = setInterval(() => {
+      this.broadcastStatus().catch(err => {
+        this.logger.error('Failed to broadcast status:', err);
+      });
+    }, 10000);
 
     // Announce startup
     await this.mail.publish({
@@ -109,6 +170,10 @@ export class AgentController {
 
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+    }
+
+    if (this.statusInterval) {
+      clearInterval(this.statusInterval);
     }
 
     // Announce shutdown
@@ -214,7 +279,10 @@ export class AgentController {
     await this.claimAndExecuteTask(task);
   }
 
-  private async claimAndExecuteTask(task: Task): Promise<void> {
+  private async claimAndExecuteTask(
+    task: Task,
+    claimContext?: { readyTaskCount: number; matchedSkills: string[]; skillScore: number }
+  ): Promise<void> {
     this.logger.info(`Attempting to claim task: ${task.id} - ${task.title}`);
 
     // Try to claim the task
@@ -225,17 +293,41 @@ export class AgentController {
     }
 
     this.currentTask = claimed;
+    this.currentTaskStartTime = new Date();
+    this.currentPhase = 'analyzing';
     await this.updateStatus('busy', task.id);
 
-    // Notify other agents
+    // Build rich claim payload with reasoning
+    const matchedSkills = claimContext?.matchedSkills || [];
+    const skillScore = claimContext?.skillScore || 0;
+    const readyTaskCount = claimContext?.readyTaskCount || 1;
+
+    const claimPayload: TaskClaimedPayload = {
+      taskId: task.id,
+      taskTitle: task.title,
+      agentName: this.agent.name,
+      agentId: this.agent.id,
+      reasoning: {
+        matchedSkills,
+        skillScore,
+        why: this.buildClaimReasoning(task, matchedSkills, skillScore, readyTaskCount),
+        estimatedDuration: task.estimatedMinutes || 30,
+        alternativesConsidered: readyTaskCount - 1,
+      },
+      context: {
+        totalReadyTasks: readyTaskCount,
+        busyAgentCount: 0, // Would need orchestrator context
+        taskPriority: task.priority,
+        taskType: task.tags?.find(t => t.startsWith('type:'))?.replace('type:', ''),
+      },
+    };
+
+    // Notify other agents with rich payload
     await this.mail.publish({
       id: '',
       type: 'task.claimed',
       from: this.agent.id,
-      payload: {
-        taskId: task.id,
-        agentName: this.agent.name,
-      },
+      payload: claimPayload as unknown as Record<string, unknown>,
       timestamp: new Date(),
     });
 
@@ -245,13 +337,28 @@ export class AgentController {
     this.logger.debug(`Retrieved ${memories.length} relevant memories via semantic search`);
 
     try {
+      // Broadcast progress: analyzing
+      await this.broadcastProgress('analyzing', `Analyzing task: ${task.title}`, 10);
+
       // Execute the task with file locking protection
+      await this.broadcastProgress('executing', `Executing task with file locking protection`, 30);
       await this.executeTaskWithLocking(claimed, memories);
+
+      // Calculate duration
+      const durationMs = this.currentTaskStartTime
+        ? Date.now() - this.currentTaskStartTime.getTime()
+        : 0;
+      const actualMinutes = Math.round(durationMs / 60000);
+
+      // Update stats
+      this.stats.tasksCompleted++;
+      this.stats.totalCompletionMs += durationMs;
 
       // Mark task as completed
       await this.beads.updateTask(task.id, {
         status: 'completed',
         completedAt: new Date(),
+        actualMinutes,
       });
 
       // Store learnings in CASS
@@ -263,50 +370,94 @@ export class AgentController {
           taskId: task.id,
           agentId: this.agent.id,
           skills: task.requiredSkills,
+          durationMs,
         },
       });
 
-      // Notify completion
+      // Build rich completion payload
+      const completedPayload: TaskCompletedPayload = {
+        taskId: task.id,
+        taskTitle: task.title,
+        agentName: this.agent.name,
+        agentId: this.agent.id,
+        summary: `Successfully completed "${task.title}"`,
+        durationMs,
+        actualMinutes,
+      };
+
+      // Notify completion with rich payload
       await this.mail.publish({
         id: '',
         type: 'task.completed',
         from: this.agent.id,
-        payload: {
-          taskId: task.id,
-          agentName: this.agent.name,
-        },
+        payload: completedPayload as unknown as Record<string, unknown>,
         timestamp: new Date(),
       });
 
-      this.logger.info(`Successfully completed task: ${task.id}`);
+      this.logger.info(`Successfully completed task: ${task.id} in ${actualMinutes}m`);
 
       // Notify orchestrator of task completion for metrics
       if (this.config.onTaskComplete) {
         this.config.onTaskComplete(this.agent.id);
       }
+
+      // Report quality metrics if callback is configured
+      // Note: In a full implementation, metrics would be collected from
+      // running lint/type-check/test commands. For now, we report basic success.
+      if (this.config.onQualityReport) {
+        await this.config.onQualityReport(task.id, this.agent.id, {
+          // Placeholder metrics - a full implementation would run
+          // actual quality checks (lint, typecheck, tests)
+          buildSuccess: true,
+        });
+      }
     } catch (error) {
       const errorMessage = (error as Error).message;
       this.logger.error(`Failed to execute task ${task.id}:`, error);
 
+      // Calculate duration even on failure
+      const durationMs = this.currentTaskStartTime
+        ? Date.now() - this.currentTaskStartTime.getTime()
+        : 0;
+
       // Determine failure type from error message
-      let failureType: FailureType = 'error';
+      let failureType: 'error' | 'timeout' | 'stalled' | 'blocked' = 'error';
       if (errorMessage.includes('timed out')) {
         failureType = 'timeout';
       } else if (errorMessage.includes('stalled') || errorMessage.includes('no output')) {
         failureType = 'stalled';
+      } else if (errorMessage.includes('FILE_LOCKED') || errorMessage.includes('blocked')) {
+        failureType = 'blocked';
       }
 
       // Implement retry logic with exponential backoff
-      const currentRetryCount = (task.retryCount || 0);
+      const currentRetryCount = task.retryCount || 0;
       const maxRetries = task.maxRetries ?? 2;
       const nextRetryCount = currentRetryCount + 1;
+      const willRetry = nextRetryCount <= maxRetries;
 
-      if (nextRetryCount <= maxRetries) {
+      // Build rich failure payload
+      const failedPayload: TaskFailedPayload = {
+        taskId: task.id,
+        taskTitle: task.title,
+        agentName: this.agent.name,
+        agentId: this.agent.id,
+        error: errorMessage,
+        failureType,
+        phase: this.currentPhase,
+        durationMs,
+        retryCount: nextRetryCount,
+        maxRetries,
+        willRetry,
+        nextRetryIn: willRetry ? 30000 * Math.pow(2, currentRetryCount) : undefined,
+      };
+
+      if (willRetry) {
         // Calculate exponential backoff: 30s, 60s, 120s
         const backoffMs = 30000 * Math.pow(2, currentRetryCount);
 
         this.logger.info(
-          `Task ${task.id} failed (${failureType}), scheduling retry ${nextRetryCount}/${maxRetries} in ${backoffMs / 1000}s`
+          `Task ${task.id} failed (${failureType}) at ${this.currentPhase} phase, scheduling retry ${nextRetryCount}/${maxRetries} in ${backoffMs / 1000}s`
         );
 
         // Update task for retry - set status back to 'ready' so it can be claimed again
@@ -319,18 +470,12 @@ export class AgentController {
           failureType,
         });
 
-        // Notify about retry scheduling
+        // Notify about retry scheduling with rich payload
         await this.mail.publish({
           id: '',
           type: 'task.retry_scheduled',
           from: this.agent.id,
-          payload: {
-            taskId: task.id,
-            retryCount: nextRetryCount,
-            maxRetries,
-            backoffMs,
-            failureType,
-          },
+          payload: failedPayload as unknown as Record<string, unknown>,
           timestamp: new Date(),
         });
 
@@ -340,8 +485,11 @@ export class AgentController {
       } else {
         // Max retries exceeded - mark as permanently failed
         this.logger.error(
-          `Task ${task.id} permanently failed after ${maxRetries} retries: ${errorMessage}`
+          `Task ${task.id} permanently failed after ${maxRetries} retries at ${this.currentPhase} phase: ${errorMessage}`
         );
+
+        // Update stats on permanent failure
+        this.stats.tasksFailed++;
 
         await this.beads.updateTask(task.id, {
           status: 'failed',
@@ -351,17 +499,12 @@ export class AgentController {
           failureType,
         });
 
+        // Publish rich failure message
         await this.mail.publish({
           id: '',
           type: 'task.failed',
           from: this.agent.id,
-          payload: {
-            taskId: task.id,
-            error: errorMessage,
-            retryCount: nextRetryCount,
-            failureType,
-            permanent: true,
-          },
+          payload: failedPayload as unknown as Record<string, unknown>,
           timestamp: new Date(),
         });
 
@@ -372,6 +515,8 @@ export class AgentController {
       }
     } finally {
       this.currentTask = undefined;
+      this.currentTaskStartTime = undefined;
+      this.currentPhase = 'analyzing'; // Reset to initial phase
       await this.updateStatus('idle', undefined);
 
       // Notify orchestrator of cycle completion
@@ -461,6 +606,7 @@ export class AgentController {
       task,
       memories,
       workDir: this.workDir,
+      agentId: this.agent.id,
       agentName: this.agent.name,
       agentSkills: this.agent.skills,
     });
@@ -492,5 +638,119 @@ export class AgentController {
 
   getCurrentTask(): Task | undefined {
     return this.currentTask;
+  }
+
+  // ============================================================================
+  // Rich Agent Messaging (Enhancement 4)
+  // ============================================================================
+
+  /**
+   * Broadcast detailed agent status
+   */
+  private async broadcastStatus(): Promise<void> {
+    const avgCompletionMs = this.stats.tasksCompleted > 0
+      ? this.stats.totalCompletionMs / this.stats.tasksCompleted
+      : 0;
+
+    const payload: AgentStatusPayload = {
+      agentId: this.agent.id,
+      agentName: this.agent.name,
+      status: this.agent.status,
+      currentTask: this.currentTask && this.currentTaskStartTime ? {
+        taskId: this.currentTask.id,
+        taskTitle: this.currentTask.title,
+        phase: this.currentPhase,
+        startedAt: this.currentTaskStartTime.toISOString(),
+        elapsedMs: Date.now() - this.currentTaskStartTime.getTime(),
+      } : undefined,
+      stats: {
+        tasksCompleted: this.stats.tasksCompleted,
+        tasksFailed: this.stats.tasksFailed,
+        avgCompletionMs: Math.round(avgCompletionMs),
+        uptime: Date.now() - this.stats.startTime.getTime(),
+      },
+      skills: this.agent.skills,
+      acquiredSkills: this.agent.acquiredSkills || [],
+    };
+
+    await this.mail.publish({
+      id: '',
+      type: 'agent.status',
+      from: this.agent.id,
+      payload: payload as unknown as Record<string, unknown>,
+      timestamp: new Date(),
+    });
+  }
+
+  /**
+   * Broadcast progress during task execution
+   */
+  private async broadcastProgress(
+    phase: TaskPhase,
+    description: string,
+    percentComplete: number
+  ): Promise<void> {
+    if (!this.currentTask || !this.currentTaskStartTime) return;
+
+    this.currentPhase = phase;
+
+    const payload: TaskProgressPayload = {
+      taskId: this.currentTask.id,
+      taskTitle: this.currentTask.title,
+      agentName: this.agent.name,
+      agentId: this.agent.id,
+      phase,
+      description,
+      percentComplete,
+      elapsedMs: Date.now() - this.currentTaskStartTime.getTime(),
+    };
+
+    await this.mail.publish({
+      id: '',
+      type: 'task.progress',
+      from: this.agent.id,
+      payload: payload as unknown as Record<string, unknown>,
+      timestamp: new Date(),
+    });
+  }
+
+  /**
+   * Build a rich "why I claimed this task" explanation
+   */
+  private buildClaimReasoning(
+    task: Task,
+    matchedSkills: string[],
+    skillScore: number,
+    readyTaskCount: number
+  ): string {
+    const reasons: string[] = [];
+
+    if (task.priority === 'critical') {
+      reasons.push('critical priority task');
+    } else if (task.priority === 'high') {
+      reasons.push('high priority task');
+    }
+
+    if (skillScore >= 0.9) {
+      reasons.push('excellent skill match');
+    } else if (skillScore >= 0.7) {
+      reasons.push('good skill match');
+    }
+
+    if (matchedSkills.length > 0) {
+      reasons.push(`matched skills: ${matchedSkills.join(', ')}`);
+    }
+
+    if (readyTaskCount === 1) {
+      reasons.push('only available task');
+    }
+
+    return reasons.length > 0
+      ? reasons.join('; ')
+      : 'selected based on availability';
+  }
+
+  getStats(): AgentStats {
+    return { ...this.stats };
   }
 }

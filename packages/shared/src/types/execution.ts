@@ -33,3 +33,29 @@ export interface ExecutionProgressEvent {
   newLines?: string[];
   error?: string;
 }
+
+/**
+ * Real-time output event for TUI streaming
+ * Emitted on each chunk of stdout/stderr from agent execution
+ */
+export interface ExecutionOutputEvent {
+  agentId: string;
+  agentName: string;
+  taskId: string;
+  taskTitle: string;
+  chunk: string;
+  stream: 'stdout' | 'stderr';
+  timestamp: Date;
+}
+
+/**
+ * Agent output buffer configuration for TUI
+ */
+export interface AgentOutputBuffer {
+  agentId: string;
+  agentName: string;
+  currentTaskId?: string;
+  currentTaskTitle?: string;
+  lines: string[];
+  maxLines: number;
+}

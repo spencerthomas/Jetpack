@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import { existsSync, watch, FSWatcher } from 'fs';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { EventEmitter } from 'events';
 
 const execFileAsync = promisify(execFile);
 import {
@@ -15,6 +16,8 @@ import {
   RuntimeStats,
   EndState,
   RuntimeEvent,
+  ExecutionOutputEvent,
+  AgentOutputBuffer,
 } from '@jetpack/shared';
 import { RuntimeManager } from './RuntimeManager';
 
@@ -66,6 +69,11 @@ import { BeadsAdapter, BeadsAdapterConfig } from '@jetpack/beads-adapter';
 import { MCPMailAdapter, MCPMailConfig } from '@jetpack/mcp-mail-adapter';
 import { CASSAdapter, CASSConfig } from '@jetpack/cass-adapter';
 import { SupervisorAgent, SupervisorResult, LLMProviderConfigInput } from '@jetpack/supervisor';
+import {
+  QualityMetricsAdapter,
+  RegressionDetector,
+  RegressionSummary,
+} from '@jetpack/quality-adapter';
 import { AgentController, AgentControllerConfig } from './AgentController';
 import { SkillDetector } from './SkillDetector';
 
@@ -76,6 +84,14 @@ export interface JetpackConfig {
   runtimeLimits?: Partial<RuntimeLimits>;
   onEndState?: (endState: EndState, stats: RuntimeStats) => void | Promise<void>;
   onRuntimeEvent?: (event: RuntimeEvent) => void;
+  /** Enable TUI mode for visual agent dashboard */
+  enableTuiMode?: boolean;
+  /** Callback for agent output events */
+  onAgentOutput?: (event: ExecutionOutputEvent) => void;
+  /** Enable quality metrics tracking (default: false) */
+  enableQualityMetrics?: boolean;
+  /** Callback when quality regressions are detected */
+  onQualityRegression?: (summary: RegressionSummary) => void;
 }
 
 export interface AgentRegistryEntry {
@@ -94,7 +110,7 @@ export interface AgentRegistry {
   updatedAt: string;
 }
 
-export class JetpackOrchestrator {
+export class JetpackOrchestrator extends EventEmitter {
   private logger: Logger;
   private beads!: BeadsAdapter;
   private cass!: CASSAdapter;
@@ -111,10 +127,70 @@ export class JetpackOrchestrator {
   private _currentBranch: string = 'main';
   private _skillDetector!: SkillDetector;
   private _projectSkills: string[] = [];
+  private _agentOutputBuffers: Map<string, AgentOutputBuffer> = new Map();
+  private _tuiMode: boolean = false;
+  private quality?: QualityMetricsAdapter;
+  private regressionDetector?: RegressionDetector;
 
   constructor(private config: JetpackConfig) {
+    super();
     this.logger = new Logger('Jetpack');
     this.workDir = config.workDir;
+    this._tuiMode = config.enableTuiMode ?? false;
+  }
+
+  /**
+   * Get whether TUI mode is enabled
+   */
+  get tuiMode(): boolean {
+    return this._tuiMode;
+  }
+
+  /**
+   * Get output buffers for all agents (for TUI dashboard)
+   */
+  getAgentOutputBuffers(): Map<string, AgentOutputBuffer> {
+    return new Map(this._agentOutputBuffers);
+  }
+
+  /**
+   * Handle output event from an agent
+   */
+  private handleAgentOutput(event: ExecutionOutputEvent): void {
+    // Update the buffer for this agent
+    let buffer = this._agentOutputBuffers.get(event.agentId);
+    if (!buffer) {
+      buffer = {
+        agentId: event.agentId,
+        agentName: event.agentName,
+        currentTaskId: event.taskId,
+        currentTaskTitle: event.taskTitle,
+        lines: [],
+        maxLines: 100,
+      };
+      this._agentOutputBuffers.set(event.agentId, buffer);
+    }
+
+    // Update current task info
+    buffer.currentTaskId = event.taskId;
+    buffer.currentTaskTitle = event.taskTitle;
+
+    // Add new lines from the chunk
+    const newLines = event.chunk.split('\n').filter(Boolean);
+    buffer.lines.push(...newLines);
+
+    // Trim to max lines
+    if (buffer.lines.length > buffer.maxLines) {
+      buffer.lines = buffer.lines.slice(-buffer.maxLines);
+    }
+
+    // Emit for TUI and other listeners
+    this.emit('agentOutput', event);
+
+    // Call config callback if provided
+    if (this.config.onAgentOutput) {
+      this.config.onAgentOutput(event);
+    }
   }
 
   /**
@@ -215,6 +291,15 @@ export class JetpackOrchestrator {
       });
     }
 
+    // Initialize Quality Metrics tracking if enabled
+    if (this.config.enableQualityMetrics) {
+      this.logger.info('Initializing quality metrics tracking');
+      this.quality = new QualityMetricsAdapter({ workDir: this.workDir });
+      await this.quality.initialize();
+      this.regressionDetector = new RegressionDetector();
+      this.logger.info('Quality metrics tracking initialized');
+    }
+
     this.logger.info('Jetpack orchestrator initialized');
   }
 
@@ -275,6 +360,15 @@ export class JetpackOrchestrator {
         onTaskFailed: (agentId: string, taskId: string, error: string) =>
           this.handleAgentTaskFailed(agentId, taskId, error),
         onCycleComplete: () => this.handleAgentCycleComplete(),
+        // TUI mode: emit output events instead of writing to stdout
+        enableTuiMode: this._tuiMode,
+        onOutput: (event) => this.handleAgentOutput(event),
+        // Quality metrics reporting (if enabled)
+        onQualityReport: this.config.enableQualityMetrics
+          ? async (taskId, agentId, metrics) => {
+              await this.recordQualitySnapshot(taskId, agentId, metrics);
+            }
+          : undefined,
       };
       return new AgentController(agentConfig, this.beads, mail, this.cass);
     });
@@ -530,6 +624,11 @@ export class JetpackOrchestrator {
       this.cass.close();
     }
 
+    // Close quality metrics adapter
+    if (this.quality) {
+      await this.quality.close();
+    }
+
     this.logger.info('Jetpack shut down complete');
   }
 
@@ -574,6 +673,141 @@ export class JetpackOrchestrator {
 
   getAgents(): AgentController[] {
     return this.agents;
+  }
+
+  /**
+   * Get the quality metrics adapter (if enabled)
+   */
+  getQualityAdapter(): QualityMetricsAdapter | undefined {
+    return this.quality;
+  }
+
+  /**
+   * Get the regression detector (if quality metrics enabled)
+   */
+  getRegressionDetector(): RegressionDetector | undefined {
+    return this.regressionDetector;
+  }
+
+  /**
+   * Check if quality metrics tracking is enabled
+   */
+  isQualityMetricsEnabled(): boolean {
+    return !!this.quality;
+  }
+
+  /**
+   * Record a quality snapshot after task completion
+   * Called by agents to report metrics for a completed task
+   */
+  async recordQualitySnapshot(
+    taskId: string,
+    agentId: string,
+    metrics: {
+      lintErrors?: number;
+      lintWarnings?: number;
+      typeErrors?: number;
+      testsPassing?: number;
+      testsFailing?: number;
+      testCoverage?: number;
+      buildSuccess?: boolean;
+    }
+  ): Promise<RegressionSummary | null> {
+    if (!this.quality || !this.regressionDetector) {
+      return null;
+    }
+
+    // Create snapshot with provided or default metrics
+    const snapshot = await this.quality.saveSnapshot({
+      id: this.quality.generateSnapshotId(),
+      taskId,
+      timestamp: new Date(),
+      isBaseline: false,
+      metrics: {
+        lintErrors: metrics.lintErrors ?? 0,
+        lintWarnings: metrics.lintWarnings ?? 0,
+        typeErrors: metrics.typeErrors ?? 0,
+        testsPassing: metrics.testsPassing ?? 0,
+        testsFailing: metrics.testsFailing ?? 0,
+        testCoverage: metrics.testCoverage ?? 0,
+        buildSuccess: metrics.buildSuccess ?? true,
+      },
+      tags: [`agent:${agentId}`, `task:${taskId}`],
+    });
+
+    this.logger.debug(`Recorded quality snapshot ${snapshot.id} for task ${taskId}`);
+
+    // Check for regressions against baseline
+    const baseline = await this.quality.getBaseline();
+    if (!baseline) {
+      // No baseline yet - consider making this the first baseline
+      this.logger.debug('No quality baseline set - snapshot recorded without regression check');
+      return null;
+    }
+
+    // Detect regressions
+    const regressions = this.regressionDetector.detectRegressions(baseline, snapshot, taskId);
+
+    if (regressions.length > 0) {
+      const summary = this.regressionDetector.summarizeRegressions(regressions);
+
+      this.logger.warn(
+        `Quality regressions detected for task ${taskId}: ${summary.total} regressions`,
+        summary.descriptions
+      );
+
+      // Notify via callback if configured
+      if (this.config.onQualityRegression) {
+        this.config.onQualityRegression(summary);
+      }
+
+      // Emit event for other listeners
+      this.emit('qualityRegression', { taskId, agentId, summary, regressions });
+
+      return summary;
+    }
+
+    return null;
+  }
+
+  /**
+   * Set a quality snapshot as the baseline for regression detection
+   */
+  async setQualityBaseline(snapshotId: string): Promise<void> {
+    if (!this.quality) {
+      throw new Error('Quality metrics not enabled');
+    }
+    await this.quality.setBaseline(snapshotId);
+    this.logger.info(`Set quality baseline to snapshot ${snapshotId}`);
+  }
+
+  /**
+   * Create a baseline snapshot from current project state
+   * Useful for establishing initial quality baseline
+   */
+  async createQualityBaseline(metrics: {
+    lintErrors: number;
+    lintWarnings: number;
+    typeErrors: number;
+    testsPassing: number;
+    testsFailing: number;
+    testCoverage: number;
+    buildSuccess: boolean;
+  }): Promise<string> {
+    if (!this.quality) {
+      throw new Error('Quality metrics not enabled');
+    }
+
+    const snapshot = await this.quality.saveSnapshot({
+      id: this.quality.generateSnapshotId(),
+      timestamp: new Date(),
+      isBaseline: true,
+      metrics,
+      tags: ['baseline', 'initial'],
+    });
+
+    this.logger.info(`Created quality baseline snapshot ${snapshot.id}`);
+    return snapshot.id;
   }
 
   /**
@@ -702,8 +936,20 @@ export class JetpackOrchestrator {
 
   /**
    * Create and initialize a supervisor agent
+   * @param llmConfig - LLM provider configuration
+   * @param options - Additional supervisor options
    */
-  async createSupervisor(llmConfig: LLMProviderConfigInput): Promise<SupervisorAgent> {
+  async createSupervisor(
+    llmConfig: LLMProviderConfigInput,
+    options?: {
+      /** Interval for background monitoring (default: 30000ms = 30s) */
+      backgroundMonitorIntervalMs?: number;
+      /** Poll interval for task status checks (default: 2000ms) */
+      pollIntervalMs?: number;
+      /** Max iterations for request execution (default: 100) */
+      maxIterations?: number;
+    }
+  ): Promise<SupervisorAgent> {
     this.logger.info('Creating supervisor agent');
 
     this.supervisor = new SupervisorAgent({
@@ -712,6 +958,9 @@ export class JetpackOrchestrator {
       cass: this.cass,
       getAgents: () => this.agents.map(a => a.getAgent()),
       getAgentMail: (agentId: string) => this.agentMails.get(agentId),
+      backgroundMonitorIntervalMs: options?.backgroundMonitorIntervalMs,
+      pollIntervalMs: options?.pollIntervalMs,
+      maxIterations: options?.maxIterations,
     });
 
     await this.supervisor.initialize();

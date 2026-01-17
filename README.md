@@ -19,26 +19,39 @@ Jetpack is a **multi-agent orchestration system** that coordinates AI agents to 
 - Agents autonomously claim tasks based on skills and availability
 - Coordinate through message passing to prevent duplicate work
 - Share knowledge through a collective memory system
+- **NEW:** Dynamic skill acquisition - agents learn new skills at runtime
 
 ### 💾 Persistent Memory
 - Beads stores task history and dependencies (git-backed)
 - CASS stores semantic memory and learned patterns
 - Agents learn from past work to improve over time
+- **NEW:** Semantic search with vector embeddings for intelligent context retrieval
 
 ### 🔒 Safe Execution
 - File leasing prevents concurrent modification conflicts
 - Task dependencies ensure proper execution order
 - Automatic rollback on failures
+- **NEW:** Automatic file locking during task execution
 
 ### 📊 Visual Oversight
 - Real-time task graph visualization
 - Agent status monitoring
 - Progress tracking and metrics
+- **NEW:** TUI dashboard with tmux-style split panes for live agent output
+- **NEW:** Quality metrics tracking with regression detection
 
 ### 🛠️ Multi-Stack Support
 - 34+ tech stacks supported
 - Language-specific agents (TypeScript, Python, Rust, Go)
 - Extensible adapter architecture
+- **NEW:** Auto-detection of project skills from codebase
+
+### 🤖 Always-On Supervisor
+- **NEW:** Supervisor starts automatically with background monitoring
+- Detects unassigned tasks and notifies idle agents
+- Auto-retries failed tasks with retry budget
+- Recovers from stalled agents by reassigning work
+- Branch-aware task filtering
 
 ## 🏗️ Architecture
 
@@ -75,10 +88,13 @@ Jetpack has a layered architecture with three core storage adapters and an optio
 | Component | Purpose | Storage |
 |-----------|---------|---------|
 | **Beads** | Persistent task queue with dependency tracking | `.beads/tasks.jsonl` |
-| **MCP Mail** | Pub/sub messaging between agents | `.jetpack/mail/` |
+| **MCP Mail** | Pub/sub messaging between agents + file leasing | `.jetpack/mail/` |
 | **CASS** | Vector-based semantic memory for context | `.cass/memory.db` |
 | **Orchestrator** | Coordinates adapters and agent lifecycle | In-memory |
-| **Supervisor** | LLM-powered planning and conflict resolution | In-memory |
+| **Supervisor** | LLM-powered planning with background monitoring | In-memory |
+| **Quality Adapter** | Quality snapshots and regression detection | `.quality/metrics.db` |
+| **CLI TUI** | Tmux-style terminal dashboard | In-memory |
+| **Skill Registry** | Dynamic skill detection and matching | In-memory |
 
 ## 🚦 Quick Start
 
@@ -195,6 +211,9 @@ jetpack start                   # Uses config defaults
 jetpack start -a 5              # Override: 5 agents
 jetpack start --no-browser      # Don't auto-open browser
 jetpack start --no-ui           # CLI-only mode
+jetpack start --tui             # Enable tmux-style TUI dashboard
+jetpack start --no-supervisor   # Disable always-on supervisor
+jetpack start --supervisor-interval 30000  # Supervisor check interval (ms)
 
 # Task management
 jetpack task -t "Title" -p high -s typescript,backend
@@ -868,24 +887,54 @@ import { JetpackOrchestrator } from '@jetpack/orchestrator';
 const jetpack = new JetpackOrchestrator({
   workDir: process.cwd(),
   autoStart: true,
+
+  // New: Always-on supervisor (enabled by default)
+  enableSupervisor: true,
+  supervisorConfig: {
+    provider: 'claude',
+    model: 'claude-sonnet-4-20250514',
+    monitorIntervalMs: 30000,  // Check every 30s
+    maxRetries: 3,
+  },
+
+  // New: Quality metrics tracking
+  enableQualityMetrics: true,
+  onQualityRegression: (summary) => {
+    console.warn('Quality regression detected:', summary.overallStatus);
+    // Could trigger alerts, block merges, etc.
+  },
+
+  // New: Branch-aware task filtering
+  branch: 'feature/auth',  // Or auto-detect from git
 });
 
 // Initialize
 await jetpack.initialize();
 
-// Start agents
+// Start agents with dynamic skill detection
 await jetpack.startAgents(5);
 
-// Create tasks
+// Create hierarchical tasks
+const epic = await jetpack.createTask({
+  title: 'User Authentication System',
+  type: 'epic',
+  priority: 'high',
+  requiredSkills: ['backend', 'security'],
+});
+
 const task1 = await jetpack.createTask({
-  title: 'Implement feature X',
+  title: 'Implement JWT service',
+  type: 'task',
+  parentId: epic.id,
   priority: 'high',
   requiredSkills: ['typescript', 'backend'],
   estimatedMinutes: 30,
 });
 
 const task2 = await jetpack.createTask({
-  title: 'Test feature X',
+  title: 'Write authentication tests',
+  type: 'task',
+  parentId: epic.id,
   priority: 'medium',
   requiredSkills: ['testing'],
   dependencies: [task1.id],
@@ -896,6 +945,13 @@ const task2 = await jetpack.createTask({
 const status = await jetpack.getStatus();
 console.log('Agents:', status.agents);
 console.log('Tasks:', status.tasks);
+
+// Get quality metrics (if enabled)
+const quality = jetpack.getQualityAdapter();
+if (quality) {
+  const baseline = await quality.getBaseline();
+  console.log('Quality baseline:', baseline);
+}
 
 // Shutdown gracefully
 await jetpack.shutdown();
@@ -1134,16 +1190,33 @@ const jetpack = new JetpackOrchestrator({
 
 ## 🚀 Roadmap
 
-- [x] **Kanban Web UI** - Modern drag-and-drop interface ✅
-- [x] **MCP Mail Inbox Viewer** - Real-time message monitoring ✅
-- [x] **LangGraph Supervisor** - Intelligent full orchestration with multi-LLM support ✅
-- [x] **Memory Dashboard** - CASS stats, visualization, and management ✅
-- [x] **Plan Management** - Create, execute, and template plan workflows ✅
-- [x] **Supervisor UI** - LangGraph node visualization and request queue ✅
-- [x] **Dark Mode** - Default dark theme with cyan accent ✅
-- [x] **Agent Spawning UI** - Multi-harness support (Claude Code, Codex, Gemini) ✅
-- [x] **Inbox Redesign** - 3-panel layout with threads and categories ✅
-- [x] **Hierarchical Tasks** - Tree view with Epic/Task/Sub-task/Leaf types ✅
+### ✅ Completed
+
+- [x] **Kanban Web UI** - Modern drag-and-drop interface
+- [x] **MCP Mail Inbox Viewer** - Real-time message monitoring
+- [x] **LangGraph Supervisor** - Intelligent full orchestration with multi-LLM support
+- [x] **Memory Dashboard** - CASS stats, visualization, and management
+- [x] **Plan Management** - Create, execute, and template plan workflows
+- [x] **Supervisor UI** - LangGraph node visualization and request queue
+- [x] **Dark Mode** - Default dark theme with cyan accent
+- [x] **Agent Spawning UI** - Multi-harness support (Claude Code, Codex, Gemini)
+- [x] **Inbox Redesign** - 3-panel layout with threads and categories
+- [x] **Hierarchical Tasks** - Tree view with Epic/Task/Sub-task/Leaf types
+- [x] **Always-On Supervisor** - Background monitoring with auto-recovery
+- [x] **TUI Dashboard** - Tmux-style split panes for live agent output
+- [x] **Dynamic Skills Marketplace** - Auto-detection and runtime skill acquisition
+- [x] **Rich Agent Messaging** - Detailed status with reasoning payloads
+- [x] **Smart Dependency Handling** - Parallel-first planning, bottleneck prevention
+- [x] **Branch-Tagged Projects** - Branch-aware task filtering
+- [x] **Selective Plan Execution** - Choose which plan items to convert to tasks
+- [x] **Hierarchical Planning** - Epic > Task > Subtask > Leaf structure
+- [x] **File Locking Integration** - Automatic lease acquisition during execution
+- [x] **Semantic Search for CASS** - Vector embedding-based memory retrieval
+- [x] **Quality Metrics Integration** - Regression detection and quality snapshots
+- [x] **Message Acknowledgment** - Reliable delivery tracking for messages
+
+### 🔜 Planned
+
 - [ ] Integration with Named Tmux Manager for command orchestration
 - [ ] Ultimate Bug Scanner adapter for quality gates
 - [ ] WebSocket support for instant UI updates

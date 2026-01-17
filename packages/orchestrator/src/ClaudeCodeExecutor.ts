@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
-import { Task, Logger, MemoryEntry } from '@jetpack/shared';
+import { EventEmitter } from 'events';
+import { Task, Logger, MemoryEntry, ExecutionOutputEvent } from '@jetpack/shared';
 
 export interface ExecutionResult {
   success: boolean;
@@ -13,6 +14,7 @@ export interface ExecutionContext {
   task: Task;
   memories: MemoryEntry[];
   workDir: string;
+  agentId: string;
   agentName: string;
   agentSkills: string[];
 }
@@ -22,12 +24,14 @@ export interface ExecutorConfig {
   timeoutMs?: number;
   /** Time to wait after SIGTERM before sending SIGKILL (default: 10 seconds) */
   gracefulShutdownMs?: number;
+  /** Emit events for TUI consumption instead of writing to stdout directly */
+  emitOutputEvents?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (increased from 5 minutes for complex tasks)
 const DEFAULT_GRACEFUL_SHUTDOWN_MS = 10 * 1000; // 10 seconds
 
-export class ClaudeCodeExecutor {
+export class ClaudeCodeExecutor extends EventEmitter {
   private logger: Logger;
   private currentProcess?: ChildProcess;
   private defaultWorkDir: string;
@@ -35,11 +39,15 @@ export class ClaudeCodeExecutor {
   private gracefulShutdownMs: number;
   private executionTimeout?: NodeJS.Timeout;
   private killTimeout?: NodeJS.Timeout;
+  private emitOutputEvents: boolean;
+  private currentContext?: ExecutionContext;
 
   constructor(workDir: string, config: ExecutorConfig = {}) {
+    super();
     this.defaultWorkDir = workDir;
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.gracefulShutdownMs = config.gracefulShutdownMs ?? DEFAULT_GRACEFUL_SHUTDOWN_MS;
+    this.emitOutputEvents = config.emitOutputEvents ?? false;
     this.logger = new Logger('ClaudeCodeExecutor');
   }
 
@@ -50,6 +58,9 @@ export class ClaudeCodeExecutor {
     const startTime = Date.now();
     const prompt = this.buildPrompt(context);
     const workDir = context.workDir || this.defaultWorkDir;
+
+    // Store context for event emission
+    this.currentContext = context;
 
     this.logger.info(`Executing task: ${context.task.title}`);
     this.logger.debug(`Prompt length: ${prompt.length} chars, timeout: ${this.timeoutMs}ms`);
@@ -194,15 +205,45 @@ When done, provide a brief summary of what you accomplished.
       this.currentProcess.stdout?.on('data', (data) => {
         const chunk = data.toString();
         stdout += chunk;
-        // Log progress in real-time
-        process.stdout.write(chunk);
+
+        // Emit output event for TUI if enabled
+        if (this.emitOutputEvents && this.currentContext) {
+          const event: ExecutionOutputEvent = {
+            agentId: this.currentContext.agentId,
+            agentName: this.currentContext.agentName,
+            taskId: this.currentContext.task.id,
+            taskTitle: this.currentContext.task.title,
+            chunk,
+            stream: 'stdout',
+            timestamp: new Date(),
+          };
+          this.emit('output', event);
+        } else {
+          // Fallback: Log progress in real-time to stdout
+          process.stdout.write(chunk);
+        }
       });
 
       this.currentProcess.stderr?.on('data', (data) => {
         const chunk = data.toString();
         stderr += chunk;
-        // Log errors in real-time
-        process.stderr.write(chunk);
+
+        // Emit output event for TUI if enabled
+        if (this.emitOutputEvents && this.currentContext) {
+          const event: ExecutionOutputEvent = {
+            agentId: this.currentContext.agentId,
+            agentName: this.currentContext.agentName,
+            taskId: this.currentContext.task.id,
+            taskTitle: this.currentContext.task.title,
+            chunk,
+            stream: 'stderr',
+            timestamp: new Date(),
+          };
+          this.emit('output', event);
+        } else {
+          // Fallback: Log errors in real-time to stderr
+          process.stderr.write(chunk);
+        }
       });
 
       this.currentProcess.on('close', (code) => {

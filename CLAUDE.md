@@ -8,8 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | Command | Description |
 |---------|-------------|
-| `pnpm jetpack start` | Start orchestrator + agents + web UI |
+| `pnpm jetpack start` | Start orchestrator + agents + web UI + supervisor |
 | `pnpm jetpack start -a 5` | Start with 5 agents |
+| `pnpm jetpack start --tui` | Start with TUI dashboard (tmux-style) |
+| `pnpm jetpack start --no-supervisor` | Disable auto-started supervisor |
 | `pnpm jetpack task -t "Title" -p high` | Create a task |
 | `pnpm jetpack status` | Show system status |
 | `pnpm jetpack demo` | Run guided demo |
@@ -23,7 +25,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `packages/orchestrator/src/JetpackOrchestrator.ts` | Main coordinator |
 | `packages/orchestrator/src/AgentController.ts` | Agent lifecycle |
 | `packages/orchestrator/src/ClaudeCodeExecutor.ts` | Spawns Claude CLI |
+| `packages/orchestrator/src/SkillDetector.ts` | Dynamic skill detection |
+| `packages/supervisor/src/SupervisorAgent.ts` | LangGraph supervisor with background monitoring |
 | `packages/shared/src/types/` | All TypeScript types |
+| `packages/shared/src/services/SkillRegistry.ts` | Skill registry and matching |
+| `packages/quality-adapter/src/` | Quality metrics and regression detection |
+| `packages/cli-tui/src/` | Terminal UI dashboard |
 | `apps/web/src/app/api/` | Next.js API routes |
 | `apps/cli/src/commands/` | CLI command implementations |
 
@@ -77,11 +84,14 @@ JetpackOrchestrator (packages/orchestrator)
 
 ### Package Dependencies
 
-- `@jetpack/shared` - Base types (Task, Agent, Message, Memory) using Zod schemas
+- `@jetpack/shared` - Base types (Task, Agent, Message, Memory), Zod schemas, SkillRegistry
 - `@jetpack/beads-adapter` - Tasks stored in `.beads/tasks.jsonl`, optional git auto-commit
 - `@jetpack/cass-adapter` - Memory stored in `.cass/memory.db`, supports semantic search
-- `@jetpack/mcp-mail-adapter` - Messages in `.jetpack/mail/{inbox,outbox}/*.json`
-- `@jetpack/orchestrator` - Combines adapters, manages agent pool
+- `@jetpack/mcp-mail-adapter` - Messages in `.jetpack/mail/{inbox,outbox}/*.json`, file leasing
+- `@jetpack/orchestrator` - Combines adapters, manages agent pool, quality metrics
+- `@jetpack/supervisor` - LangGraph supervisor with background monitoring
+- `@jetpack/quality-adapter` - Quality snapshots, regression detection, quality gates
+- `@jetpack/cli-tui` - Ink-based terminal UI dashboard (tmux-style panes)
 - `@jetpack/mcp-server` - MCP server for Claude Code integration
 - `@jetpack/cli` - Commander-based CLI (`start`, `task`, `status`, `demo`, `mcp`)
 - `@jetpack/web` - Next.js 15 Kanban UI with React 19, dnd-kit, Tailwind
@@ -104,8 +114,285 @@ JetpackOrchestrator (packages/orchestrator)
 
 - `.beads/` - Task storage (JSONL, git-backed)
 - `.cass/` - SQLite memory database
-- `.jetpack/mail/` - Inter-agent message queues
+- `.jetpack/mail/` - Inter-agent message queues, file leases
 - `.jetpack/plans/` - Plan storage (JSON files)
+- `.quality/` - Quality metrics database (when enabled)
+
+## New Features (Recent Enhancements)
+
+### Always-On Supervisor with Background Monitoring
+
+The supervisor now starts automatically with `jetpack start` and runs background monitoring:
+
+```typescript
+// Supervisor auto-starts (opt-out with --no-supervisor)
+jetpack start
+
+// Background monitoring checks every 30s for:
+// - Unassigned ready tasks → notifies agents
+// - Failed tasks with retries left → resets to ready
+// - Stalled agents (busy but no activity for 2min) → reassigns tasks
+// - Blocked tasks with completed dependencies → unblocks
+
+// Custom interval
+jetpack start --supervisor-interval 60000  // 60 seconds
+```
+
+**CLI Options:**
+- `--no-supervisor` - Disable supervisor entirely
+- `--supervisor-interval <ms>` - Set monitoring interval (default: 30000)
+- `-l, --llm <provider>` - LLM provider (claude/openai)
+- `-m, --model <model>` - Specific model to use
+
+### TUI Dashboard (Tmux-Style Agent Visibility)
+
+Launch a terminal UI showing live agent output in split panes:
+
+```bash
+jetpack start --tui
+```
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Status Bar: 5 agents | 12 tasks | 3 running | 2h 15m       │
+├───────────────┬───────────────┬───────────────┬─────────────┤
+│ Agent 1       │ Agent 2       │ Agent 3       │ Agent 4     │
+│ [typescript]  │ [backend]     │ [python]      │ [devops]    │
+│ ─────────────│───────────────│───────────────│─────────────│
+│ Working on:   │ Working on:   │ Idle          │ Working on: │
+│ bd-123        │ bd-456        │               │ bd-789      │
+│ > Reading...  │ > Writing..   │ Waiting for   │ > Running   │
+│ > Analyzing   │ > Testing..   │ ready tasks   │ > tests...  │
+└───────────────┴───────────────┴───────────────┴─────────────┘
+```
+
+**Programmatic:**
+```typescript
+const jetpack = new JetpackOrchestrator({
+  workDir: '/path/to/project',
+  enableTuiMode: true,
+  onAgentOutput: (event) => console.log(event.chunk),
+});
+```
+
+### Dynamic Skills Marketplace
+
+Skills are auto-detected from the codebase and agents can acquire skills at runtime:
+
+```typescript
+// Auto-detected from package.json, config files, etc.
+const detected = jetpack.projectSkills;  // ['typescript', 'react', 'nextjs']
+
+// Agents acquire missing skills dynamically
+// When claiming a task requiring 'react' but agent only has 'typescript':
+// → Agent acquires 'react' skill and proceeds
+
+// Skill registry for matching
+import { getSkillRegistry } from '@jetpack/shared';
+const registry = getSkillRegistry();
+const score = registry.calculateMatchScore(agentSkills, taskSkills);
+```
+
+**Skill Detection Sources:**
+- `package.json` dependencies → typescript, react, vue, next, etc.
+- Config files → `tsconfig.json`, `requirements.txt`, `Cargo.toml`
+- Directory patterns → `.github/workflows` → ci-cd skill
+
+### Branch-Tagged Projects
+
+Tasks and plans are tagged with the current git branch:
+
+```typescript
+// Tasks automatically tagged with current branch
+const task = await jetpack.createTask({
+  title: 'Fix login bug',
+  // branch: 'feature/auth'  // Auto-set from git
+});
+
+// Filter tasks by branch
+const tasks = await beads.listTasks({ branch: 'feature/auth' });
+
+// Get current branch
+const branch = await jetpack.getCurrentBranch();
+```
+
+### Rich Agent Messaging
+
+Agents broadcast detailed status with reasoning:
+
+```typescript
+// Task claimed message includes reasoning
+{
+  type: 'task.claimed',
+  payload: {
+    taskId: 'bd-123',
+    agentName: 'agent-1',
+    reasoning: {
+      matchedSkills: ['typescript', 'react'],
+      skillScore: 0.85,
+      why: 'Highest priority task matching my skills',
+      estimatedDuration: 30,
+      alternativesConsidered: 3,
+    },
+    context: {
+      totalReadyTasks: 5,
+      busyAgentCount: 2,
+      taskPriority: 'high',
+    }
+  }
+}
+
+// Progress updates during execution
+{
+  type: 'task.progress',
+  payload: {
+    phase: 'executing',  // analyzing | planning | executing | testing | reviewing
+    description: 'Running unit tests',
+    percentComplete: 75,
+  }
+}
+```
+
+### Hierarchical Planning (Epic > Task > Subtask)
+
+Plans support hierarchical structure with different item types:
+
+```typescript
+interface PlanItem {
+  id: string;
+  type: 'epic' | 'task' | 'subtask' | 'leaf';  // Hierarchy level
+  title: string;
+  status: PlanItemStatus;
+  priority: TaskPriority;
+  skills: string[];
+  dependencies: string[];
+  children?: PlanItem[];      // Nested items
+  parentId?: string;          // Parent reference
+  executable: boolean;        // Can agents claim this level?
+  autoDecompose: boolean;     // Should agent break down further?
+}
+```
+
+**Hierarchy Rules:**
+- **Epics**: NOT directly claimable (organizational only)
+- **Tasks**: Claimable, agent may create internal sub-plan
+- **Subtasks**: Claimable, typically atomic execution
+- **Leaf**: Smallest unit, always atomic
+
+### Selective Plan Execution
+
+Execute only selected items from a plan:
+
+```typescript
+// Via API
+POST /api/plans/[id]/execute
+{
+  selectedItemIds: ['item-1', 'item-3', 'item-5'],
+  skipDependencyCheck: false
+}
+
+// Via MCP Server
+jetpack_execute_plan_items({
+  planId: 'plan-123',
+  itemIds: ['item-1', 'item-3']
+})
+```
+
+### Quality Metrics Integration
+
+Track code quality and detect regressions after task completion:
+
+```typescript
+const jetpack = new JetpackOrchestrator({
+  workDir: '/path/to/project',
+  enableQualityMetrics: true,
+  onQualityRegression: (summary) => {
+    console.warn(`Quality regression: ${summary.total} issues`);
+    console.warn(summary.descriptions);
+  },
+});
+
+// Create a baseline
+await jetpack.createQualityBaseline({
+  lintErrors: 0,
+  lintWarnings: 5,
+  typeErrors: 0,
+  testsPassing: 100,
+  testsFailing: 0,
+  testCoverage: 85,
+  buildSuccess: true,
+});
+
+// Snapshots recorded automatically after each task
+// Regressions detected against baseline
+
+// Manual snapshot
+await jetpack.recordQualitySnapshot(taskId, agentId, {
+  lintErrors: 2,
+  testsFailing: 1,
+});
+```
+
+**Quality Gates:**
+- `test_pass_rate >= 100%` (blocking)
+- `lint_errors == 0` (blocking)
+- `type_errors == 0` (blocking)
+- `test_coverage >= 80%` (warning)
+
+### File Locking (Automatic)
+
+Agents automatically acquire file leases before editing:
+
+```typescript
+// Automatic in AgentController.executeTaskWithLocking()
+// 1. Predict files to modify from task description
+// 2. Acquire leases (60s default, auto-renew)
+// 3. Execute task
+// 4. Release leases
+
+// Manual usage
+const acquired = await mail.acquireLease('src/Button.tsx', 120000);
+if (!acquired) {
+  const { agentId } = await mail.isLeased('src/Button.tsx');
+  console.log(`Blocked by ${agentId}`);
+}
+
+// Leases auto-expire after duration
+// Stalled agents' leases recovered by supervisor
+```
+
+### Semantic Search for Memory
+
+Agents use vector embeddings for memory retrieval:
+
+```typescript
+// Automatic in AgentController when claiming tasks
+const queryText = `${task.title} ${task.description}`;
+const memories = await cass.semanticSearchByQuery(queryText, 5, 0.7);
+
+// Manual semantic search
+const similar = await cass.semanticSearch(embedding, 5);
+```
+
+### Message Acknowledgment
+
+Track message delivery and handle unacknowledged messages:
+
+```typescript
+// Messages can require acknowledgment
+await mail.publish({
+  type: 'task.assigned',
+  ackRequired: true,
+  // ...
+});
+
+// Agents acknowledge receipt
+await mail.acknowledge(messageId, agentId);
+
+// Supervisor monitors unacknowledged assignments
+const unacked = await mail.getUnacknowledgedMessages();
+// Stale assignments (>1 min) trigger reassignment
+```
 
 ### Claude Code Integration (MCP Server)
 
@@ -271,6 +558,34 @@ Complete this task by making the necessary code changes...`
 
 ## Common Patterns
 
+### Full JetpackConfig Options
+```typescript
+const jetpack = new JetpackOrchestrator({
+  workDir: '/path/to/project',
+  numAgents: 5,
+  autoStart: true,
+
+  // TUI Dashboard
+  enableTuiMode: true,
+  onAgentOutput: (event) => { /* handle output */ },
+
+  // Quality Metrics
+  enableQualityMetrics: true,
+  onQualityRegression: (summary) => {
+    console.warn(`Regressions: ${summary.descriptions}`);
+  },
+
+  // Runtime Limits
+  runtimeLimits: {
+    maxTasks: 100,
+    maxTimeMs: 3600000,  // 1 hour
+    maxCycles: 500,
+  },
+  onEndState: (state, stats) => { /* handle completion */ },
+  onRuntimeEvent: (event) => { /* handle events */ },
+});
+```
+
 ### Creating a task with dependencies
 ```typescript
 const task1 = await jetpack.createTask({
@@ -284,6 +599,64 @@ const task2 = await jetpack.createTask({
   priority: 'high',
   requiredSkills: ['backend'],
   dependencies: [task1.id],  // Won't start until task1 completes
+});
+```
+
+### Creating hierarchical plans
+```typescript
+const plan = await planStore.createPlan({
+  id: 'plan-auth',
+  title: 'User Authentication',
+  items: [
+    {
+      id: 'epic-1',
+      type: 'epic',
+      title: 'Authentication System',
+      executable: false,  // Epics are not directly claimable
+      children: [
+        {
+          id: 'task-1',
+          type: 'task',
+          title: 'Create user model',
+          executable: true,
+          skills: ['database', 'backend'],
+        },
+        {
+          id: 'task-2',
+          type: 'task',
+          title: 'JWT service',
+          executable: true,
+          skills: ['backend', 'security'],
+          dependencies: ['task-1'],
+        },
+      ],
+    },
+  ],
+});
+```
+
+### Using quality metrics
+```typescript
+// Enable quality tracking
+const jetpack = new JetpackOrchestrator({
+  workDir: '/path/to/project',
+  enableQualityMetrics: true,
+});
+
+// Set baseline before starting work
+await jetpack.createQualityBaseline({
+  lintErrors: 0,
+  typeErrors: 0,
+  testsPassing: 50,
+  testsFailing: 0,
+  testCoverage: 80,
+  buildSuccess: true,
+});
+
+// Quality checked automatically after each task
+// Listen for regressions
+jetpack.on('qualityRegression', ({ taskId, summary }) => {
+  console.log(`Task ${taskId} caused regressions:`, summary.descriptions);
 });
 ```
 
@@ -324,8 +697,21 @@ interface PlanItem {
   skills: string[];     // Required: e.g., ["typescript", "react"]
   dependencies: string[]; // Required: IDs of dependent items, or []
   estimatedMinutes?: number;
+
+  // Hierarchical planning fields (optional)
+  type?: 'epic' | 'task' | 'subtask' | 'leaf';  // Hierarchy level
+  children?: PlanItem[];    // Nested items for epics/tasks
+  parentId?: string;        // Reference to parent item
+  executable?: boolean;     // Can agents claim this level? (default: true for task/subtask)
+  autoDecompose?: boolean;  // Should agent break down further? (default: false)
 }
 ```
+
+**Hierarchy Levels:**
+- **epic**: High-level feature domain, NOT directly claimable, must have children
+- **task**: Concrete work item (15-60 min), claimable by agents
+- **subtask**: Atomic step, only created for complex tasks
+- **leaf**: Smallest unit, always atomic execution
 
 ## Troubleshooting
 

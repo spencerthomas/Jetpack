@@ -7,6 +7,7 @@ import { spawn, ChildProcess, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { SupervisorAgent } from '@jetpack/supervisor';
 import { AgentSkill, TaskPriority, parseDurationMs, formatDuration, RuntimeLimits } from '@jetpack/shared';
 
 // Default config for new projects
@@ -161,7 +162,7 @@ program
 
   Commands:
     init [path]                Initialize Jetpack in a directory
-    start                      Start orchestrator, agents, and web UI
+    start                      Start orchestrator, agents, supervisor, and web UI
     task                       Create a new task for agents
     status                     Show current system status
     demo                       Run demo with sample tasks
@@ -169,8 +170,10 @@ program
 
   Examples:
     jetpack init .             Initialize in current directory
-    jetpack start              Start everything (default: 3 agents, port 3002)
+    jetpack start              Start everything with auto-supervisor
     jetpack start -a 5         Start with 5 agents
+    jetpack start --no-supervisor  Disable background supervisor
+    jetpack start --supervisor-interval 60000  Monitor every 60s
     jetpack start --no-ui      CLI only, no web UI
     jetpack task -t "Title"    Create a task
     jetpack status             Check system status
@@ -319,12 +322,16 @@ program
 
 program
   .command('start')
-  .description('Start Jetpack - launches agents, orchestrator, and web UI')
+  .description('Start Jetpack - launches agents, orchestrator, supervisor, and web UI')
   .option('-a, --agents <number>', 'Number of agents to start')
   .option('-p, --port <number>', 'Web UI port')
   .option('-d, --dir <path>', 'Working directory (or set JETPACK_WORK_DIR)', process.env.JETPACK_WORK_DIR || process.cwd())
   .option('--no-browser', 'Do not open browser automatically')
   .option('--no-ui', 'Run without web UI (CLI only mode)')
+  .option('--no-supervisor', 'Disable background supervisor (opt-out)')
+  .option('--supervisor-interval <ms>', 'Supervisor monitoring interval in ms', '30000')
+  .option('-l, --llm <provider>', 'LLM provider for supervisor (claude, openai)', 'claude')
+  .option('-m, --model <model>', 'LLM model for supervisor')
   .option('--max-cycles <number>', 'Stop after N work cycles (0 = unlimited)')
   .option('--max-runtime <duration>', 'Stop after duration (e.g., "8h", "30m", "1d")')
   .option('--idle-timeout <duration>', 'Stop if idle for duration (e.g., "5m")')
@@ -402,7 +409,48 @@ program
       await jetpack.startAgents(numAgents);
       spinner.succeed(chalk.green(`${numAgents} agents started`));
 
-      // 3. Start web UI (unless --no-ui)
+      // 3. Start supervisor (unless --no-supervisor)
+      let supervisor: SupervisorAgent | undefined;
+      if (options.supervisor !== false) {
+        // Check if API key is available for the selected provider
+        const hasApiKey = options.llm === 'claude'
+          ? !!process.env.ANTHROPIC_API_KEY
+          : options.llm === 'openai'
+            ? !!process.env.OPENAI_API_KEY
+            : true; // Ollama doesn't need API key
+
+        if (hasApiKey) {
+          spinner.start('Starting supervisor...');
+
+          // Default models based on provider
+          const defaultModel = options.llm === 'claude'
+            ? 'claude-3-5-sonnet-20241022'
+            : options.llm === 'openai'
+              ? 'gpt-4'
+              : 'llama2';
+
+          const intervalMs = parseInt(options.supervisorInterval);
+
+          supervisor = await jetpack.createSupervisor(
+            {
+              provider: options.llm as 'claude' | 'openai' | 'ollama',
+              model: options.model || defaultModel,
+            },
+            {
+              backgroundMonitorIntervalMs: intervalMs,
+            }
+          );
+
+          // Start background monitoring
+          supervisor.startBackgroundMonitoring();
+
+          spinner.succeed(chalk.green(`Supervisor started (monitoring every ${intervalMs / 1000}s)`));
+        } else {
+          spinner.warn(chalk.yellow(`Supervisor disabled: ${options.llm.toUpperCase()}_API_KEY not set`));
+        }
+      }
+
+      // 4. Start web UI (unless --no-ui)
       if (options.ui !== false) {
         spinner.start('Starting web UI...');
         const webStarted = await startWebUI(port, options.dir);
@@ -434,6 +482,20 @@ program
       console.log(chalk.bold('  🤖 Agents'));
       console.log(chalk.gray(`     ${numAgents} agents watching for tasks`));
       console.log('');
+
+      // Display supervisor status
+      if (supervisor) {
+        console.log(chalk.bold('  🧠 Supervisor'));
+        const llmInfo = supervisor.getLLMInfo();
+        console.log(chalk.gray(`     ${llmInfo.name} (${llmInfo.model})`));
+        console.log(chalk.gray(`     Monitoring every ${parseInt(options.supervisorInterval) / 1000}s`));
+        console.log(chalk.gray('     Auto-reassigns failed tasks, detects stalled agents'));
+        console.log('');
+      } else if (options.supervisor === false) {
+        console.log(chalk.bold('  🧠 Supervisor'));
+        console.log(chalk.gray('     Disabled (use --supervisor to enable)'));
+        console.log('');
+      }
 
       // Display runtime limits if configured
       if (hasRuntimeLimits) {
@@ -501,6 +563,15 @@ program
       process.on('SIGINT', async () => {
         clearInterval(statusInterval);
         console.log(chalk.yellow('\n\nShutting down Jetpack...'));
+
+        // Stop supervisor monitoring if running
+        if (supervisor) {
+          console.log(chalk.gray('  Stopping supervisor...'));
+          supervisor.stopBackgroundMonitoring();
+          const stats = supervisor.getBackgroundStats();
+          console.log(chalk.gray(`     Monitoring cycles: ${stats.monitoringCycles}`));
+          console.log(chalk.gray(`     Tasks reassigned: ${stats.reassignedTasks}`));
+        }
 
         // Kill web server if running
         if (webServerProcess) {

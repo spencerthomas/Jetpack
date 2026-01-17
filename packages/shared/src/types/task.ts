@@ -11,7 +11,7 @@ export const TaskStatusSchema = z.enum([
 ]);
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
-export const FailureTypeSchema = z.enum(['timeout', 'error', 'stalled']);
+export const FailureTypeSchema = z.enum(['timeout', 'error', 'stalled', 'blocked']);
 export type FailureType = z.infer<typeof FailureTypeSchema>;
 
 export const TaskPrioritySchema = z.enum(['low', 'medium', 'high', 'critical']);

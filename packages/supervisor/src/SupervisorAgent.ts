@@ -13,6 +13,8 @@ export interface SupervisorAgentConfig {
   getAgentMail: (agentId: string) => MCPMailAdapter | undefined;
   pollIntervalMs?: number;
   maxIterations?: number;
+  /** Interval for background monitoring (default: 30000ms = 30s) */
+  backgroundMonitorIntervalMs?: number;
 }
 
 export interface SupervisorResult {
@@ -31,11 +33,27 @@ export interface SupervisorResult {
  * It breaks down high-level requests into tasks, assigns them to agents,
  * monitors progress, and handles conflicts/failures.
  */
+export interface BackgroundMonitoringStats {
+  startedAt: Date;
+  monitoringCycles: number;
+  reassignedTasks: number;
+  detectedStalledAgents: number;
+  lastCycleAt?: Date;
+}
+
 export class SupervisorAgent {
   private logger: Logger;
   private llm: LLMProvider;
   private graph?: SupervisorGraph;
   private running = false;
+  private backgroundMonitoringInterval?: NodeJS.Timeout;
+  private backgroundMonitoringActive = false;
+  private backgroundStats: BackgroundMonitoringStats = {
+    startedAt: new Date(),
+    monitoringCycles: 0,
+    reassignedTasks: 0,
+    detectedStalledAgents: 0,
+  };
 
   constructor(private config: SupervisorAgentConfig) {
     this.logger = new Logger('SupervisorAgent');
@@ -213,5 +231,199 @@ export class SupervisorAgent {
       name: this.llm.name,
       model: this.llm.model,
     };
+  }
+
+  /**
+   * Start background monitoring for proactive supervision
+   *
+   * This runs periodically to:
+   * - Check for unassigned tasks and prompt assignment
+   * - Auto-reassign failed tasks
+   * - Detect stalled agents and redistribute work
+   */
+  startBackgroundMonitoring(): void {
+    if (this.backgroundMonitoringActive) {
+      this.logger.warn('Background monitoring already active');
+      return;
+    }
+
+    const intervalMs = this.config.backgroundMonitorIntervalMs ?? 30000;
+    this.logger.info(`Starting background monitoring (interval: ${intervalMs}ms)`);
+
+    this.backgroundMonitoringActive = true;
+    this.backgroundStats = {
+      startedAt: new Date(),
+      monitoringCycles: 0,
+      reassignedTasks: 0,
+      detectedStalledAgents: 0,
+    };
+
+    // Run monitoring cycle periodically
+    this.backgroundMonitoringInterval = setInterval(() => {
+      this.runMonitoringCycle().catch((err) => {
+        this.logger.error('Background monitoring cycle failed:', err);
+      });
+    }, intervalMs);
+
+    // Run first cycle immediately
+    this.runMonitoringCycle().catch((err) => {
+      this.logger.error('Initial monitoring cycle failed:', err);
+    });
+  }
+
+  /**
+   * Stop background monitoring
+   */
+  stopBackgroundMonitoring(): void {
+    if (!this.backgroundMonitoringActive) {
+      return;
+    }
+
+    this.logger.info('Stopping background monitoring');
+    this.backgroundMonitoringActive = false;
+
+    if (this.backgroundMonitoringInterval) {
+      clearInterval(this.backgroundMonitoringInterval);
+      this.backgroundMonitoringInterval = undefined;
+    }
+  }
+
+  /**
+   * Check if background monitoring is active
+   */
+  isBackgroundMonitoringActive(): boolean {
+    return this.backgroundMonitoringActive;
+  }
+
+  /**
+   * Get background monitoring statistics
+   */
+  getBackgroundStats(): BackgroundMonitoringStats {
+    return { ...this.backgroundStats };
+  }
+
+  /**
+   * Run a single monitoring cycle
+   * This is the core of background supervision
+   */
+  private async runMonitoringCycle(): Promise<void> {
+    if (!this.backgroundMonitoringActive) {
+      return;
+    }
+
+    this.backgroundStats.monitoringCycles++;
+    this.backgroundStats.lastCycleAt = new Date();
+
+    try {
+      const agents = this.config.getAgents();
+      const beads = this.config.beads;
+
+      // 1. Check for unassigned ready tasks
+      const readyTasks = await beads.getReadyTasks();
+      const unassignedTasks = readyTasks.filter(task => !task.assignedAgent);
+
+      if (unassignedTasks.length > 0) {
+        this.logger.debug(`Found ${unassignedTasks.length} unassigned ready tasks`);
+        // Agents should automatically pick these up via their polling
+        // But we can publish a notification to encourage faster pickup
+        await this.notifyUnassignedTasks(unassignedTasks.length);
+      }
+
+      // 2. Check for failed tasks that could be retried
+      const failedTasks = await beads.listTasks({ status: 'failed' });
+      for (const task of failedTasks) {
+        if (task.retryCount < (task.maxRetries ?? 2)) {
+          // Reset task to ready for retry
+          await beads.updateTask(task.id, {
+            status: 'ready',
+            retryCount: task.retryCount + 1,
+            assignedAgent: undefined,
+          });
+          this.backgroundStats.reassignedTasks++;
+          this.logger.info(`Reset failed task ${task.id} for retry (attempt ${task.retryCount + 1})`);
+        }
+      }
+
+      // 3. Detect stalled agents (busy but no activity in 2 minutes)
+      const stalledAgents = agents.filter(agent => {
+        if (agent.status !== 'busy') return false;
+        if (!agent.lastActive) return false;
+        const lastActive = new Date(agent.lastActive);
+        const stalledMs = Date.now() - lastActive.getTime();
+        return stalledMs > 120000; // 2 minutes
+      });
+
+      if (stalledAgents.length > 0) {
+        this.backgroundStats.detectedStalledAgents += stalledAgents.length;
+        this.logger.warn(`Detected ${stalledAgents.length} stalled agents`);
+
+        // Find tasks claimed by stalled agents and reset them
+        for (const agent of stalledAgents) {
+          const agentTasks = await beads.listTasks({
+            status: 'in_progress',
+            assignedAgent: agent.id,
+          });
+
+          for (const task of agentTasks) {
+            await beads.updateTask(task.id, {
+              status: 'ready',
+              assignedAgent: undefined,
+            });
+            this.backgroundStats.reassignedTasks++;
+            this.logger.info(`Reassigned task ${task.id} from stalled agent ${agent.name}`);
+          }
+        }
+      }
+
+      // 4. Check for blocked tasks that may have unblocked
+      const blockedTasks = await beads.listTasks({ status: 'blocked' });
+      for (const task of blockedTasks) {
+        // Check if all dependencies are now complete
+        const deps = task.dependencies || [];
+        let allDepsComplete = true;
+
+        for (const depId of deps) {
+          const depTask = await beads.getTask(depId);
+          if (!depTask || depTask.status !== 'completed') {
+            allDepsComplete = false;
+            break;
+          }
+        }
+
+        if (allDepsComplete && deps.length > 0) {
+          await beads.updateTask(task.id, { status: 'ready' });
+          this.logger.info(`Unblocked task ${task.id} - dependencies complete`);
+        }
+      }
+
+    } catch (err) {
+      this.logger.error('Monitoring cycle error:', err);
+    }
+  }
+
+  /**
+   * Notify agents about unassigned tasks via MCP Mail
+   */
+  private async notifyUnassignedTasks(count: number): Promise<void> {
+    const agents = this.config.getAgents();
+    if (agents.length === 0) return;
+
+    // Get mail for first idle agent to broadcast
+    const idleAgent = agents.find(a => a.status === 'idle');
+    if (!idleAgent) return;
+
+    const mail = this.config.getAgentMail(idleAgent.id);
+    if (!mail) return;
+
+    await mail.publish({
+      id: '',
+      type: 'task.available',
+      from: 'supervisor',
+      payload: {
+        unassignedCount: count,
+        message: `${count} tasks waiting for assignment`,
+      },
+      timestamp: new Date(),
+    });
   }
 }

@@ -12,7 +12,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { Plan, PlanItem, Task, TaskPriority, TaskStatus } from '@jetpack/shared';
+import type { Plan, PlanItem, Task, TaskPriority, TaskStatus, PlanItemType } from '@jetpack/shared';
+import { isClaimableItem } from '@jetpack/shared';
 
 // Determine working directory - check env var or use cwd
 const WORK_DIR = process.env.JETPACK_WORK_DIR || process.cwd();
@@ -211,13 +212,27 @@ async function convertPlanItemsToTasks(
   let itemsToConvert: PlanItem[];
 
   if (itemIds === 'all' || !itemIds) {
-    // Convert all pending items
-    itemsToConvert = allItems.filter((item) => item.status === 'pending');
-  } else {
-    // Convert specified items only
+    // Convert all pending AND claimable items (respects hierarchy - skips epics)
     itemsToConvert = allItems.filter(
-      (item) => itemIds.includes(item.id) && item.status === 'pending'
+      (item) => item.status === 'pending' && isClaimableItem(item)
     );
+  } else {
+    // Convert specified items only (if they're claimable)
+    itemsToConvert = allItems.filter(
+      (item) => itemIds.includes(item.id) && item.status === 'pending' && isClaimableItem(item)
+    );
+  }
+
+  // Warn about non-claimable items that were explicitly requested
+  if (itemIds !== 'all' && itemIds) {
+    const requestedEpics = allItems.filter(
+      (item) => itemIds.includes(item.id) && !isClaimableItem(item)
+    );
+    if (requestedEpics.length > 0) {
+      console.warn(
+        `Skipping ${requestedEpics.length} non-claimable items (epics are organizational only)`
+      );
+    }
   }
 
   if (itemsToConvert.length === 0) {

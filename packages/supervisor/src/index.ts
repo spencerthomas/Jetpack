@@ -1,5 +1,10 @@
 // Main exports
-export { SupervisorAgent, SupervisorAgentConfig, SupervisorResult } from './SupervisorAgent';
+export {
+  SupervisorAgent,
+  SupervisorAgentConfig,
+  SupervisorResult,
+  BackgroundMonitoringStats,
+} from './SupervisorAgent';
 
 // LLM providers
 export { LLMProvider, LLMProviderConfig, LLMProviderConfigInput, ChatMessage, createLLMProvider } from './llm';

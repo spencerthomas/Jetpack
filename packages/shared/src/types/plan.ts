@@ -12,6 +12,15 @@ export const PlanItemStatusSchema = z.enum([
 ]);
 export type PlanItemStatus = z.infer<typeof PlanItemStatusSchema>;
 
+// Plan item type - hierarchical structure (Epic > Task > Subtask)
+export const PlanItemTypeSchema = z.enum([
+  'epic',     // High-level feature domain (not directly claimable)
+  'task',     // Concrete work item (15-60 min), claimable by agents
+  'subtask',  // Atomic steps within a task
+  'leaf',     // Legacy: single-level items without hierarchy
+]);
+export type PlanItemType = z.infer<typeof PlanItemTypeSchema>;
+
 // Priority levels
 export const PlanPrioritySchema = z.enum(['low', 'medium', 'high', 'critical']);
 export type PlanPriority = z.infer<typeof PlanPrioritySchema>;
@@ -40,6 +49,14 @@ export const PlanItemSchema: z.ZodType<PlanItem> = z.lazy(() =>
     dependencies: z.array(z.string()), // IDs of other plan items
     children: z.array(PlanItemSchema).optional(), // Nested sub-items
 
+    // Hierarchy type - determines how this item is treated
+    type: PlanItemTypeSchema.optional().default('leaf'), // epic/task/subtask/leaf
+    parentId: z.string().optional(), // Reference to parent item ID
+
+    // Execution config
+    executable: z.boolean().optional().default(true), // Can agents claim this level?
+    autoDecompose: z.boolean().optional().default(false), // Should agent break down further?
+
     // Execution tracking (populated when converted/executing)
     taskId: z.string().optional(),      // Linked Beads task ID
     assignedAgent: z.string().optional(), // Agent currently working on it
@@ -60,6 +77,14 @@ export interface PlanItem {
   estimatedMinutes?: number;
   dependencies: string[];
   children?: PlanItem[];
+
+  // Hierarchy type - determines how this item is treated
+  type?: PlanItemType; // epic/task/subtask/leaf (defaults to 'leaf')
+  parentId?: string; // Reference to parent item ID
+
+  // Execution config
+  executable?: boolean; // Can agents claim this level? (defaults to true)
+  autoDecompose?: boolean; // Should agent break down further? (defaults to false)
 
   // Execution tracking
   taskId?: string;
@@ -261,4 +286,114 @@ export function generatePlanId(): string {
     id += chars[Math.floor(Math.random() * chars.length)];
   }
   return id;
+}
+
+// ================== Hierarchical Planning Helpers ==================
+
+/**
+ * Check if a plan item can be claimed/converted to a task
+ * Epics are organizational only, not directly claimable
+ */
+export function isClaimableItem(item: PlanItem): boolean {
+  // Explicitly not executable
+  if (item.executable === false) return false;
+
+  // Epics are never claimable (organizational grouping)
+  if (item.type === 'epic') return false;
+
+  // Tasks, subtasks, and leaf items are claimable by default
+  return true;
+}
+
+/**
+ * Get all claimable items from a plan (items that can be converted to tasks)
+ * Respects hierarchy: skips epics, includes tasks/subtasks/leaf items
+ */
+export function getClaimableItems(plan: Plan): PlanItem[] {
+  const allItems = flattenPlanItems(plan.items);
+  return allItems.filter(isClaimableItem);
+}
+
+/**
+ * Get items at a specific hierarchy level
+ */
+export function getItemsByType(plan: Plan, type: PlanItemType): PlanItem[] {
+  const allItems = flattenPlanItems(plan.items);
+  return allItems.filter(item => (item.type || 'leaf') === type);
+}
+
+/**
+ * Get all epics (top-level organizational groupings)
+ */
+export function getEpics(plan: Plan): PlanItem[] {
+  return getItemsByType(plan, 'epic');
+}
+
+/**
+ * Get children of a specific item
+ */
+export function getItemChildren(plan: Plan, parentId: string): PlanItem[] {
+  const parent = findPlanItem(plan.items, parentId);
+  return parent?.children || [];
+}
+
+/**
+ * Get the parent of an item (if it has one)
+ */
+export function getItemParent(plan: Plan, itemId: string): PlanItem | null {
+  const allItems = flattenPlanItems(plan.items);
+  const item = allItems.find(i => i.id === itemId);
+  if (!item?.parentId) return null;
+  return findPlanItem(plan.items, item.parentId);
+}
+
+/**
+ * Populate parentId fields based on nested structure
+ * Call this after creating a plan from nested items
+ */
+export function populateParentIds(items: PlanItem[], parentId?: string): PlanItem[] {
+  return items.map(item => {
+    const updatedItem = { ...item };
+    if (parentId) {
+      updatedItem.parentId = parentId;
+    }
+    if (item.children && item.children.length > 0) {
+      updatedItem.children = populateParentIds(item.children, item.id);
+    }
+    return updatedItem;
+  });
+}
+
+/**
+ * Infer item types based on hierarchy depth and presence of children
+ * - Items with children at depth 0 → epic
+ * - Items with children at depth 1+ → task
+ * - Items without children → subtask (if has parent) or leaf (if no parent)
+ */
+export function inferItemTypes(items: PlanItem[], depth = 0): PlanItem[] {
+  return items.map(item => {
+    const hasChildren = item.children && item.children.length > 0;
+    const updatedItem = { ...item };
+
+    // Only set type if not already specified
+    if (!item.type) {
+      if (hasChildren && depth === 0) {
+        updatedItem.type = 'epic';
+        updatedItem.executable = false; // Epics aren't directly executable
+      } else if (hasChildren) {
+        updatedItem.type = 'task';
+      } else if (depth > 0) {
+        updatedItem.type = 'subtask';
+      } else {
+        updatedItem.type = 'leaf';
+      }
+    }
+
+    // Recursively process children
+    if (hasChildren) {
+      updatedItem.children = inferItemTypes(item.children!, depth + 1);
+    }
+
+    return updatedItem;
+  });
 }

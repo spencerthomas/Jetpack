@@ -43,6 +43,7 @@
     "@jetpack/mcp-server": "workspace:*",
     "@jetpack/orchestrator": "workspace:*",
     "@jetpack/shared": "workspace:*",
+    "@jetpack/supervisor": "workspace:*",
     "commander": "^12.1.0",
     "chalk": "^4.1.2",
     "ora": "^5.4.1"
