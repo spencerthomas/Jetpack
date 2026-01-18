@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Plan, PlanProgressEvent } from '@jetpack/shared';
+import { Plan, PlanProgressEvent } from '@jetpack-agent/shared';
 
 // Get working directory from environment variable
 function getWorkDir(): string {

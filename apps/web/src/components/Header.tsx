@@ -1,6 +1,6 @@
 'use client';
 
-import { Agent, Task } from '@jetpack/shared';
+import { Agent, Task } from '@jetpack-agent/shared';
 import { Plus, Inbox, Activity } from 'lucide-react';
 import { useState } from 'react';
 import CreateTaskModal from './CreateTaskModal';

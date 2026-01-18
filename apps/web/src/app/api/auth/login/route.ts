@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { LoginRequestSchema } from '@jetpack/shared';
+import { LoginRequestSchema } from '@jetpack-agent/shared';
 
 export async function POST(request: Request) {
   try {

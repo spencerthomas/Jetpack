@@ -7,7 +7,7 @@ import {
   RegressionSeverity,
   RegressionThresholds,
   DEFAULT_REGRESSION_THRESHOLDS,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 
 export interface RegressionDetectorConfig {
   thresholds?: Partial<RegressionThresholds>;

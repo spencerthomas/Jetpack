@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Annotation } from '@langchain/langgraph';
-import { Task, Agent, TaskStatus } from '@jetpack/shared';
+import { Task, Agent, TaskStatus } from '@jetpack-agent/shared';
 
 /**
  * Conflict types that the coordinator handles

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ClaudeCodeExecutor, ExecutorConfig } from './ClaudeCodeExecutor';
-import { Task, TaskStatus } from '@jetpack/shared';
+import { Task, TaskStatus } from '@jetpack-agent/shared';
 
 // Mock task for testing
 const createMockTask = (overrides?: Partial<Task>): Task => ({

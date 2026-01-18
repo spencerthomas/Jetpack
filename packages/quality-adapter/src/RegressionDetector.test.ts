@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RegressionDetector, RegressionDetectorConfig } from './RegressionDetector';
-import { QualitySnapshot, QualityMetrics } from '@jetpack/shared';
+import { QualitySnapshot, QualityMetrics } from '@jetpack-agent/shared';
 
 // Helper to create a snapshot
 const createSnapshot = (

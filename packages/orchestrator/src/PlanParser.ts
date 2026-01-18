@@ -5,7 +5,7 @@ import {
   PlanStatus,
   generatePlanId,
   generatePlanItemId,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 
 /**
  * PlanParser - Converts markdown to Plan structure

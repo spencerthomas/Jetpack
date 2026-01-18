@@ -1,7 +1,7 @@
-import { Logger, Agent } from '@jetpack/shared';
-import { BeadsAdapter } from '@jetpack/beads-adapter';
-import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
-import { CASSAdapter } from '@jetpack/cass-adapter';
+import { Logger, Agent } from '@jetpack-agent/shared';
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
+import { MCPMailAdapter } from '@jetpack-agent/mcp-mail-adapter';
+import { CASSAdapter } from '@jetpack-agent/cass-adapter';
 import { LLMProvider, LLMProviderConfigInput, createLLMProvider } from './llm';
 import { createSupervisorGraph, SupervisorGraph, SupervisorState } from './graph';
 

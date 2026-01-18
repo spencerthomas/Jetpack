@@ -7,7 +7,7 @@ export * from './RuntimeManager';
 export * from './prompts/agent-system';
 
 // Re-export supervisor types for convenience
-export { SupervisorAgent, SupervisorResult, LLMProviderConfigInput } from '@jetpack/supervisor';
+export { SupervisorAgent, SupervisorResult, LLMProviderConfigInput } from '@jetpack-agent/supervisor';
 
 // Re-export quality adapter types for convenience
 export {
@@ -16,4 +16,4 @@ export {
   RegressionDetector,
   RegressionDetectorConfig,
   RegressionSummary,
-} from '@jetpack/quality-adapter';
+} from '@jetpack-agent/quality-adapter';

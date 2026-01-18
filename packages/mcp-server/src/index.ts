@@ -12,8 +12,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { Plan, PlanItem, Task, TaskPriority, TaskStatus, PlanItemType } from '@jetpack/shared';
-import { isClaimableItem } from '@jetpack/shared';
+import type { Plan, PlanItem, Task, TaskPriority, TaskStatus, PlanItemType } from '@jetpack-agent/shared';
+import { isClaimableItem } from '@jetpack-agent/shared';
 
 // Determine working directory - check env var or use cwd
 const WORK_DIR = process.env.JETPACK_WORK_DIR || process.cwd();

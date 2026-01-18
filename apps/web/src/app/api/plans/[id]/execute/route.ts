@@ -7,7 +7,7 @@ import {
   AgentSkill,
   generateTaskId,
   flattenPlanItems,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 
 // Extended Plan type with execution tracking (not in shared types yet)
 interface ExecutionRecord {

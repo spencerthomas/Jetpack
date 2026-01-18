@@ -3,7 +3,7 @@ import {
   MemoryEntry,
   Regression,
   QualitySnapshot,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 import { QualityMetricsAdapter } from './QualityMetricsAdapter';
 import { RegressionDetector, RegressionSummary } from './RegressionDetector';
 

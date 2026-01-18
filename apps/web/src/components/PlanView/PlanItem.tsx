@@ -12,7 +12,7 @@ import {
   User,
   Link as LinkIcon,
 } from 'lucide-react';
-import type { PlanItem as PlanItemType, PlanItemStatus } from '@jetpack/shared';
+import type { PlanItem as PlanItemType, PlanItemStatus } from '@jetpack-agent/shared';
 
 interface PlanItemProps {
   item: PlanItemType;

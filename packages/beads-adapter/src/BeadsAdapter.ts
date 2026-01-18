@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
 import { simpleGit, SimpleGit } from 'simple-git';
-import { Task, TaskStatus, TaskGraph, Logger } from '@jetpack/shared';
+import { Task, TaskStatus, TaskGraph, Logger } from '@jetpack-agent/shared';
 
 export interface BeadsAdapterConfig {
   beadsDir: string;

@@ -45,6 +45,6 @@
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "@jetpack-agent/orchestrator": ">=0.1.0"
+    "@jetpack-agent/orchestrator": "workspace:*"
   }
 }

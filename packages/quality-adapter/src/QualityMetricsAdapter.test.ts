@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { QualityMetricsAdapter, QualityMetricsAdapterConfig } from './QualityMetricsAdapter';
-import { QualitySnapshot, QualityMetrics, QualityGate } from '@jetpack/shared';
+import { QualitySnapshot, QualityMetrics, QualityGate } from '@jetpack-agent/shared';
 
 const TEST_QUALITY_DIR = '/tmp/jetpack-test-quality';
 

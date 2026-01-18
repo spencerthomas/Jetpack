@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { PlanProgressEvent } from '@jetpack/shared';
+import type { PlanProgressEvent } from '@jetpack-agent/shared';
 
 interface UsePlanProgressOptions {
   planId: string;

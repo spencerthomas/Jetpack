@@ -8,8 +8,8 @@ import {
   generatePlanId,
   generatePlanItemId,
   calculatePlanStats,
-} from '@jetpack/shared';
-import { PlanParser } from '@jetpack/orchestrator';
+} from '@jetpack-agent/shared';
+import { PlanParser } from '@jetpack-agent/orchestrator';
 
 // Get working directory from environment variable
 function getWorkDir(): string {

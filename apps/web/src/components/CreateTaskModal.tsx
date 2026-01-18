@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { AgentSkill, TaskPriority } from '@jetpack/shared';
+import { AgentSkill, TaskPriority } from '@jetpack-agent/shared';
 
 interface CreateTaskModalProps {
   onClose: () => void;

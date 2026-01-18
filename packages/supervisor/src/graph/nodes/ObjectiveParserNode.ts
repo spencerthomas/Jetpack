@@ -1,4 +1,4 @@
-import { Logger } from '@jetpack/shared';
+import { Logger } from '@jetpack-agent/shared';
 import { LLMProvider } from '../../llm';
 import {
   OBJECTIVE_PARSER_SYSTEM_PROMPT,

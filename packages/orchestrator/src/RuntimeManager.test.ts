@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs/promises';
 import { RuntimeManager, RuntimeManagerConfig } from './RuntimeManager';
-import { RuntimeEvent, EndState } from '@jetpack/shared';
+import { RuntimeEvent, EndState } from '@jetpack-agent/shared';
 
 const TEST_WORK_DIR = '/tmp/jetpack-test-runtime';
 

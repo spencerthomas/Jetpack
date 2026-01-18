@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { BeadsAdapter, BeadsAdapterConfig } from './BeadsAdapter';
-import { Task, TaskStatus } from '@jetpack/shared';
+import { Task, TaskStatus } from '@jetpack-agent/shared';
 
 const TEST_BEADS_DIR = '/tmp/jetpack-test-beads';
 

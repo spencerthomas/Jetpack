@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { render } from 'ink';
-import type { AgentOutputBuffer, ExecutionOutputEvent } from '@jetpack/shared';
+import type { AgentOutputBuffer, ExecutionOutputEvent } from '@jetpack-agent/shared';
 
 // Re-export for external usage
 export { AgentDashboard } from './AgentDashboard.js';

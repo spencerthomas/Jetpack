@@ -1,6 +1,6 @@
 'use client';
 
-import { Task } from '@jetpack/shared';
+import { Task } from '@jetpack-agent/shared';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Clock, Tag, User, AlertCircle } from 'lucide-react';

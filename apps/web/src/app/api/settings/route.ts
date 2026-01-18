@@ -5,7 +5,7 @@ import {
   JetpackSettingsSchema,
   type JetpackSettings,
   DEFAULT_SETTINGS as SHARED_DEFAULTS,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 
 // CASS-specific settings (separate from JetpackSettings)
 interface CASSSettings {

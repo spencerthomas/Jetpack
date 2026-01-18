@@ -1,5 +1,5 @@
-import { Logger, TaskStatus, RuntimeMode, RuntimeSettings } from '@jetpack/shared';
-import { BeadsAdapter } from '@jetpack/beads-adapter';
+import { Logger, TaskStatus, RuntimeMode, RuntimeSettings } from '@jetpack-agent/shared';
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
 import { SupervisorState, Conflict } from '../state';
 
 export interface MonitorNodeConfig {

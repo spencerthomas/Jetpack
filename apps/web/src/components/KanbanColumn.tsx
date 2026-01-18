@@ -1,6 +1,6 @@
 'use client';
 
-import { Task, TaskStatus } from '@jetpack/shared';
+import { Task, TaskStatus } from '@jetpack-agent/shared';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import TaskCard from './TaskCard';

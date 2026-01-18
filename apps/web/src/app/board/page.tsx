@@ -5,7 +5,7 @@ import KanbanBoard from '@/components/KanbanBoard';
 import StatusDashboard from '@/components/StatusDashboard';
 import ActivityFeed from '@/components/ActivityFeed';
 import QueueDisplay from '@/components/QueueDisplay';
-import { Task } from '@jetpack/shared';
+import { Task } from '@jetpack-agent/shared';
 import { Plus, Scan, CheckCircle2, X, LayoutGrid, Clock, Tag, User, Link2, AlertCircle, ExternalLink, ChevronRight, ChevronDown, GitBranch, Box, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui';
 import CreateTaskModal from '@/components/CreateTaskModal';

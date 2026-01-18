@@ -8,7 +8,7 @@
 import { chromium, firefox, webkit, Browser, Page, BrowserContext } from 'playwright';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Logger, Task } from '@jetpack/shared';
+import { Logger, Task } from '@jetpack-agent/shared';
 import {
   BrowserValidatorConfig,
   BrowserValidatorConfigSchema,

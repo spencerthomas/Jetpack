@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CASSAdapter, CASSConfig } from './CASSAdapter';
-import { MemoryEntry, MemoryType } from '@jetpack/shared';
+import { MemoryEntry, MemoryType } from '@jetpack-agent/shared';
 
 const TEST_CASS_DIR = '/tmp/jetpack-test-cass';
 

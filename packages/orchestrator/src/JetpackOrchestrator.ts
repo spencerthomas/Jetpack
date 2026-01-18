@@ -19,7 +19,7 @@ import {
   RuntimeEvent,
   ExecutionOutputEvent,
   AgentOutputBuffer,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 import { RuntimeManager } from './RuntimeManager';
 
 // Simple frontmatter parser
@@ -66,15 +66,15 @@ function parseFrontmatter(content: string): { frontmatter: TaskFrontmatter; body
 
   return { frontmatter, body: body.trim() };
 }
-import { BeadsAdapter, BeadsAdapterConfig } from '@jetpack/beads-adapter';
-import { MCPMailAdapter, MCPMailConfig } from '@jetpack/mcp-mail-adapter';
-import { CASSAdapter, CASSConfig } from '@jetpack/cass-adapter';
-import { SupervisorAgent, SupervisorResult, LLMProviderConfigInput } from '@jetpack/supervisor';
+import { BeadsAdapter, BeadsAdapterConfig } from '@jetpack-agent/beads-adapter';
+import { MCPMailAdapter, MCPMailConfig } from '@jetpack-agent/mcp-mail-adapter';
+import { CASSAdapter, CASSConfig } from '@jetpack-agent/cass-adapter';
+import { SupervisorAgent, SupervisorResult, LLMProviderConfigInput } from '@jetpack-agent/supervisor';
 import {
   QualityMetricsAdapter,
   RegressionDetector,
   RegressionSummary,
-} from '@jetpack/quality-adapter';
+} from '@jetpack-agent/quality-adapter';
 import { AgentController, AgentControllerConfig } from './AgentController';
 import { SkillDetector } from './SkillDetector';
 

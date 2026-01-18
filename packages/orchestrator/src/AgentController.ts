@@ -15,11 +15,11 @@ import {
   AgentStatusPayload,
   ExecutionOutputEvent,
   QualitySettings,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 import { spawn } from 'child_process';
-import { BeadsAdapter } from '@jetpack/beads-adapter';
-import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
-import { CASSAdapter } from '@jetpack/cass-adapter';
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
+import { MCPMailAdapter } from '@jetpack-agent/mcp-mail-adapter';
+import { CASSAdapter } from '@jetpack-agent/cass-adapter';
 import { ClaudeCodeExecutor } from './ClaudeCodeExecutor';
 
 /** Quality metrics to report after task completion */

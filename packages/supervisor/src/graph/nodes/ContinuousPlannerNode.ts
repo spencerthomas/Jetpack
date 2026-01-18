@@ -1,6 +1,6 @@
-import { Logger, generateTaskId, AgentSkill, Task, TaskStatus } from '@jetpack/shared';
-import { BeadsAdapter } from '@jetpack/beads-adapter';
-import { CASSAdapter } from '@jetpack/cass-adapter';
+import { Logger, generateTaskId, AgentSkill, Task, TaskStatus } from '@jetpack-agent/shared';
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
+import { CASSAdapter } from '@jetpack-agent/cass-adapter';
 import { LLMProvider } from '../../llm';
 import {
   CONTINUOUS_PLANNER_SYSTEM_PROMPT,

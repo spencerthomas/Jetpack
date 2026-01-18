@@ -1,6 +1,6 @@
 import * as path from 'path';
 import Database from 'better-sqlite3';
-import { MemoryEntry, MemoryType, MemoryStore, Logger } from '@jetpack/shared';
+import { MemoryEntry, MemoryType, MemoryStore, Logger } from '@jetpack-agent/shared';
 import * as crypto from 'crypto';
 import { EmbeddingGenerator, EmbeddingConfig, createEmbeddingGenerator } from './EmbeddingGenerator';
 

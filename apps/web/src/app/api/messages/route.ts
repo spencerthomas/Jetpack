@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Message, MessageType } from '@jetpack/shared';
-import { MessageIndex, createMessageIndex } from '@jetpack/mcp-mail-adapter';
+import { Message, MessageType } from '@jetpack-agent/shared';
+import { MessageIndex, createMessageIndex } from '@jetpack-agent/mcp-mail-adapter';
 
 interface ExtendedMessage extends Message {
   source: 'broadcast' | 'direct';

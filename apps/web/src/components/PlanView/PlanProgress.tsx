@@ -1,7 +1,7 @@
 'use client';
 
 import { CheckCircle2, Loader2, AlertCircle, Clock, Users } from 'lucide-react';
-import type { Plan, PlanItem } from '@jetpack/shared';
+import type { Plan, PlanItem } from '@jetpack-agent/shared';
 
 interface PlanProgressProps {
   plan: Plan;

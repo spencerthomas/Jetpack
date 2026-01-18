@@ -1,6 +1,6 @@
-import { Logger, Task } from '@jetpack/shared';
-import { BeadsAdapter } from '@jetpack/beads-adapter';
-import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
+import { Logger, Task } from '@jetpack-agent/shared';
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
+import { MCPMailAdapter } from '@jetpack-agent/mcp-mail-adapter';
 import { LLMProvider } from '../../llm';
 import {
   COORDINATOR_SYSTEM_PROMPT,

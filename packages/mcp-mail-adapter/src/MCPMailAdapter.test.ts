@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { MCPMailAdapter } from './MCPMailAdapter';
-import { Message } from '@jetpack/shared';
+import { Message } from '@jetpack-agent/shared';
 
 const TEST_MAIL_DIR = '/tmp/jetpack-test-mail';
 const TEST_AGENT_ID = 'test-agent-1';

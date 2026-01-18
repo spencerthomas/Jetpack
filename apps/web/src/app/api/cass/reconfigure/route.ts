@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 import * as fs from 'fs/promises';
 import path from 'path';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { Agent } from '@jetpack/shared';
+import { Agent } from '@jetpack-agent/shared';
 import { Bot, Circle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';

@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { Logger } from '@jetpack/shared';
+import { Logger } from '@jetpack-agent/shared';
 
 export type EmbeddingModel =
   | 'text-embedding-3-small'

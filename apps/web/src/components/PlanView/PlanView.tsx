@@ -8,7 +8,7 @@ import {
   FileText,
   Download,
 } from 'lucide-react';
-import type { Plan, PlanItem as PlanItemType } from '@jetpack/shared';
+import type { Plan, PlanItem as PlanItemType } from '@jetpack-agent/shared';
 import { PlanItem } from './PlanItem';
 import { PlanProgress } from './PlanProgress';
 

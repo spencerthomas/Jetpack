@@ -1,5 +1,5 @@
-import { Logger, generateTaskId, AgentSkill, TaskStatus } from '@jetpack/shared';
-import { BeadsAdapter } from '@jetpack/beads-adapter';
+import { Logger, generateTaskId, AgentSkill, TaskStatus } from '@jetpack-agent/shared';
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
 import { LLMProvider } from '../../llm';
 import {
   PLANNER_SYSTEM_PROMPT,

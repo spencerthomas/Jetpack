@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
-import { MemoryType } from '@jetpack/shared';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
+import { MemoryType } from '@jetpack-agent/shared';
 import path from 'path';
 
 let orchestrator: JetpackOrchestrator | null = null;

@@ -1,6 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
-import { Task, Logger, MemoryEntry, ExecutionOutputEvent, AgentSkill } from '@jetpack/shared';
+import { Task, Logger, MemoryEntry, ExecutionOutputEvent, AgentSkill } from '@jetpack-agent/shared';
 import { buildAgentPrompt, getSkillSpecificInstructions } from './prompts/agent-system';
 
 export interface ExecutionResult {

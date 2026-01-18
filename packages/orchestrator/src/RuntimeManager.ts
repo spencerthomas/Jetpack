@@ -11,7 +11,7 @@ import {
   RuntimeEvent,
   formatDuration,
   Logger,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 
 export interface RuntimeManagerConfig {
   workDir: string;

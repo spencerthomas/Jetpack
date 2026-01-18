@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { MessageIndex, createMessageIndex } from './MessageIndex';
-import { Message, MessageType } from '@jetpack/shared';
+import { Message, MessageType } from '@jetpack-agent/shared';
 
 describe('MessageIndex', () => {
   let tempDir: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { Message, Agent } from '@jetpack/shared';
+import { Message, Agent } from '@jetpack-agent/shared';
 import {
   Mail,
   Archive,

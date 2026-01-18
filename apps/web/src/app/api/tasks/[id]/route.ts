@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 import path from 'path';
 
 // Get working directory from environment variable or default to repo root

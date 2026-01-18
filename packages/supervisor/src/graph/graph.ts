@@ -1,6 +1,6 @@
 import { StateGraph, END, START } from '@langchain/langgraph';
-import { BeadsAdapter } from '@jetpack/beads-adapter';
-import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
+import { MCPMailAdapter } from '@jetpack-agent/mcp-mail-adapter';
 import { LLMProvider } from '../llm';
 import { SupervisorStateAnnotation, SupervisorState } from './state';
 import {

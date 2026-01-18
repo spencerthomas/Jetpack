@@ -1,7 +1,7 @@
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Message, MessageType, Logger } from '@jetpack/shared';
+import { Message, MessageType, Logger } from '@jetpack-agent/shared';
 
 export interface MessageSearchFilters {
   type?: MessageType | MessageType[];

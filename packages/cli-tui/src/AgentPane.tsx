@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import type { AgentOutputBuffer } from '@jetpack/shared';
+import type { AgentOutputBuffer } from '@jetpack-agent/shared';
 
 export interface AgentPaneProps {
   buffer: AgentOutputBuffer;

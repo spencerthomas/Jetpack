@@ -1,6 +1,6 @@
 'use client';
 
-import { Message, Agent, MessageType } from '@jetpack/shared';
+import { Message, Agent, MessageType } from '@jetpack-agent/shared';
 import { Mail, Send, Bell, AlertTriangle, CheckCircle, XCircle, Activity } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';

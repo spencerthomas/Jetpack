@@ -5,7 +5,7 @@
  * test-validated, verifiable code that is clean, maintainable, and secure.
  */
 
-import { Task, MemoryEntry, AgentSkill } from '@jetpack/shared';
+import { Task, MemoryEntry, AgentSkill } from '@jetpack-agent/shared';
 
 /**
  * Core TDD system prompt for all agents

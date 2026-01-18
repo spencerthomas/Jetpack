@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Plan } from '@jetpack/shared';
+import { Plan } from '@jetpack-agent/shared';
 
 // Extended Plan type with execution tracking (not in shared types yet)
 interface ExecutionRecord {

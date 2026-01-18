@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 import path from 'path';
 
 let orchestrator: JetpackOrchestrator | null = null;

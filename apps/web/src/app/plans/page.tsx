@@ -16,7 +16,7 @@ import {
   Timer,
 } from 'lucide-react';
 import { LiveIndicator } from '@/components/ui';
-import type { Plan, PlanStatus } from '@jetpack/shared';
+import type { Plan, PlanStatus } from '@jetpack-agent/shared';
 
 // Extended type to include legacy "active" status for backward compatibility
 type ExtendedPlanStatus = PlanStatus | 'active';

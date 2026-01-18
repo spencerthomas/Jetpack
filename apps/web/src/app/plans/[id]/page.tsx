@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui';
 import { PlanView } from '@/components/PlanView';
 import { usePlanProgress } from '@/hooks';
-import type { Plan, PlanStatus } from '@jetpack/shared';
+import type { Plan, PlanStatus } from '@jetpack-agent/shared';
 
 const STATUS_BADGES: Record<
   PlanStatus,

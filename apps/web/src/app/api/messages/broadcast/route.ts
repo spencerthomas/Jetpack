@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { generateMessageId } from '@jetpack/shared';
+import { generateMessageId } from '@jetpack-agent/shared';
 
 const JETPACK_DIR = path.join(process.cwd(), '../..', '.jetpack');
 const MAIL_DIR = path.join(JETPACK_DIR, 'mail');

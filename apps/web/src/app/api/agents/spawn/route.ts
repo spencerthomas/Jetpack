@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { generateAgentId } from '@jetpack/shared';
+import { generateAgentId } from '@jetpack-agent/shared';
 
 const JETPACK_DIR = path.join(process.cwd(), '../..', '.jetpack');
 

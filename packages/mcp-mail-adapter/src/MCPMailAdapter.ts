@@ -1,7 +1,7 @@
 import EventEmitter from 'eventemitter3';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Message, MessageType, MessageBus, MessageAckStatus, Logger, generateMessageId } from '@jetpack/shared';
+import { Message, MessageType, MessageBus, MessageAckStatus, Logger, generateMessageId } from '@jetpack-agent/shared';
 
 export interface MCPMailConfig {
   mailDir: string;

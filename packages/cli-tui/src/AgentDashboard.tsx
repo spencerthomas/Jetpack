@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
-import type { AgentOutputBuffer } from '@jetpack/shared';
+import type { AgentOutputBuffer } from '@jetpack-agent/shared';
 import { StatusBar } from './StatusBar.js';
 import { AgentPane } from './AgentPane.js';
 

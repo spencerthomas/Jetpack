@@ -1,5 +1,5 @@
-import { Logger } from '@jetpack/shared';
-import { BeadsAdapter } from '@jetpack/beads-adapter';
+import { Logger } from '@jetpack-agent/shared';
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
 import { LLMProvider } from '../../llm';
 import {
   PROGRESS_ANALYZER_SYSTEM_PROMPT,

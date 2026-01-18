@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Logger, getSkillRegistry, DetectedSkill, ProjectSkillProfile } from '@jetpack/shared';
+import { Logger, getSkillRegistry, DetectedSkill, ProjectSkillProfile } from '@jetpack-agent/shared';
 
 /**
  * SkillDetector auto-detects skills from a project directory

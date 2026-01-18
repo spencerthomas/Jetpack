@@ -174,8 +174,8 @@ export async function POST(request: NextRequest) {
 async function generatePlan(userRequest: string) {
   try {
     // Import PlanParser and types
-    const { PlanParser } = await import('@jetpack/orchestrator');
-    const { calculatePlanStats } = await import('@jetpack/shared');
+    const { PlanParser } = await import('@jetpack-agent/orchestrator');
+    const { calculatePlanStats } = await import('@jetpack-agent/shared');
 
     // For now, generate a basic plan structure
     // In a full implementation, this would call the LLM-powered PlannerNode

@@ -10,7 +10,7 @@ import {
   updatePlanItem,
   findPlanItem,
   flattenPlanItems,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 
 // Valid agent skills for filtering
 const VALID_SKILLS: Set<string> = new Set([

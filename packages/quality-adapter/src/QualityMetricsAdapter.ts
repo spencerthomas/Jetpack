@@ -9,7 +9,7 @@ import {
   QualityGate,
   GateCheckResult,
   DEFAULT_QUALITY_GATES,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 
 export interface QualityMetricsAdapterConfig {
   workDir: string;

@@ -26,16 +26,16 @@ importers:
 
   apps/cli:
     dependencies:
-      '@jetpack/mcp-server':
+      '@jetpack-agent/mcp-server':
         specifier: workspace:*
         version: link:../../packages/mcp-server
-      '@jetpack/orchestrator':
+      '@jetpack-agent/orchestrator':
         specifier: workspace:*
         version: link:../../packages/orchestrator
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@jetpack/supervisor':
+      '@jetpack-agent/supervisor':
         specifier: workspace:*
         version: link:../../packages/supervisor
       '@types/prompts':
@@ -72,13 +72,13 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.3)
-      '@jetpack/mcp-mail-adapter':
+      '@jetpack-agent/mcp-mail-adapter':
         specifier: workspace:*
         version: link:../../packages/mcp-mail-adapter
-      '@jetpack/orchestrator':
+      '@jetpack-agent/orchestrator':
         specifier: workspace:*
         version: link:../../packages/orchestrator
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       better-sqlite3:
@@ -133,7 +133,7 @@ importers:
 
   packages/beads-adapter:
     dependencies:
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../shared
       simple-git:
@@ -155,7 +155,7 @@ importers:
 
   packages/browser-validator:
     dependencies:
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../shared
       playwright:
@@ -177,7 +177,7 @@ importers:
 
   packages/cass-adapter:
     dependencies:
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../shared
       better-sqlite3:
@@ -205,10 +205,10 @@ importers:
 
   packages/cli-tui:
     dependencies:
-      '@jetpack/orchestrator':
+      '@jetpack-agent/orchestrator':
         specifier: workspace:*
         version: link:../orchestrator
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../shared
       ink:
@@ -227,7 +227,7 @@ importers:
 
   packages/mcp-mail-adapter:
     dependencies:
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../shared
       better-sqlite3:
@@ -255,7 +255,7 @@ importers:
 
   packages/mcp-server:
     dependencies:
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../shared
       '@modelcontextprotocol/sdk':
@@ -274,22 +274,22 @@ importers:
 
   packages/orchestrator:
     dependencies:
-      '@jetpack/beads-adapter':
+      '@jetpack-agent/beads-adapter':
         specifier: workspace:*
         version: link:../beads-adapter
-      '@jetpack/cass-adapter':
+      '@jetpack-agent/cass-adapter':
         specifier: workspace:*
         version: link:../cass-adapter
-      '@jetpack/mcp-mail-adapter':
+      '@jetpack-agent/mcp-mail-adapter':
         specifier: workspace:*
         version: link:../mcp-mail-adapter
-      '@jetpack/quality-adapter':
+      '@jetpack-agent/quality-adapter':
         specifier: workspace:*
         version: link:../quality-adapter
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../shared
-      '@jetpack/supervisor':
+      '@jetpack-agent/supervisor':
         specifier: workspace:*
         version: link:../supervisor
       zod:
@@ -308,7 +308,7 @@ importers:
 
   packages/quality-adapter:
     dependencies:
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../shared
       better-sqlite3:
@@ -346,16 +346,16 @@ importers:
 
   packages/supervisor:
     dependencies:
-      '@jetpack/beads-adapter':
+      '@jetpack-agent/beads-adapter':
         specifier: workspace:*
         version: link:../beads-adapter
-      '@jetpack/cass-adapter':
+      '@jetpack-agent/cass-adapter':
         specifier: workspace:*
         version: link:../cass-adapter
-      '@jetpack/mcp-mail-adapter':
+      '@jetpack-agent/mcp-mail-adapter':
         specifier: workspace:*
         version: link:../mcp-mail-adapter
-      '@jetpack/shared':
+      '@jetpack-agent/shared':
         specifier: workspace:*
         version: link:../shared
       '@langchain/anthropic':

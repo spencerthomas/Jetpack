@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Moon, Bell, Keyboard, Terminal, Brain, Loader2, Check, AlertCircle, Users, Plus, X, Play, Clock, Target, Repeat, Globe, Shield } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
-import type { JetpackSettings, RuntimeSettings } from '@jetpack/shared';
+import type { JetpackSettings, RuntimeSettings } from '@jetpack-agent/shared';
 
 interface CASSSettings {
   autoGenerateEmbeddings: boolean;

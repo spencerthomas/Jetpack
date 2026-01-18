@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Task } from '@jetpack/shared';
+import { Task } from '@jetpack-agent/shared';
 import { Sparkles, Cpu, CheckCircle2, Activity, Timer, Plus, X, Settings2, Zap, Bot, Code2, Database, Mail, RefreshCw } from 'lucide-react';
 import { LiveIndicator } from '@/components/ui';
 

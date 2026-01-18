@@ -1,6 +1,6 @@
-import { Logger } from '@jetpack/shared';
-import { BeadsAdapter } from '@jetpack/beads-adapter';
-import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
+import { Logger } from '@jetpack-agent/shared';
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
+import { MCPMailAdapter } from '@jetpack-agent/mcp-mail-adapter';
 import { LLMProvider } from '../../llm';
 import { ASSIGNER_SYSTEM_PROMPT, ASSIGNER_USER_PROMPT, AssignerOutputSchema } from '../../prompts/assigner';
 import { SupervisorState, Reassignment } from '../state';

@@ -1,6 +1,6 @@
 'use client';
 
-import { Task, TaskStatus } from '@jetpack/shared';
+import { Task, TaskStatus } from '@jetpack-agent/shared';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core';
 import { useState } from 'react';
 import KanbanColumn from './KanbanColumn';

@@ -7,9 +7,9 @@ import prompts from 'prompts';
 import { spawn, ChildProcess, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
-import { SupervisorAgent } from '@jetpack/supervisor';
-import { AgentSkill, TaskPriority, parseDurationMs, formatDuration, RuntimeLimits } from '@jetpack/shared';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
+import { SupervisorAgent } from '@jetpack-agent/supervisor';
+import { AgentSkill, TaskPriority, parseDurationMs, formatDuration, RuntimeLimits } from '@jetpack-agent/shared';
 
 // Default config for new projects
 const DEFAULT_CONFIG = {
@@ -954,7 +954,7 @@ program
 
     try {
       // Dynamically import the MCP server (it will handle stdio)
-      await import('@jetpack/mcp-server');
+      await import('@jetpack-agent/mcp-server');
     } catch (error) {
       console.error(chalk.red('Failed to start MCP server:'), error);
       process.exit(1);

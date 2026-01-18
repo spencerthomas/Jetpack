@@ -11,7 +11,7 @@ import {
   findPlanItem,
   updatePlanItem,
   calculatePlanStats,
-} from '@jetpack/shared';
+} from '@jetpack-agent/shared';
 import { PlanParser } from './PlanParser';
 
 // Re-export types for convenience

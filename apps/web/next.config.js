@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@jetpack/orchestrator', '@jetpack/shared', '@jetpack/mcp-mail-adapter'],
+  transpilePackages: ['@jetpack-agent/orchestrator', '@jetpack-agent/shared', '@jetpack-agent/mcp-mail-adapter'],
   serverExternalPackages: ['better-sqlite3'],
 };
 
