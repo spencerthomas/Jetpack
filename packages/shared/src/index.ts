@@ -3,6 +3,7 @@ export * from './types/agent';
 export * from './types/task';
 export * from './types/message';
 export * from './types/memory';
+export * from './types/memory-config';
 export * from './types/user';
 export * from './types/runtime';
 export * from './types/settings';

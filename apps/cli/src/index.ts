@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+// Memory Management: Set default heap size for multi-agent workloads
+// This prevents OOM crashes during long-running sessions with multiple agents
+if (!process.env.NODE_OPTIONS?.includes('--max-old-space-size')) {
+  process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim();
+}
+
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
