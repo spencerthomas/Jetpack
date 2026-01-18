@@ -368,6 +368,10 @@ export class ConcurrencyLimiter extends EventEmitter {
   shutdown(): void {
     this.taskSemaphore.cancelAll('Concurrency limiter shutdown');
     this.agentSemaphore.cancelAll('Concurrency limiter shutdown');
+
+    // Clean up all event listeners to prevent memory leaks
+    this.removeAllListeners();
+
     this.logger.info('Concurrency limiter shutdown');
   }
 

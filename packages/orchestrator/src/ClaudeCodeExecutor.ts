@@ -633,7 +633,7 @@ When done, provide a brief summary of what you accomplished.
     // Clear context reference
     this.currentContext = undefined;
 
-    // Remove all EventEmitter listeners
+    // Remove all EventEmitter listeners to prevent memory leaks
     this.removeAllListeners();
 
     this.logger.debug('ClaudeCodeExecutor destroyed');

@@ -10,7 +10,6 @@ import {
   MemoryEvent,
   MemoryAction,
   formatBytes,
-  mbToBytes,
   bytesToMb,
   Logger,
 } from '@jetpack-agent/shared';
@@ -92,12 +91,18 @@ export class MemoryMonitor extends EventEmitter {
 
   /**
    * Stop monitoring memory usage
+   * @param cleanup If true, also removes all event listeners (default: false for reconfigure compatibility)
    */
-  stop(): void {
+  stop(cleanup: boolean = false): void {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = undefined;
       this.logger.info('Memory monitor stopped');
+    }
+
+    // Clean up all event listeners when shutting down completely
+    if (cleanup) {
+      this.removeAllListeners();
     }
   }
 
@@ -266,8 +271,7 @@ export class MemoryMonitor extends EventEmitter {
   /**
    * Handle state transitions for throttling and pausing
    */
-  private handleStateTransitions(from: MemorySeverity, to: MemorySeverity, stats: MemoryStats): void {
-    const fromLevel = this.severityLevel(from);
+  private handleStateTransitions(_from: MemorySeverity, to: MemorySeverity, stats: MemoryStats): void {
     const toLevel = this.severityLevel(to);
 
     // Throttling: starts at elevated, stops below elevated
@@ -466,8 +470,4 @@ export class MemoryMonitor extends EventEmitter {
   }
 }
 
-// Declare global gc for TypeScript
-declare global {
-  // eslint-disable-next-line no-var
-  var gc: (() => void) | undefined;
-}
+// Note: The global `gc` function is typed in @types/node when running with --expose-gc

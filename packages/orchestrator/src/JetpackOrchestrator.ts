@@ -1049,13 +1049,13 @@ export class JetpackOrchestrator extends EventEmitter {
   async shutdown(): Promise<void> {
     this.logger.info('Shutting down Jetpack');
 
-    // Stop Memory Monitor first
+    // Stop Memory Monitor first (with full cleanup)
     if (this.memoryMonitor) {
-      this.memoryMonitor.stop();
+      this.memoryMonitor.stop(true); // true = cleanup listeners
       this.logger.info('Memory monitor stopped');
     }
 
-    // Shutdown Concurrency Limiter (cancels waiting requests)
+    // Shutdown Concurrency Limiter (cancels waiting requests, cleans up listeners)
     if (this.concurrencyLimiter) {
       this.concurrencyLimiter.shutdown();
       this.logger.info('Concurrency limiter shutdown');
@@ -1087,6 +1087,9 @@ export class JetpackOrchestrator extends EventEmitter {
     if (this.broadcastMail) {
       await this.broadcastMail.shutdown();
     }
+
+    // Clean up all orchestrator event listeners to prevent memory leaks
+    this.removeAllListeners();
 
     this.logger.info('Jetpack shut down complete');
   }

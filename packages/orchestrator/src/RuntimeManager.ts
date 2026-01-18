@@ -119,6 +119,9 @@ export class RuntimeManager extends EventEmitter {
     if (this.onEndStateCallback) {
       await this.onEndStateCallback(endState, stats);
     }
+
+    // Clean up all event listeners to prevent memory leaks
+    this.removeAllListeners();
   }
 
   /**
