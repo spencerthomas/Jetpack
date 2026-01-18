@@ -1,6 +1,6 @@
 {
   "name": "@jetpack-agent/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Jetpack CLI - Multi-Agent Swarm Development orchestration tool",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

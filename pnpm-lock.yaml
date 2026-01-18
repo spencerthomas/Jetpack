@@ -225,6 +225,43 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
+  packages/jetpack-agent:
+    dependencies:
+      '@jetpack-agent/beads-adapter':
+        specifier: ^0.1.1
+        version: 0.1.1
+      '@jetpack-agent/browser-validator':
+        specifier: ^0.1.1
+        version: 0.1.1(typescript@5.9.3)
+      '@jetpack-agent/cass-adapter':
+        specifier: ^0.1.1
+        version: 0.1.1(ws@8.19.0)
+      '@jetpack-agent/cli-tui':
+        specifier: ^0.1.1
+        version: 0.1.1(@jetpack-agent/orchestrator@0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76)))(@types/react@19.2.7)
+      '@jetpack-agent/mcp-mail-adapter':
+        specifier: ^0.1.1
+        version: 0.1.1
+      '@jetpack-agent/mcp-server':
+        specifier: ^0.1.1
+        version: 0.1.1(@cfworker/json-schema@4.1.1)(hono@4.11.4)
+      '@jetpack-agent/orchestrator':
+        specifier: ^0.1.1
+        version: 0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
+      '@jetpack-agent/quality-adapter':
+        specifier: ^0.1.1
+        version: 0.1.1
+      '@jetpack-agent/shared':
+        specifier: ^0.1.1
+        version: 0.1.1
+      '@jetpack-agent/supervisor':
+        specifier: ^0.1.1
+        version: 0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/mcp-mail-adapter:
     dependencies:
       '@jetpack-agent/shared':
@@ -773,6 +810,51 @@ packages:
   '@jest/schemas@29.6.3':
     resolution: {integrity: sha512-mo5j5X+jIZmJQveBKeS/clAueipV7KgiX1vMgCxam1RNYiqE1w62n0/tJJnHtjW8ZHcQco5gY85jA3mi0L+nSA==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
+
+  '@jetpack-agent/beads-adapter@0.1.1':
+    resolution: {integrity: sha512-DgPIv2Mf9DC3hJCTCXx9NkSglVaIO63GUhwrP1ynqSWrFZRcCP2DpI/bTsB7v7I57RB9dQ36HbgZRjeeVgM5tA==}
+    engines: {node: '>=20.0.0'}
+
+  '@jetpack-agent/browser-validator@0.1.1':
+    resolution: {integrity: sha512-8xjY0okLS/oysa9t8p4YaPfoCmgDdBBHFJJJCh0GK0j+IFG+XCl2AFR2yoKE2gMA1xdqUEw/GakesvayqEpJjA==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      typescript: ^5.0.0
+
+  '@jetpack-agent/cass-adapter@0.1.1':
+    resolution: {integrity: sha512-JEq3cbDfh/Zo4EbgzBWyiA2R4xwIDd6RwmJ/p7HSv6oTvnnjNuy3FTdEWG15uBNFLrDRb+S3lp+P5ZlN/u10Xg==}
+    engines: {node: '>=20.0.0'}
+
+  '@jetpack-agent/cli-tui@0.1.1':
+    resolution: {integrity: sha512-EDhab4aXRWo3yQ1eNkCuYUahRqdJpfJiMIRqT7tEqUiR5bm9RWOqNE+OLNbJsmuzKMRwjxzy40BQ6at1q4hH3A==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@jetpack-agent/orchestrator': 0.1.1
+
+  '@jetpack-agent/mcp-mail-adapter@0.1.1':
+    resolution: {integrity: sha512-0G3n6FOX27SAbJyOJSpaTqKooP2rpcwZbb+g3qFhxV63/2kW09XUI3xW/4+GqzZbJJjdchUiYhMi04ztIwDi1A==}
+    engines: {node: '>=20.0.0'}
+
+  '@jetpack-agent/mcp-server@0.1.1':
+    resolution: {integrity: sha512-IhG02DX4JQeM9xpgys/dh6VSS3JmxbqmBfJ6D2avyMsOuP7Axf2tPkoRLJxMoiTmhaexKYthZDY2nyX8ludv2A==}
+    engines: {node: '>=20.0.0'}
+    hasBin: true
+
+  '@jetpack-agent/orchestrator@0.1.1':
+    resolution: {integrity: sha512-egR+WpuQmHBL2dhuiwJvO5omz5cCzvlYSTnhK1SSs+vgQUTZ+WBijnq3F2mbFqEcfsiWC3ZHvaXyQtE7zniiiw==}
+    engines: {node: '>=20.0.0'}
+
+  '@jetpack-agent/quality-adapter@0.1.1':
+    resolution: {integrity: sha512-XOQRoJQpDzwvGpNr0g2ARaqN+Nh7LLgF6uDhbK1V6a+7Nylg90+P3SCkJ1I8EsJL/sEg1j61/PvIRigAD1T2jw==}
+    engines: {node: '>=20.0.0'}
+
+  '@jetpack-agent/shared@0.1.1':
+    resolution: {integrity: sha512-DRAHNaUy5Ehc/byjLWxziWBNvqy1t7XewfeoYGtrp35kehJgG41fDAjwoYTbf0ByVrVqo+4gwyv0WmWgp4n2WQ==}
+    engines: {node: '>=20.0.0'}
+
+  '@jetpack-agent/supervisor@0.1.1':
+    resolution: {integrity: sha512-PeDnoMo44ru527GdkgK46HyC+9h7UC4o11u/GmfgBXyTp0MK64uzt24pxGCCzQIozDsKIYWujCcufRZ4ISaXPg==}
+    engines: {node: '>=20.0.0'}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -3168,6 +3250,114 @@ snapshots:
     dependencies:
       '@sinclair/typebox': 0.27.8
 
+  '@jetpack-agent/beads-adapter@0.1.1':
+    dependencies:
+      '@jetpack-agent/shared': 0.1.1
+      simple-git: 3.30.0
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - supports-color
+
+  '@jetpack-agent/browser-validator@0.1.1(typescript@5.9.3)':
+    dependencies:
+      '@jetpack-agent/shared': 0.1.1
+      playwright: 1.57.0
+      typescript: 5.9.3
+      zod: 3.25.76
+
+  '@jetpack-agent/cass-adapter@0.1.1(ws@8.19.0)':
+    dependencies:
+      '@jetpack-agent/shared': 0.1.1
+      better-sqlite3: 11.10.0
+      openai: 4.104.0(ws@8.19.0)(zod@3.25.76)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - encoding
+      - ws
+
+  '@jetpack-agent/cli-tui@0.1.1(@jetpack-agent/orchestrator@0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76)))(@types/react@19.2.7)':
+    dependencies:
+      '@jetpack-agent/orchestrator': 0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
+      '@jetpack-agent/shared': 0.1.1
+      ink: 5.2.1(@types/react@19.2.7)(react@18.3.1)
+      react: 18.3.1
+    transitivePeerDependencies:
+      - '@types/react'
+      - bufferutil
+      - react-devtools-core
+      - utf-8-validate
+
+  '@jetpack-agent/mcp-mail-adapter@0.1.1':
+    dependencies:
+      '@jetpack-agent/shared': 0.1.1
+      better-sqlite3: 11.10.0
+      eventemitter3: 5.0.1
+      zod: 3.25.76
+
+  '@jetpack-agent/mcp-server@0.1.1(@cfworker/json-schema@4.1.1)(hono@4.11.4)':
+    dependencies:
+      '@jetpack-agent/shared': 0.1.1
+      '@modelcontextprotocol/sdk': 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - hono
+      - supports-color
+
+  '@jetpack-agent/orchestrator@0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))':
+    dependencies:
+      '@jetpack-agent/beads-adapter': 0.1.1
+      '@jetpack-agent/cass-adapter': 0.1.1(ws@8.19.0)
+      '@jetpack-agent/mcp-mail-adapter': 0.1.1
+      '@jetpack-agent/quality-adapter': 0.1.1
+      '@jetpack-agent/shared': 0.1.1
+      '@jetpack-agent/supervisor': 0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+      - '@opentelemetry/exporter-trace-otlp-proto'
+      - '@opentelemetry/sdk-trace-base'
+      - encoding
+      - openai
+      - react
+      - react-dom
+      - supports-color
+      - ws
+      - zod-to-json-schema
+
+  '@jetpack-agent/quality-adapter@0.1.1':
+    dependencies:
+      '@jetpack-agent/shared': 0.1.1
+      better-sqlite3: 11.10.0
+      zod: 3.25.76
+
+  '@jetpack-agent/shared@0.1.1':
+    dependencies:
+      zod: 3.25.76
+
+  '@jetpack-agent/supervisor@0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))':
+    dependencies:
+      '@jetpack-agent/beads-adapter': 0.1.1
+      '@jetpack-agent/cass-adapter': 0.1.1(ws@8.19.0)
+      '@jetpack-agent/mcp-mail-adapter': 0.1.1
+      '@jetpack-agent/shared': 0.1.1
+      '@langchain/anthropic': 0.3.34(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(zod@3.25.76)
+      '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
+      '@langchain/langgraph': 0.2.74(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@3.25.76))
+      '@langchain/openai': 0.3.17(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(ws@8.19.0)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+      - '@opentelemetry/exporter-trace-otlp-proto'
+      - '@opentelemetry/sdk-trace-base'
+      - encoding
+      - openai
+      - react
+      - react-dom
+      - supports-color
+      - ws
+      - zod-to-json-schema
+
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -3223,6 +3413,17 @@ snapshots:
       '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
       uuid: 10.0.0
 
+  '@langchain/langgraph-sdk@0.0.112(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@types/json-schema': 7.0.15
+      p-queue: 6.6.2
+      p-retry: 4.6.2
+      uuid: 9.0.1
+    optionalDependencies:
+      '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
+      react: 18.3.1
+      react-dom: 19.2.3(react@18.3.1)
+
   '@langchain/langgraph-sdk@0.0.112(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@types/json-schema': 7.0.15
@@ -3233,6 +3434,19 @@ snapshots:
       '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
+
+  '@langchain/langgraph@0.2.74(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@3.25.76))':
+    dependencies:
+      '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
+      '@langchain/langgraph-checkpoint': 0.0.18(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))
+      '@langchain/langgraph-sdk': 0.0.112(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)
+      uuid: 10.0.0
+      zod: 3.25.76
+    optionalDependencies:
+      zod-to-json-schema: 3.25.1(zod@3.25.76)
+    transitivePeerDependencies:
+      - react
+      - react-dom
 
   '@langchain/langgraph@0.2.74(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod-to-json-schema@3.25.1(zod@3.25.76))':
     dependencies:
@@ -4208,6 +4422,39 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  ink@5.2.1(@types/react@19.2.7)(react@18.3.1):
+    dependencies:
+      '@alcalzone/ansi-tokenize': 0.1.3
+      ansi-escapes: 7.2.0
+      ansi-styles: 6.2.3
+      auto-bind: 5.0.1
+      chalk: 5.6.2
+      cli-boxes: 3.0.0
+      cli-cursor: 4.0.0
+      cli-truncate: 4.0.0
+      code-excerpt: 4.0.0
+      es-toolkit: 1.44.0
+      indent-string: 5.0.0
+      is-in-ci: 1.0.0
+      patch-console: 2.0.0
+      react: 18.3.1
+      react-reconciler: 0.29.2(react@18.3.1)
+      scheduler: 0.23.2
+      signal-exit: 3.0.7
+      slice-ansi: 7.1.2
+      stack-utils: 2.0.6
+      string-width: 7.2.0
+      type-fest: 4.41.0
+      widest-line: 5.0.0
+      wrap-ansi: 9.0.2
+      ws: 8.19.0
+      yoga-layout: 3.2.1
+    optionalDependencies:
+      '@types/react': 19.2.7
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   ipaddr.js@1.9.1: {}
 
   is-binary-path@2.1.0:
@@ -4682,6 +4929,12 @@ snapshots:
       ini: 1.3.8
       minimist: 1.2.8
       strip-json-comments: 2.0.1
+
+  react-dom@19.2.3(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+      scheduler: 0.27.0
+    optional: true
 
   react-dom@19.2.3(react@19.2.3):
     dependencies:
