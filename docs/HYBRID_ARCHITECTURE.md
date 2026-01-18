@@ -256,6 +256,7 @@ export class LeaseDO {
 | `@jetpack-agent/cf-beads-adapter` | `CloudflareTaskStore` | Cloudflare D1 | ✅ Complete |
 | `@jetpack-agent/cf-mail-adapter` | `CloudflareMailBus` | Durable Objects | ✅ Complete |
 | `@jetpack-agent/cf-cass-adapter` | `CloudflareMemoryStore` | D1 + Vectorize | ✅ Complete |
+| `@jetpack-agent/worker-api` | Hono Worker | API Gateway | ✅ Complete |
 
 ### Usage Examples
 

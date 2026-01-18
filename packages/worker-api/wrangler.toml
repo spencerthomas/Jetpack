@@ -1,0 +1,35 @@
+name = "jetpack-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database bindings
+[[d1_databases]]
+binding = "DB"
+database_name = "jetpack-db"
+database_id = "REPLACE_WITH_DATABASE_ID"
+
+# Vectorize index for semantic search
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "jetpack-memories"
+
+# Durable Objects for messaging and locking
+[[durable_objects.bindings]]
+name = "MAILBOX_DO"
+class_name = "MailboxDurableObject"
+
+[[durable_objects.bindings]]
+name = "LEASE_DO"
+class_name = "LeaseDurableObject"
+
+# Migrations for Durable Objects
+[[migrations]]
+tag = "v1"
+new_classes = ["MailboxDurableObject", "LeaseDurableObject"]
+
+# Environment variables (set via wrangler secret put)
+# - API_TOKEN: Authentication token for API access
+
+[vars]
+ENVIRONMENT = "development"
