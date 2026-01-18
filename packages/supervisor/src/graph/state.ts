@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { Annotation } from '@langchain/langgraph';
 import { Task, Agent, TaskStatus } from '@jetpack-agent/shared';
+import {
+  createSlidingWindowReducer,
+  createSlidingSetReducer,
+  createSlidingRecordReducer,
+  STATE_LIMITS,
+} from './sliding-window';
 
 /**
  * Conflict types that the coordinator handles
@@ -138,10 +144,10 @@ export const SupervisorStateAnnotation = Annotation.Root({
     reducer: (_, newTasks) => newTasks || [],
   }),
 
-  // Created tasks (after Beads integration)
+  // Created tasks (after Beads integration) - bounded to prevent memory growth
   createdTasks: Annotation<Task[]>({
     default: () => [],
-    reducer: (existing, newTasks) => [...existing, ...(newTasks || [])],
+    reducer: createSlidingWindowReducer<Task>(STATE_LIMITS.MAX_TASKS),
   }),
 
   // Available agents
@@ -150,40 +156,40 @@ export const SupervisorStateAnnotation = Annotation.Root({
     reducer: (_, agents) => agents,
   }),
 
-  // Task assignments: taskId -> agentId
+  // Task assignments: taskId -> agentId - bounded to prevent memory growth
   assignments: Annotation<Record<string, string>>({
     default: () => ({}),
-    reducer: (existing, updates) => ({ ...existing, ...updates }),
+    reducer: createSlidingRecordReducer<string>(STATE_LIMITS.MAX_ASSIGNMENTS),
   }),
 
-  // Current task statuses
+  // Current task statuses - bounded to prevent memory growth
   taskStatuses: Annotation<Record<string, TaskStatus>>({
     default: () => ({}),
-    reducer: (existing, updates) => ({ ...existing, ...updates }),
+    reducer: createSlidingRecordReducer<TaskStatus>(STATE_LIMITS.MAX_STATUSES),
   }),
 
-  // Conflicts to resolve
+  // Conflicts to resolve - bounded to prevent memory growth
   conflicts: Annotation<Conflict[]>({
     default: () => [],
-    reducer: (existing, newConflicts) => [...existing, ...(newConflicts || [])],
+    reducer: createSlidingWindowReducer<Conflict>(STATE_LIMITS.MAX_CONFLICTS),
   }),
 
-  // Reassignment history
+  // Reassignment history - bounded to prevent memory growth
   reassignments: Annotation<Reassignment[]>({
     default: () => [],
-    reducer: (existing, newReassignments) => [...existing, ...(newReassignments || [])],
+    reducer: createSlidingWindowReducer<Reassignment>(STATE_LIMITS.MAX_REASSIGNMENTS),
   }),
 
-  // Completed task IDs
+  // Completed task IDs - bounded unique set
   completedTaskIds: Annotation<string[]>({
     default: () => [],
-    reducer: (existing, newIds) => [...new Set([...existing, ...(newIds || [])])],
+    reducer: createSlidingSetReducer(STATE_LIMITS.MAX_COMPLETED_IDS),
   }),
 
-  // Failed task IDs
+  // Failed task IDs - bounded unique set
   failedTaskIds: Annotation<string[]>({
     default: () => [],
-    reducer: (existing, newIds) => [...new Set([...existing, ...(newIds || [])])],
+    reducer: createSlidingSetReducer(STATE_LIMITS.MAX_FAILED_IDS),
   }),
 
   // Current iteration count (for loop detection)
