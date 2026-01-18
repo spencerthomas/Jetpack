@@ -5,10 +5,35 @@
   "description": "TUI dashboard for Jetpack multi-agent orchestration",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jetpack",
+    "tui",
+    "terminal",
+    "dashboard",
+    "ink",
+    "multi-agent"
+  ],
+  "author": "Tom Spencer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spencerthomas/Jetpack.git",
+    "directory": "packages/cli-tui"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@jetpack/shared": "workspace:*",
@@ -20,6 +45,6 @@
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "@jetpack/orchestrator": "workspace:*"
+    "@jetpack/orchestrator": ">=0.1.0"
   }
 }

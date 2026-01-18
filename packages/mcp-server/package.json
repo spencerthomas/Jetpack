@@ -4,13 +4,39 @@
   "description": "MCP server for Claude Code integration with Jetpack",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
     "jetpack-mcp": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node dist/index.js"
+    "clean": "rm -rf dist",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jetpack",
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "ai-agents"
+  ],
+  "author": "Tom Spencer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spencerthomas/Jetpack.git",
+    "directory": "packages/mcp-server"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
@@ -20,14 +46,5 @@
   "devDependencies": {
     "@types/node": "^22.15.21",
     "typescript": "^5.8.3"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ATheorell/Jetpack.git",
-    "directory": "packages/mcp-server"
-  },
-  "license": "MIT"
+  }
 }

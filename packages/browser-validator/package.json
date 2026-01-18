@@ -4,10 +4,37 @@
   "description": "Browser-based validation for UI tasks using headless browser automation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jetpack",
+    "browser",
+    "validation",
+    "playwright",
+    "testing",
+    "automation"
+  ],
+  "author": "Tom Spencer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spencerthomas/Jetpack.git",
+    "directory": "packages/browser-validator"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@jetpack/shared": "workspace:*",
