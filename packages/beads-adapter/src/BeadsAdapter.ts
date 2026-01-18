@@ -2,7 +2,18 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
 import { simpleGit, SimpleGit } from 'simple-git';
-import { Task, TaskStatus, TaskGraph, Logger } from '@jetpack-agent/shared';
+import {
+  Task,
+  TaskStatus,
+  TaskPriority,
+  TaskGraph,
+  Logger,
+  ITaskStore,
+  TaskStats,
+  TaskListOptions,
+  TaskInput,
+  TaskUpdate,
+} from '@jetpack-agent/shared';
 
 export interface BeadsAdapterConfig {
   beadsDir: string;
@@ -11,7 +22,15 @@ export interface BeadsAdapterConfig {
   watchForChanges?: boolean; // Enable file watching for external task creation (default: true)
 }
 
-export class BeadsAdapter {
+/**
+ * BeadsAdapter - Local SQLite-based task storage
+ *
+ * Implements ITaskStore interface for hybrid Cloudflare architecture.
+ * Uses JSONL file format for task persistence.
+ *
+ * @see docs/HYBRID_ARCHITECTURE.md
+ */
+export class BeadsAdapter implements ITaskStore {
   private git: SimpleGit;
   private logger: Logger;
   private tasksFile: string;
@@ -158,10 +177,12 @@ export class BeadsAdapter {
     }
   }
 
-  async createTask(task: Omit<Task, 'createdAt' | 'updatedAt'>): Promise<Task> {
+  async createTask(input: TaskInput): Promise<Task> {
     const now = new Date();
+    const id = input.id || this.generateTaskId();
     const fullTask: Task = {
-      ...task,
+      ...input,
+      id,
       createdAt: now,
       updatedAt: now,
     };
@@ -173,7 +194,19 @@ export class BeadsAdapter {
     return fullTask;
   }
 
-  async updateTask(id: string, updates: Partial<Task>): Promise<Task | null> {
+  /**
+   * Generate a unique task ID
+   */
+  private generateTaskId(): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = 'bd-';
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  async updateTask(id: string, updates: TaskUpdate): Promise<Task | null> {
     const task = this.tasks.get(id);
     if (!task) {
       this.logger.warn(`Task not found: ${id}`);
@@ -199,18 +232,40 @@ export class BeadsAdapter {
     return this.tasks.get(id) || null;
   }
 
-  async listTasks(filter?: { status?: TaskStatus; assignedAgent?: string }): Promise<Task[]> {
+  async listTasks(options?: TaskListOptions): Promise<Task[]> {
     let tasks = Array.from(this.tasks.values());
 
-    if (filter?.status) {
-      tasks = tasks.filter(t => t.status === filter.status);
+    if (options?.status) {
+      const statuses = Array.isArray(options.status) ? options.status : [options.status];
+      tasks = tasks.filter(t => statuses.includes(t.status));
     }
 
-    if (filter?.assignedAgent) {
-      tasks = tasks.filter(t => t.assignedAgent === filter.assignedAgent);
+    if (options?.priority) {
+      const priorities = Array.isArray(options.priority) ? options.priority : [options.priority];
+      tasks = tasks.filter(t => priorities.includes(t.priority));
+    }
+
+    if (options?.assignedAgent) {
+      tasks = tasks.filter(t => t.assignedAgent === options.assignedAgent);
+    }
+
+    if (options?.branch) {
+      tasks = tasks.filter(t => t.branch === options.branch);
+    }
+
+    if (options?.offset) {
+      tasks = tasks.slice(options.offset);
+    }
+
+    if (options?.limit) {
+      tasks = tasks.slice(0, options.limit);
     }
 
     return tasks;
+  }
+
+  async getTasksByStatus(status: TaskStatus): Promise<Task[]> {
+    return this.listTasks({ status });
   }
 
   async deleteTask(id: string): Promise<boolean> {
@@ -284,30 +339,68 @@ export class BeadsAdapter {
     });
   }
 
+  async releaseTask(taskId: string): Promise<boolean> {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      return false;
+    }
+
+    await this.updateTask(taskId, {
+      status: 'ready',
+      assignedAgent: undefined,
+    });
+
+    this.logger.info(`Released task: ${taskId}`);
+    return true;
+  }
+
   async getTasksByAgent(agentId: string): Promise<Task[]> {
     return Array.from(this.tasks.values()).filter(
       t => t.assignedAgent === agentId && t.status !== 'completed' && t.status !== 'failed'
     );
   }
 
-  async getStats(): Promise<{
-    total: number;
-    byStatus: Record<TaskStatus, number>;
-    avgCompletionTime: number;
-  }> {
+  async getStats(): Promise<TaskStats> {
     const tasks = Array.from(this.tasks.values());
     const byStatus: Record<string, number> = {};
+    const byPriority: Record<string, number> = {};
 
     for (const status of ['pending', 'ready', 'claimed', 'in_progress', 'blocked', 'completed', 'failed'] as TaskStatus[]) {
       byStatus[status] = 0;
     }
 
+    for (const priority of ['low', 'medium', 'high', 'critical'] as TaskPriority[]) {
+      byPriority[priority] = 0;
+    }
+
+    for (const task of tasks) {
+      byStatus[task.status] = (byStatus[task.status] || 0) + 1;
+      byPriority[task.priority] = (byPriority[task.priority] || 0) + 1;
+    }
+
+    return {
+      total: tasks.length,
+      byStatus: byStatus as Record<TaskStatus, number>,
+      byPriority: byPriority as Record<TaskPriority, number>,
+    };
+  }
+
+  /**
+   * Get extended stats including completion time (for backwards compatibility)
+   */
+  async getExtendedStats(): Promise<{
+    total: number;
+    byStatus: Record<TaskStatus, number>;
+    byPriority: Record<TaskPriority, number>;
+    avgCompletionTime: number;
+  }> {
+    const stats = await this.getStats();
+    const tasks = Array.from(this.tasks.values());
+
     let totalCompletionTime = 0;
     let completedCount = 0;
 
     for (const task of tasks) {
-      byStatus[task.status] = (byStatus[task.status] || 0) + 1;
-
       if (task.status === 'completed' && task.actualMinutes) {
         totalCompletionTime += task.actualMinutes;
         completedCount++;
@@ -315,8 +408,7 @@ export class BeadsAdapter {
     }
 
     return {
-      total: tasks.length,
-      byStatus: byStatus as Record<TaskStatus, number>,
+      ...stats,
       avgCompletionTime: completedCount > 0 ? totalCompletionTime / completedCount : 0,
     };
   }

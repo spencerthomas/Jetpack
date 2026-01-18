@@ -1,6 +1,14 @@
 import * as path from 'path';
 import Database from 'better-sqlite3';
-import { MemoryEntry, MemoryType, MemoryStore, Logger } from '@jetpack-agent/shared';
+import {
+  MemoryEntry,
+  MemoryType,
+  MemoryStore,
+  Logger,
+  IMemoryStore,
+  MemoryInput,
+  MemoryStats,
+} from '@jetpack-agent/shared';
 import * as crypto from 'crypto';
 import { EmbeddingGenerator, EmbeddingConfig, createEmbeddingGenerator } from './EmbeddingGenerator';
 
@@ -14,7 +22,15 @@ export interface CASSConfig {
   embeddingConfig?: EmbeddingConfig;
 }
 
-export class CASSAdapter implements MemoryStore {
+/**
+ * CASSAdapter - Local SQLite-based memory storage with optional embeddings
+ *
+ * Implements IMemoryStore interface for hybrid Cloudflare architecture.
+ * Supports semantic search via embeddings (OpenAI ada-002 compatible).
+ *
+ * @see docs/HYBRID_ARCHITECTURE.md
+ */
+export class CASSAdapter implements IMemoryStore, MemoryStore {
   private db!: Database.Database;
   private logger: Logger;
   private dbPath: string;
@@ -65,7 +81,7 @@ export class CASSAdapter implements MemoryStore {
     this.logger.info('CASS memory system initialized');
   }
 
-  async store(entry: Omit<MemoryEntry, 'id' | 'createdAt' | 'lastAccessed' | 'accessCount'>): Promise<string> {
+  async store(entry: MemoryInput): Promise<string> {
     const id = this.generateId();
     const now = Date.now();
 
@@ -128,6 +144,18 @@ export class CASSAdapter implements MemoryStore {
     updateStmt.run(Date.now(), id);
 
     return this.rowToMemoryEntry(row);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const stmt = this.db.prepare('DELETE FROM memories WHERE id = ?');
+    const result = stmt.run(id);
+
+    if (result.changes > 0) {
+      this.logger.debug(`Deleted memory: ${id}`);
+      return true;
+    }
+
+    return false;
   }
 
   async search(query: string, limit: number = 10): Promise<MemoryEntry[]> {
@@ -455,12 +483,7 @@ export class CASSAdapter implements MemoryStore {
     return rows.map(row => this.rowToMemoryEntry(row));
   }
 
-  async getStats(): Promise<{
-    total: number;
-    byType: Record<MemoryType, number>;
-    avgImportance: number;
-    totalAccesses: number;
-  }> {
+  async getStats(): Promise<MemoryStats> {
     const totalStmt = this.db.prepare('SELECT COUNT(*) as count FROM memories');
     const total = (totalStmt.get() as any).count;
 
@@ -474,11 +497,16 @@ export class CASSAdapter implements MemoryStore {
     const avgStmt = this.db.prepare('SELECT AVG(importance) as avg, SUM(access_count) as total_accesses FROM memories');
     const avgRow = avgStmt.get() as any;
 
+    // Get embedding stats
+    const embeddingStats = await this.getEmbeddingStats();
+
     return {
       total,
       byType: byType as Record<MemoryType, number>,
       avgImportance: avgRow.avg || 0,
       totalAccesses: avgRow.total_accesses || 0,
+      withEmbedding: embeddingStats.withEmbedding,
+      withoutEmbedding: embeddingStats.withoutEmbedding,
     };
   }
 

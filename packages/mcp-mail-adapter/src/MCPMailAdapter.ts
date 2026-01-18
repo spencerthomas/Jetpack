@@ -1,7 +1,16 @@
 import EventEmitter from 'eventemitter3';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Message, MessageType, MessageBus, MessageAckStatus, Logger, generateMessageId } from '@jetpack-agent/shared';
+import {
+  Message,
+  MessageType,
+  MessageBus,
+  MessageAckStatus,
+  Logger,
+  generateMessageId,
+  IMailBus,
+  LeaseStatus,
+} from '@jetpack-agent/shared';
 
 export interface MCPMailConfig {
   mailDir: string;
@@ -15,7 +24,15 @@ interface FileLease {
   expiresAt: Date;
 }
 
-export class MCPMailAdapter implements MessageBus {
+/**
+ * MCPMailAdapter - Local file-based messaging system
+ *
+ * Implements IMailBus interface for hybrid Cloudflare architecture.
+ * Uses file system for message passing between agents.
+ *
+ * @see docs/HYBRID_ARCHITECTURE.md
+ */
+export class MCPMailAdapter implements IMailBus, MessageBus {
   private emitter = new EventEmitter();
   private logger: Logger;
   private inboxDir: string;
@@ -34,6 +51,13 @@ export class MCPMailAdapter implements MessageBus {
     this.outboxDir = path.join(config.mailDir, 'outbox');
     this.archiveDir = path.join(config.mailDir, 'archive');
     this.leasesFile = path.join(config.mailDir, 'leases.json');
+  }
+
+  /**
+   * IMailBus: Get the agent ID for this mail adapter
+   */
+  get agentId(): string {
+    return this.config.agentId;
   }
 
   async initialize(): Promise<void> {
@@ -178,6 +202,20 @@ export class MCPMailAdapter implements MessageBus {
 
   unsubscribe(type: MessageType, handler: (msg: Message) => void | Promise<void>): void {
     this.emitter.off(type, handler);
+  }
+
+  /**
+   * IMailBus: Send a message directly to a specific agent
+   */
+  async sendTo(agentId: string, message: Message): Promise<void> {
+    const messageWithId: Message = {
+      ...message,
+      id: message.id || generateMessageId(),
+      timestamp: message.timestamp || new Date(),
+      to: agentId,
+    };
+    await this.sendToAgent(messageWithId, agentId);
+    this.logger.debug(`Sent direct message to ${agentId}: ${messageWithId.type}`);
   }
 
   private startPolling(): void {
@@ -343,17 +381,16 @@ export class MCPMailAdapter implements MessageBus {
     return true;
   }
 
-  async releaseLease(filePath: string): Promise<boolean> {
+  async releaseLease(filePath: string): Promise<void> {
     const lease = this.leases.get(filePath);
     if (!lease || lease.agentId !== this.config.agentId) {
-      return false;
+      return;
     }
 
     this.leases.delete(filePath);
     await this.saveLeases();
 
     this.logger.info(`Released lease for ${filePath}`);
-    return true;
   }
 
   async renewLease(filePath: string, durationMs: number = 60000): Promise<boolean> {
@@ -369,17 +406,30 @@ export class MCPMailAdapter implements MessageBus {
     return true;
   }
 
-  async isLeased(filePath: string): Promise<{ leased: boolean; agentId?: string }> {
+  async isLeased(filePath: string): Promise<LeaseStatus> {
     // Reload leases from disk to see leases from other agents
     await this.loadLeases();
     await this.cleanupExpiredLeases();
 
     const lease = this.leases.get(filePath);
     if (lease) {
-      return { leased: true, agentId: lease.agentId };
+      return {
+        isLeased: true,
+        agentId: lease.agentId,
+        expiresAt: lease.expiresAt.getTime(),
+      };
     }
 
-    return { leased: false };
+    return { isLeased: false };
+  }
+
+  /**
+   * Legacy method for backwards compatibility
+   * @deprecated Use isLeased() instead
+   */
+  async checkLease(filePath: string): Promise<{ leased: boolean; agentId?: string }> {
+    const status = await this.isLeased(filePath);
+    return { leased: status.isLeased, agentId: status.agentId };
   }
 
   private async releaseAllLeases(): Promise<void> {
@@ -415,8 +465,7 @@ export class MCPMailAdapter implements MessageBus {
    * Acknowledge a message. Updates the message file with acknowledgment info.
    * Searches in archive, outbox, and all inboxes.
    */
-  async acknowledge(messageId: string, ackedBy?: string): Promise<boolean> {
-    const agentId = ackedBy || this.config.agentId;
+  async acknowledge(messageId: string, agentId: string): Promise<void> {
     const ackedAt = new Date();
 
     // Search for the message in various locations
@@ -440,7 +489,7 @@ export class MCPMailAdapter implements MessageBus {
         // Write back
         await fs.writeFile(messageFile, JSON.stringify(message, null, 2));
         this.logger.debug(`Acknowledged message ${messageId} by ${agentId}`);
-        return true;
+        return;
       } catch (error) {
         // File not found in this location, continue searching
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -464,7 +513,7 @@ export class MCPMailAdapter implements MessageBus {
 
           await fs.writeFile(messageFile, JSON.stringify(message, null, 2));
           this.logger.debug(`Acknowledged message ${messageId} by ${agentId}`);
-          return true;
+          return;
         } catch {
           // Not in this inbox
         }
@@ -474,7 +523,6 @@ export class MCPMailAdapter implements MessageBus {
     }
 
     this.logger.warn(`Message ${messageId} not found for acknowledgment`);
-    return false;
   }
 
   /**
