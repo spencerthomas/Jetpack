@@ -10,7 +10,12 @@ import {
   MemoryStats,
 } from '@jetpack-agent/shared';
 import * as crypto from 'crypto';
-import { EmbeddingGenerator, EmbeddingConfig, createEmbeddingGenerator } from './EmbeddingGenerator';
+import {
+  EmbeddingGenerator,
+  EmbeddingConfig,
+  createEmbeddingGenerator,
+  getProviderInfo,
+} from './EmbeddingGenerator';
 
 export interface CASSConfig {
   cassDir: string;
@@ -46,9 +51,17 @@ export class CASSAdapter implements IMemoryStore, MemoryStore {
     if (this.autoGenerateEmbeddings || config.embeddingConfig) {
       this.embeddingGenerator = createEmbeddingGenerator(config.embeddingConfig);
       if (this.embeddingGenerator) {
-        this.logger.info('Embedding generator initialized');
+        const genConfig = this.embeddingGenerator.getConfig();
+        this.logger.info(
+          `Embedding generator initialized: provider=${genConfig.provider}, model=${genConfig.model}`
+        );
       } else if (this.autoGenerateEmbeddings) {
-        this.logger.warn('Auto-embedding enabled but no API key found. Set OPENAI_API_KEY.');
+        const info = getProviderInfo();
+        this.logger.warn(
+          'Auto-embedding enabled but no provider configured. ' +
+            'Set EMBEDDING_PROVIDER=openai and EMBEDDING_API_KEY, or EMBEDDING_PROVIDER=ollama. ' +
+            `Current config: ${JSON.stringify(info.environmentVariables)}`
+        );
       }
     }
   }
@@ -323,14 +336,17 @@ export class CASSAdapter implements IMemoryStore, MemoryStore {
     autoGenerateEmbeddings: boolean;
     hasEmbeddingGenerator: boolean;
     embeddingModel?: string;
+    embeddingProvider?: string;
   } {
+    const genConfig = this.embeddingGenerator?.getConfig();
     return {
       cassDir: this.config.cassDir,
       compactionThreshold: this.config.compactionThreshold,
       maxEntries: this.config.maxEntries,
       autoGenerateEmbeddings: this.autoGenerateEmbeddings,
       hasEmbeddingGenerator: this.embeddingGenerator !== null,
-      embeddingModel: this.config.embeddingConfig?.model,
+      embeddingModel: genConfig?.model ?? this.config.embeddingConfig?.model,
+      embeddingProvider: genConfig?.provider,
     };
   }
 
