@@ -37,8 +37,13 @@ import {
   createAdapters,
   HybridAdapterConfig,
   AdapterMode,
+  MemoryConfig,
+  MemoryEvent,
+  MemoryStats,
+  MemorySeverity,
 } from '@jetpack-agent/shared';
 import { RuntimeManager } from './RuntimeManager';
+import { MemoryMonitor } from './MemoryMonitor';
 
 // Simple frontmatter parser
 interface TaskFrontmatter {
@@ -142,6 +147,12 @@ export interface JetpackConfig {
     /** API token for authenticating with Cloudflare Worker */
     apiToken?: string;
   };
+  /** Enable memory monitoring (default: true) */
+  enableMemoryMonitoring?: boolean;
+  /** Memory management configuration */
+  memoryConfig?: Partial<MemoryConfig>;
+  /** Callback for memory events */
+  onMemoryEvent?: (event: MemoryEvent) => void;
 }
 
 export interface AgentRegistryEntry {
@@ -189,10 +200,10 @@ export class JetpackOrchestrator extends EventEmitter {
   private regressionDetector?: RegressionDetector;
   /** Standalone mail adapter for broadcasting (works even without agents) */
   private broadcastMail?: MCPMailAdapter;
-  /** Memory leak fix: Memory monitoring interval */
-  private memoryMonitorInterval?: NodeJS.Timeout;
-  /** Memory leak fix: Track last heap warning time to avoid spam */
-  private lastMemoryWarningTime: number = 0;
+  /** Memory monitor for heap management and tiered responses */
+  private memoryMonitor?: MemoryMonitor;
+  /** Whether task assignment is paused due to memory pressure */
+  private _tasksPausedForMemory: boolean = false;
   /** Environment configuration loaded from .env and process.env */
   private _envConfig: EnvironmentConfig;
 
@@ -637,6 +648,47 @@ export class JetpackOrchestrator extends EventEmitter {
     this.broadcastMail = new MCPMailAdapter(broadcastMailConfig);
     await this.broadcastMail.initialize();
 
+    // Initialize Memory Monitor (enabled by default)
+    if (this.config.enableMemoryMonitoring !== false) {
+      this.logger.info('Initializing memory monitor');
+      this.memoryMonitor = new MemoryMonitor({
+        workDir: this.workDir,
+        memoryConfig: this.config.memoryConfig,
+        onSeverityChange: (from, to, stats) => {
+          this.emit('memorySeverityChanged', { from, to, stats });
+        },
+        onPauseTasks: () => {
+          this._tasksPausedForMemory = true;
+          this.logger.warn('Tasks paused due to memory pressure');
+          this.emit('tasksPaused', { reason: 'memory_pressure' });
+        },
+        onResumeTasks: () => {
+          this._tasksPausedForMemory = false;
+          this.logger.info('Tasks resumed - memory pressure reduced');
+          this.emit('tasksResumed', { reason: 'memory_recovered' });
+        },
+        onThrottleStart: () => {
+          this.logger.warn('Task throttling started due to elevated memory');
+          this.emit('throttleStarted', { reason: 'memory_elevated' });
+        },
+        onThrottleStop: () => {
+          this.logger.info('Task throttling stopped - memory recovered');
+          this.emit('throttleStopped', { reason: 'memory_recovered' });
+        },
+        onEmergencyShutdown: async () => {
+          this.logger.error('EMERGENCY: Memory critical - initiating graceful shutdown');
+          await this.shutdown();
+        },
+      });
+
+      // Forward memory events to config callback if provided
+      if (this.config.onMemoryEvent) {
+        this.memoryMonitor.on('memoryEvent', this.config.onMemoryEvent);
+      }
+
+      this.logger.info('Memory monitor initialized');
+    }
+
     this.logger.info('Jetpack orchestrator initialized');
   }
 
@@ -662,6 +714,12 @@ export class JetpackOrchestrator extends EventEmitter {
     // Start RuntimeManager if configured
     if (this.runtimeManager) {
       await this.runtimeManager.start();
+    }
+
+    // Start Memory Monitor
+    if (this.memoryMonitor) {
+      this.memoryMonitor.start();
+      this.logger.info('Memory monitor started');
     }
 
     const skillSets: AgentSkill[][] = [
@@ -966,6 +1024,12 @@ export class JetpackOrchestrator extends EventEmitter {
   async shutdown(): Promise<void> {
     this.logger.info('Shutting down Jetpack');
 
+    // Stop Memory Monitor first
+    if (this.memoryMonitor) {
+      this.memoryMonitor.stop();
+      this.logger.info('Memory monitor stopped');
+    }
+
     // Stop RuntimeManager if running
     if (this.runtimeManager?.isRunning()) {
       await this.runtimeManager.stop('manual_stop');
@@ -1058,6 +1122,41 @@ export class JetpackOrchestrator extends EventEmitter {
    */
   isQualityMetricsEnabled(): boolean {
     return !!this.quality;
+  }
+
+  /**
+   * Get the memory monitor instance (if enabled)
+   */
+  getMemoryMonitor(): MemoryMonitor | undefined {
+    return this.memoryMonitor;
+  }
+
+  /**
+   * Check if memory monitoring is enabled
+   */
+  isMemoryMonitoringEnabled(): boolean {
+    return !!this.memoryMonitor;
+  }
+
+  /**
+   * Get current memory stats (if memory monitoring is enabled)
+   */
+  getMemoryStats(): MemoryStats | null {
+    return this.memoryMonitor?.getStats() || null;
+  }
+
+  /**
+   * Check if tasks are paused due to memory pressure
+   */
+  isTasksPausedForMemory(): boolean {
+    return this._tasksPausedForMemory;
+  }
+
+  /**
+   * Get current memory severity level
+   */
+  getMemorySeverity(): MemorySeverity | null {
+    return this.memoryMonitor?.getSeverity() || null;
   }
 
   /**

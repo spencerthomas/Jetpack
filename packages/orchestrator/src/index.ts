@@ -4,6 +4,7 @@ export * from './ClaudeCodeExecutor';
 export * from './PlanStore';
 export * from './PlanParser';
 export * from './RuntimeManager';
+export * from './MemoryMonitor';
 export * from './prompts/agent-system';
 export * from './gracefulShutdown';
 export * from './metrics';
