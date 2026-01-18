@@ -43,6 +43,7 @@
     "@jetpack-agent/cass-adapter": "workspace:*",
     "@jetpack-agent/supervisor": "workspace:*",
     "@jetpack-agent/quality-adapter": "workspace:*",
+    "dotenv": "^16.4.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {

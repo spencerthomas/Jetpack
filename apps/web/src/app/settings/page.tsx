@@ -83,6 +83,11 @@ const DEFAULT_JETPACK_SETTINGS: JetpackSettings = {
     enableFailureAnalysis: true,
     autoDecompose: true,
   },
+  hybrid: {
+    mode: 'local',
+    syncIntervalMs: 5000,
+    offlineFallback: true,
+  },
   agentCount: 3,
 };
 

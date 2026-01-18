@@ -4,6 +4,11 @@ import { existsSync, watch, FSWatcher } from 'fs';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { EventEmitter } from 'events';
+import { config as dotenvConfig } from 'dotenv';
+
+// Load .env file from current working directory (or specified path)
+// This must happen before any other imports that might use process.env
+dotenvConfig();
 
 // BUG-1 FIX: Increase default max listeners to prevent MaxListenersExceededWarning
 // With multiple agents (each with 3 subscriptions) plus orchestrator events,
@@ -24,6 +29,9 @@ import {
   RuntimeEvent,
   ExecutionOutputEvent,
   AgentOutputBuffer,
+  HybridMode,
+  EnvironmentConfig,
+  loadEnvironmentConfig,
 } from '@jetpack-agent/shared';
 import { RuntimeManager } from './RuntimeManager';
 
@@ -120,6 +128,15 @@ export interface JetpackConfig {
     /** Interval for periodic work polling in ms (default: 30 seconds) */
     workPollingIntervalMs?: number;
   };
+  /** Hybrid/edge mode settings for distributed execution */
+  hybridSettings?: {
+    /** Execution mode: local, edge, or hybrid */
+    mode?: HybridMode;
+    /** Cloudflare Worker API URL (required for edge/hybrid modes) */
+    cloudflareUrl?: string;
+    /** API token for authenticating with Cloudflare Worker */
+    apiToken?: string;
+  };
 }
 
 export interface AgentRegistryEntry {
@@ -165,12 +182,41 @@ export class JetpackOrchestrator extends EventEmitter {
   private memoryMonitorInterval?: NodeJS.Timeout;
   /** Memory leak fix: Track last heap warning time to avoid spam */
   private lastMemoryWarningTime: number = 0;
+  /** Environment configuration loaded from .env and process.env */
+  private _envConfig: EnvironmentConfig;
 
   constructor(private config: JetpackConfig) {
     super();
     this.logger = new Logger('Jetpack');
-    this.workDir = config.workDir;
+
+    // Load environment configuration from .env file and process.env
+    // Environment variables are loaded via dotenv at module initialization
+    this._envConfig = loadEnvironmentConfig();
+
+    // Apply environment config: workDir from env if not provided in config
+    this.workDir = config.workDir || this._envConfig.workDir || process.cwd();
+
+    // Apply hybrid settings from environment if not explicitly provided
+    if (this._envConfig.mode !== 'local' && !config.hybridSettings?.mode) {
+      this.config = {
+        ...config,
+        hybridSettings: {
+          mode: this._envConfig.mode,
+          cloudflareUrl: this._envConfig.cloudflareApiUrl,
+          apiToken: this._envConfig.cloudflareApiToken,
+          ...config.hybridSettings,
+        },
+      };
+    }
+
     this._tuiMode = config.enableTuiMode ?? false;
+  }
+
+  /**
+   * Get the loaded environment configuration
+   */
+  get environmentConfig(): EnvironmentConfig {
+    return this._envConfig;
   }
 
   /**
