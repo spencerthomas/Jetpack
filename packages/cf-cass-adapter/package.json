@@ -1,0 +1,22 @@
+{
+  "name": "@jetpack-agent/cf-cass-adapter",
+  "version": "0.1.0",
+  "description": "Cloudflare D1+Vectorize-based memory storage adapter for Jetpack",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@jetpack-agent/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241230.0",
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "@cloudflare/workers-types": "^4.0.0"
+  }
+}

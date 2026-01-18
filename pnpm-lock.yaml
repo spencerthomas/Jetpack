@@ -203,6 +203,45 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@22.19.3)
 
+  packages/cf-beads-adapter:
+    dependencies:
+      '@jetpack-agent/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20241230.0
+        version: 4.20260118.0
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
+  packages/cf-cass-adapter:
+    dependencies:
+      '@jetpack-agent/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20241230.0
+        version: 4.20260118.0
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
+  packages/cf-mail-adapter:
+    dependencies:
+      '@jetpack-agent/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20241230.0
+        version: 4.20260118.0
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/cli-tui:
     dependencies:
       '@jetpack-agent/orchestrator':
@@ -238,16 +277,16 @@ importers:
         version: 0.1.1(ws@8.19.0)
       '@jetpack-agent/cli-tui':
         specifier: ^0.1.1
-        version: 0.1.1(@jetpack-agent/orchestrator@0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76)))(@types/react@19.2.7)
+        version: 0.1.1(@jetpack-agent/orchestrator@0.1.1(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76)))(@types/react@19.2.7)
       '@jetpack-agent/mcp-mail-adapter':
         specifier: ^0.1.1
         version: 0.1.1
       '@jetpack-agent/mcp-server':
         specifier: ^0.1.1
-        version: 0.1.1(@cfworker/json-schema@4.1.1)(hono@4.11.4)
+        version: 0.1.1(@cfworker/json-schema@4.1.1)
       '@jetpack-agent/orchestrator':
         specifier: ^0.1.1
-        version: 0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
+        version: 0.1.1(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
       '@jetpack-agent/quality-adapter':
         specifier: ^0.1.1
         version: 0.1.1
@@ -256,7 +295,7 @@ importers:
         version: 0.1.1
       '@jetpack-agent/supervisor':
         specifier: ^0.1.1
-        version: 0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
+        version: 0.1.1(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
     devDependencies:
       typescript:
         specifier: ^5.7.2
@@ -446,6 +485,9 @@ packages:
 
   '@cfworker/json-schema@4.1.1':
     resolution: {integrity: sha512-gAmrUZSGtKc3AiBL71iNWxDsyUC5uMaKKGdvzYsBoTW/xi42JQHl7eKV2OYzCUqvc+D2RCcf7EXY2iCyFIk6og==}
+
+  '@cloudflare/workers-types@4.20260118.0':
+    resolution: {integrity: sha512-t+2Q421kAQqwBzMUDvgg2flp8zFVxOpiAyZPbyNcnPxMDHf0z3B7LqBIVQawwI6ntZinbk9f4oUmaA5bGeYwlg==}
 
   '@dnd-kit/accessibility@3.1.1':
     resolution: {integrity: sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw==}
@@ -2989,6 +3031,8 @@ snapshots:
 
   '@cfworker/json-schema@4.1.1': {}
 
+  '@cloudflare/workers-types@4.20260118.0': {}
+
   '@dnd-kit/accessibility@3.1.1(react@19.2.3)':
     dependencies:
       react: 19.2.3
@@ -3275,9 +3319,9 @@ snapshots:
       - encoding
       - ws
 
-  '@jetpack-agent/cli-tui@0.1.1(@jetpack-agent/orchestrator@0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76)))(@types/react@19.2.7)':
+  '@jetpack-agent/cli-tui@0.1.1(@jetpack-agent/orchestrator@0.1.1(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76)))(@types/react@19.2.7)':
     dependencies:
-      '@jetpack-agent/orchestrator': 0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
+      '@jetpack-agent/orchestrator': 0.1.1(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
       '@jetpack-agent/shared': 0.1.1
       ink: 5.2.1(@types/react@19.2.7)(react@18.3.1)
       react: 18.3.1
@@ -3294,7 +3338,7 @@ snapshots:
       eventemitter3: 5.0.1
       zod: 3.25.76
 
-  '@jetpack-agent/mcp-server@0.1.1(@cfworker/json-schema@4.1.1)(hono@4.11.4)':
+  '@jetpack-agent/mcp-server@0.1.1(@cfworker/json-schema@4.1.1)':
     dependencies:
       '@jetpack-agent/shared': 0.1.1
       '@modelcontextprotocol/sdk': 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)
@@ -3304,14 +3348,14 @@ snapshots:
       - hono
       - supports-color
 
-  '@jetpack-agent/orchestrator@0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))':
+  '@jetpack-agent/orchestrator@0.1.1(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))':
     dependencies:
       '@jetpack-agent/beads-adapter': 0.1.1
       '@jetpack-agent/cass-adapter': 0.1.1(ws@8.19.0)
       '@jetpack-agent/mcp-mail-adapter': 0.1.1
       '@jetpack-agent/quality-adapter': 0.1.1
       '@jetpack-agent/shared': 0.1.1
-      '@jetpack-agent/supervisor': 0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
+      '@jetpack-agent/supervisor': 0.1.1(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))
       zod: 3.25.76
     transitivePeerDependencies:
       - '@opentelemetry/api'
@@ -3335,7 +3379,7 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
-  '@jetpack-agent/supervisor@0.1.1(openai@4.104.0(ws@8.19.0)(zod@3.25.76))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))':
+  '@jetpack-agent/supervisor@0.1.1(react@18.3.1)(ws@8.19.0)(zod-to-json-schema@3.25.1(zod@3.25.76))':
     dependencies:
       '@jetpack-agent/beads-adapter': 0.1.1
       '@jetpack-agent/cass-adapter': 0.1.1(ws@8.19.0)
@@ -3343,7 +3387,7 @@ snapshots:
       '@jetpack-agent/shared': 0.1.1
       '@langchain/anthropic': 0.3.34(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(zod@3.25.76)
       '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
-      '@langchain/langgraph': 0.2.74(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@3.25.76))
+      '@langchain/langgraph': 0.2.74(@langchain/core@0.3.80)(react@18.3.1)(zod-to-json-schema@3.25.1(zod@3.25.76))
       '@langchain/openai': 0.3.17(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(ws@8.19.0)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -3413,17 +3457,6 @@ snapshots:
       '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
       uuid: 10.0.0
 
-  '@langchain/langgraph-sdk@0.0.112(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@types/json-schema': 7.0.15
-      p-queue: 6.6.2
-      p-retry: 4.6.2
-      uuid: 9.0.1
-    optionalDependencies:
-      '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
-      react: 18.3.1
-      react-dom: 19.2.3(react@18.3.1)
-
   '@langchain/langgraph-sdk@0.0.112(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@types/json-schema': 7.0.15
@@ -3435,11 +3468,21 @@ snapshots:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
 
-  '@langchain/langgraph@0.2.74(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)(zod-to-json-schema@3.25.1(zod@3.25.76))':
+  '@langchain/langgraph-sdk@0.0.112(@langchain/core@0.3.80)(react@18.3.1)':
+    dependencies:
+      '@types/json-schema': 7.0.15
+      p-queue: 6.6.2
+      p-retry: 4.6.2
+      uuid: 9.0.1
+    optionalDependencies:
+      '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
+      react: 18.3.1
+
+  '@langchain/langgraph@0.2.74(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod-to-json-schema@3.25.1(zod@3.25.76))':
     dependencies:
       '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
       '@langchain/langgraph-checkpoint': 0.0.18(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))
-      '@langchain/langgraph-sdk': 0.0.112(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@18.3.1))(react@18.3.1)
+      '@langchain/langgraph-sdk': 0.0.112(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       uuid: 10.0.0
       zod: 3.25.76
     optionalDependencies:
@@ -3448,11 +3491,11 @@ snapshots:
       - react
       - react-dom
 
-  '@langchain/langgraph@0.2.74(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod-to-json-schema@3.25.1(zod@3.25.76))':
+  '@langchain/langgraph@0.2.74(@langchain/core@0.3.80)(react@18.3.1)(zod-to-json-schema@3.25.1(zod@3.25.76))':
     dependencies:
       '@langchain/core': 0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76))
       '@langchain/langgraph-checkpoint': 0.0.18(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))
-      '@langchain/langgraph-sdk': 0.0.112(@langchain/core@0.3.80(openai@4.104.0(ws@8.19.0)(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@langchain/langgraph-sdk': 0.0.112(@langchain/core@0.3.80)(react@18.3.1)
       uuid: 10.0.0
       zod: 3.25.76
     optionalDependencies:
@@ -4929,12 +4972,6 @@ snapshots:
       ini: 1.3.8
       minimist: 1.2.8
       strip-json-comments: 2.0.1
-
-  react-dom@19.2.3(react@18.3.1):
-    dependencies:
-      react: 18.3.1
-      scheduler: 0.27.0
-    optional: true
 
   react-dom@19.2.3(react@19.2.3):
     dependencies:
