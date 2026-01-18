@@ -103,6 +103,9 @@ export class CASSAdapter implements MemoryStore {
     const count = this.getCount();
     if (count > this.config.maxEntries) {
       await this.compact(this.config.compactionThreshold);
+    } else {
+      // Memory leak fix: Also try adaptive compaction at 80% capacity
+      await this.adaptiveCompact();
     }
 
     return id;
@@ -140,21 +143,52 @@ export class CASSAdapter implements MemoryStore {
   }
 
   async semanticSearch(embedding: number[], limit: number = 10): Promise<MemoryEntry[]> {
-    // For semantic search, we'd normally use vector similarity (cosine, dot product)
-    // Here's a simple implementation that computes cosine similarity
-    const allStmt = this.db.prepare('SELECT * FROM memories WHERE embedding IS NOT NULL');
-    const rows = allStmt.all() as any[];
+    // Memory leak fix: Use batched iteration instead of loading all embeddings at once
+    // This keeps only top-K results in memory during search
+    const BATCH_SIZE = 100;
 
-    const results = rows.map(row => {
-      const storedEmbedding = JSON.parse(row.embedding) as number[];
-      const similarity = this.cosineSimilarity(embedding, storedEmbedding);
-      return { row, similarity };
-    });
+    // Get total count first
+    const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM memories WHERE embedding IS NOT NULL');
+    const totalCount = (countStmt.get() as any).count;
 
-    // Sort by similarity descending
-    results.sort((a, b) => b.similarity - a.similarity);
+    if (totalCount === 0) {
+      return [];
+    }
 
-    return results.slice(0, limit).map(r => this.rowToMemoryEntry(r.row));
+    // Use a min-heap-like structure: keep only top `limit` results
+    // Each item: { row, similarity }
+    const topResults: Array<{ row: any; similarity: number }> = [];
+
+    // Process in batches to avoid loading everything at once
+    const batchStmt = this.db.prepare(
+      'SELECT * FROM memories WHERE embedding IS NOT NULL LIMIT ? OFFSET ?'
+    );
+
+    let offset = 0;
+    while (offset < totalCount) {
+      const batch = batchStmt.all(BATCH_SIZE, offset) as any[];
+
+      for (const row of batch) {
+        const storedEmbedding = JSON.parse(row.embedding) as number[];
+        const similarity = this.cosineSimilarity(embedding, storedEmbedding);
+
+        // If we haven't filled the results yet, just add
+        if (topResults.length < limit) {
+          topResults.push({ row, similarity });
+          // Keep sorted so we know the minimum quickly
+          topResults.sort((a, b) => b.similarity - a.similarity);
+        } else if (similarity > topResults[topResults.length - 1].similarity) {
+          // Replace the lowest similarity if this one is better
+          topResults[topResults.length - 1] = { row, similarity };
+          // Re-sort to maintain order
+          topResults.sort((a, b) => b.similarity - a.similarity);
+        }
+      }
+
+      offset += BATCH_SIZE;
+    }
+
+    return topResults.map(r => this.rowToMemoryEntry(r.row));
   }
 
   /**
@@ -334,6 +368,63 @@ export class CASSAdapter implements MemoryStore {
       this.logger.info(`Compacted ${removed} low-importance memories`);
     }
 
+    return removed;
+  }
+
+  /**
+   * Memory leak fix: Adaptive compaction - triggers when at 80% capacity
+   * Removes the bottom 20% by importance
+   */
+  async adaptiveCompact(): Promise<number> {
+    const count = this.getCount();
+    const threshold80Percent = Math.floor(this.config.maxEntries * 0.8);
+
+    if (count < threshold80Percent) {
+      return 0; // Not at capacity yet
+    }
+
+    this.logger.info(`Memory at ${Math.round(count / this.config.maxEntries * 100)}% capacity, triggering adaptive compaction`);
+
+    // Calculate how many to remove (bottom 20%)
+    const targetCount = Math.floor(this.config.maxEntries * 0.8);
+    const toRemove = count - targetCount;
+
+    if (toRemove <= 0) {
+      return 0;
+    }
+
+    // Find the importance threshold that will remove approximately `toRemove` entries
+    // Get the Nth lowest importance where N = toRemove
+    const thresholdStmt = this.db.prepare(`
+      SELECT importance FROM memories
+      WHERE type != 'codebase_knowledge'
+      ORDER BY importance ASC
+      LIMIT 1 OFFSET ?
+    `);
+
+    const thresholdRow = thresholdStmt.get(toRemove) as { importance: number } | undefined;
+    if (!thresholdRow) {
+      // Not enough non-protected entries to remove
+      return 0;
+    }
+
+    const importanceThreshold = thresholdRow.importance;
+
+    // Delete all entries below or at this threshold (capped by count)
+    const deleteStmt = this.db.prepare(`
+      DELETE FROM memories
+      WHERE id IN (
+        SELECT id FROM memories
+        WHERE importance <= ? AND type != 'codebase_knowledge'
+        ORDER BY importance ASC
+        LIMIT ?
+      )
+    `);
+
+    const result = deleteStmt.run(importanceThreshold, toRemove);
+    const removed = result.changes;
+
+    this.logger.info(`Adaptive compaction removed ${removed} low-importance memories`);
     return removed;
   }
 

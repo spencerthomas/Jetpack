@@ -36,6 +36,8 @@ export interface ExecutorConfig {
   maxTimeoutMs?: number;
   /** Enable TDD-biased system prompt (default: true) - Enhancement 6 */
   enableTddPrompt?: boolean;
+  /** Maximum output size in bytes before truncation (default: 10MB) - Memory leak fix */
+  maxOutputSize?: number;
 }
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (fallback for tasks without estimates)
@@ -44,6 +46,8 @@ const DEFAULT_GRACEFUL_SHUTDOWN_MS = 30 * 1000; // 30 seconds (BUG-7 FIX: increa
 const DEFAULT_TIMEOUT_MULTIPLIER = 2.0; // Task gets 2x estimated time
 const DEFAULT_MIN_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes minimum
 const DEFAULT_MAX_TIMEOUT_MS = 120 * 60 * 1000; // 2 hours maximum
+// Memory leak fix: Maximum output size before truncation
+const DEFAULT_MAX_OUTPUT_SIZE = 10 * 1024 * 1024; // 10MB
 
 export class ClaudeCodeExecutor extends EventEmitter {
   private logger: Logger;
@@ -62,6 +66,8 @@ export class ClaudeCodeExecutor extends EventEmitter {
   private maxTimeoutMs: number;
   // Enhancement 6: TDD-biased prompt
   private enableTddPrompt: boolean;
+  // Memory leak fix: Bounded output
+  private maxOutputSize: number;
 
   constructor(workDir: string, config: ExecutorConfig = {}) {
     super();
@@ -75,6 +81,8 @@ export class ClaudeCodeExecutor extends EventEmitter {
     this.maxTimeoutMs = config.maxTimeoutMs ?? DEFAULT_MAX_TIMEOUT_MS;
     // Enhancement 6: TDD-biased prompt (enabled by default)
     this.enableTddPrompt = config.enableTddPrompt ?? true;
+    // Memory leak fix: Bounded output size
+    this.maxOutputSize = config.maxOutputSize ?? DEFAULT_MAX_OUTPUT_SIZE;
     this.logger = new Logger('ClaudeCodeExecutor');
   }
 
@@ -177,6 +185,9 @@ export class ClaudeCodeExecutor extends EventEmitter {
         duration,
         timedOut,
       };
+    } finally {
+      // Memory leak fix: Clear context reference after execution
+      this.currentContext = undefined;
     }
   }
 
@@ -296,10 +307,27 @@ When done, provide a brief summary of what you accomplished.
 
       let stdout = '';
       let stderr = '';
+      let outputTruncated = false;
+
+      // Memory leak fix: Helper to append with size limit
+      const appendWithLimit = (buffer: string, chunk: string, maxSize: number): string => {
+        const newBuffer = buffer + chunk;
+        if (newBuffer.length > maxSize) {
+          // Truncate from the beginning, keeping the newest output
+          const truncatePoint = newBuffer.length - maxSize;
+          if (!outputTruncated) {
+            outputTruncated = true;
+            this.logger.warn(`Output exceeded ${maxSize} bytes, truncating older content`);
+          }
+          return '[...truncated...]\n' + newBuffer.slice(truncatePoint);
+        }
+        return newBuffer;
+      };
 
       this.currentProcess.stdout?.on('data', (data) => {
         const chunk = data.toString();
-        stdout += chunk;
+        // Memory leak fix: Bound stdout size
+        stdout = appendWithLimit(stdout, chunk, this.maxOutputSize);
 
         // Emit output event for TUI if enabled
         if (this.emitOutputEvents && this.currentContext) {
@@ -321,7 +349,8 @@ When done, provide a brief summary of what you accomplished.
 
       this.currentProcess.stderr?.on('data', (data) => {
         const chunk = data.toString();
-        stderr += chunk;
+        // Memory leak fix: Bound stderr size
+        stderr = appendWithLimit(stderr, chunk, this.maxOutputSize);
 
         // Emit output event for TUI if enabled
         if (this.emitOutputEvents && this.currentContext) {
@@ -448,5 +477,29 @@ When done, provide a brief summary of what you accomplished.
    */
   isExecuting(): boolean {
     return this.currentProcess !== undefined;
+  }
+
+  /**
+   * Memory leak fix: Clean up all resources and listeners
+   * Call this when the executor is no longer needed
+   */
+  destroy(): void {
+    this.logger.debug('Destroying ClaudeCodeExecutor');
+
+    // Abort any running process
+    if (this.currentProcess) {
+      this.forceKill();
+    }
+
+    // Clear all timeouts
+    this.clearTimeouts();
+
+    // Clear context reference
+    this.currentContext = undefined;
+
+    // Remove all EventEmitter listeners
+    this.removeAllListeners();
+
+    this.logger.debug('ClaudeCodeExecutor destroyed');
   }
 }

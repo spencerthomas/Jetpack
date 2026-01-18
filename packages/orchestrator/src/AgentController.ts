@@ -76,6 +76,11 @@ export class AgentController {
   private workDir: string;
   private config: AgentControllerConfig;
   private stats: AgentStats;
+  // Memory leak fix: Store bound handlers for cleanup
+  private boundTaskCreatedHandler?: (message: Message) => Promise<void>;
+  private boundTaskUpdatedHandler?: (message: Message) => Promise<void>;
+  private boundTaskAssignedHandler?: (message: Message) => Promise<void>;
+  private boundOutputHandler?: (event: ExecutionOutputEvent) => void;
 
   constructor(
     config: AgentControllerConfig,
@@ -92,8 +97,10 @@ export class AgentController {
     });
 
     // Forward executor output events to config callback
+    // Memory leak fix: Store reference for cleanup
     if (config.onOutput) {
-      this.executor.on('output', config.onOutput);
+      this.boundOutputHandler = config.onOutput;
+      this.executor.on('output', this.boundOutputHandler);
     }
 
     this.agent = {
@@ -137,9 +144,13 @@ export class AgentController {
     this.stats.startTime = new Date();
 
     // Subscribe to task broadcasts
-    this.mail.subscribe('task.created', this.handleTaskCreated.bind(this));
-    this.mail.subscribe('task.updated', this.handleTaskUpdated.bind(this));
-    this.mail.subscribe('task.assigned', this.handleTaskAssigned.bind(this));
+    // Memory leak fix: Store bound handlers for cleanup
+    this.boundTaskCreatedHandler = this.handleTaskCreated.bind(this);
+    this.boundTaskUpdatedHandler = this.handleTaskUpdated.bind(this);
+    this.boundTaskAssignedHandler = this.handleTaskAssigned.bind(this);
+    this.mail.subscribe('task.created', this.boundTaskCreatedHandler);
+    this.mail.subscribe('task.updated', this.boundTaskUpdatedHandler);
+    this.mail.subscribe('task.assigned', this.boundTaskAssignedHandler);
 
     // Start heartbeat
     this.heartbeatInterval = setInterval(() => {
@@ -191,10 +202,12 @@ export class AgentController {
 
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = undefined;
     }
 
     if (this.statusInterval) {
       clearInterval(this.statusInterval);
+      this.statusInterval = undefined;
     }
 
     // BUG-5 FIX: Clear work polling timer
@@ -202,6 +215,31 @@ export class AgentController {
       clearInterval(this.workPollingTimer);
       this.workPollingTimer = undefined;
     }
+
+    // Memory leak fix: Unsubscribe from mail topics
+    if (this.boundTaskCreatedHandler) {
+      this.mail.unsubscribe('task.created', this.boundTaskCreatedHandler);
+      this.boundTaskCreatedHandler = undefined;
+    }
+    if (this.boundTaskUpdatedHandler) {
+      this.mail.unsubscribe('task.updated', this.boundTaskUpdatedHandler);
+      this.boundTaskUpdatedHandler = undefined;
+    }
+    if (this.boundTaskAssignedHandler) {
+      this.mail.unsubscribe('task.assigned', this.boundTaskAssignedHandler);
+      this.boundTaskAssignedHandler = undefined;
+    }
+
+    // Memory leak fix: Remove executor output listener and destroy
+    if (this.boundOutputHandler) {
+      this.executor.off('output', this.boundOutputHandler);
+      this.boundOutputHandler = undefined;
+    }
+    this.executor.destroy();
+
+    // Memory leak fix: Clear current task reference
+    this.currentTask = undefined;
+    this.currentTaskStartTime = undefined;
 
     // Announce shutdown
     await this.mail.publish({

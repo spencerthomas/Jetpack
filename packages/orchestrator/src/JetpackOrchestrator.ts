@@ -142,6 +142,10 @@ export class JetpackOrchestrator extends EventEmitter {
   private regressionDetector?: RegressionDetector;
   /** Standalone mail adapter for broadcasting (works even without agents) */
   private broadcastMail?: MCPMailAdapter;
+  /** Memory leak fix: Memory monitoring interval */
+  private memoryMonitorInterval?: NodeJS.Timeout;
+  /** Memory leak fix: Track last heap warning time to avoid spam */
+  private lastMemoryWarningTime: number = 0;
 
   constructor(private config: JetpackConfig) {
     super();
@@ -165,6 +169,143 @@ export class JetpackOrchestrator extends EventEmitter {
   }
 
   /**
+   * Memory leak fix: Clear output buffer for a specific agent
+   * Call this when an agent stops or task changes
+   */
+  clearAgentBuffer(agentId: string): void {
+    const buffer = this._agentOutputBuffers.get(agentId);
+    if (buffer) {
+      buffer.lines = [];
+      buffer.currentTaskId = undefined;
+      buffer.currentTaskTitle = undefined;
+      this.logger.debug(`Cleared output buffer for agent ${agentId}`);
+    }
+  }
+
+  /**
+   * Memory leak fix: Clear all agent output buffers
+   */
+  clearAllAgentBuffers(): void {
+    for (const agentId of this._agentOutputBuffers.keys()) {
+      this.clearAgentBuffer(agentId);
+    }
+    this._agentOutputBuffers.clear();
+    this.logger.debug('Cleared all agent output buffers');
+  }
+
+  /**
+   * Memory leak fix: Start periodic memory monitoring
+   * Logs heap usage and triggers cleanup at high memory pressure
+   */
+  private startMemoryMonitoring(): void {
+    const MONITOR_INTERVAL_MS = 60000; // Check every minute
+    const HEAP_WARNING_THRESHOLD = 0.8; // 80% of max heap
+    const HEAP_CRITICAL_THRESHOLD = 0.9; // 90% of max heap
+    const WARNING_COOLDOWN_MS = 300000; // 5 minutes between warnings
+
+    this.memoryMonitorInterval = setInterval(() => {
+      const memUsage = process.memoryUsage();
+      const heapUsed = memUsage.heapUsed;
+      const heapTotal = memUsage.heapTotal;
+      const heapUsedMB = Math.round(heapUsed / 1024 / 1024);
+      const heapTotalMB = Math.round(heapTotal / 1024 / 1024);
+      const heapPercent = heapUsed / heapTotal;
+
+      // Log memory stats periodically (debug level)
+      this.logger.debug(`Memory: ${heapUsedMB}MB / ${heapTotalMB}MB (${Math.round(heapPercent * 100)}%)`);
+
+      const now = Date.now();
+
+      if (heapPercent >= HEAP_CRITICAL_THRESHOLD) {
+        // Critical: trigger aggressive cleanup
+        this.logger.warn(`CRITICAL: Heap at ${Math.round(heapPercent * 100)}%, triggering memory cleanup`);
+        this.triggerMemoryCleanup('critical');
+        this.lastMemoryWarningTime = now;
+      } else if (heapPercent >= HEAP_WARNING_THRESHOLD) {
+        // Warning: log and trigger mild cleanup
+        if (now - this.lastMemoryWarningTime > WARNING_COOLDOWN_MS) {
+          this.logger.warn(`WARNING: Heap at ${Math.round(heapPercent * 100)}%, monitoring closely`);
+          this.triggerMemoryCleanup('warning');
+          this.lastMemoryWarningTime = now;
+        }
+      }
+
+      // Emit memory event for TUI
+      this.emit('memoryUsage', {
+        heapUsedMB,
+        heapTotalMB,
+        heapPercent: Math.round(heapPercent * 100),
+        rssMB: Math.round(memUsage.rss / 1024 / 1024),
+        externalMB: Math.round(memUsage.external / 1024 / 1024),
+      });
+    }, MONITOR_INTERVAL_MS);
+
+    this.logger.info('Memory monitoring started');
+  }
+
+  /**
+   * Memory leak fix: Stop memory monitoring
+   */
+  private stopMemoryMonitoring(): void {
+    if (this.memoryMonitorInterval) {
+      clearInterval(this.memoryMonitorInterval);
+      this.memoryMonitorInterval = undefined;
+      this.logger.debug('Memory monitoring stopped');
+    }
+  }
+
+  /**
+   * Memory leak fix: Trigger memory cleanup based on severity
+   */
+  private async triggerMemoryCleanup(level: 'warning' | 'critical'): Promise<void> {
+    this.logger.info(`Triggering ${level} memory cleanup`);
+
+    // Always clear agent output buffers (they can be rebuilt)
+    this.clearAllAgentBuffers();
+
+    // Trigger CASS adaptive compaction
+    if (this.cass) {
+      try {
+        const removed = await this.cass.adaptiveCompact();
+        if (removed > 0) {
+          this.logger.info(`Memory cleanup: CASS removed ${removed} entries`);
+        }
+      } catch (error) {
+        this.logger.error('Failed to run CASS adaptive compaction:', error);
+      }
+    }
+
+    // Request garbage collection if available (Node.js --expose-gc flag)
+    if (global.gc) {
+      this.logger.debug('Requesting garbage collection');
+      global.gc();
+    }
+
+    // Emit cleanup event
+    this.emit('memoryCleanup', { level });
+  }
+
+  /**
+   * Get current memory usage statistics
+   */
+  getMemoryStats(): {
+    heapUsedMB: number;
+    heapTotalMB: number;
+    heapPercent: number;
+    rssMB: number;
+    externalMB: number;
+  } {
+    const memUsage = process.memoryUsage();
+    return {
+      heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+      heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+      heapPercent: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100),
+      rssMB: Math.round(memUsage.rss / 1024 / 1024),
+      externalMB: Math.round(memUsage.external / 1024 / 1024),
+    };
+  }
+
+  /**
    * Handle output event from an agent
    */
   private handleAgentOutput(event: ExecutionOutputEvent): void {
@@ -180,6 +321,12 @@ export class JetpackOrchestrator extends EventEmitter {
         maxLines: 100,
       };
       this._agentOutputBuffers.set(event.agentId, buffer);
+    }
+
+    // Memory leak fix: Clear buffer when task changes
+    if (buffer.currentTaskId && buffer.currentTaskId !== event.taskId) {
+      this.logger.debug(`Task changed for agent ${event.agentId}, clearing buffer`);
+      buffer.lines = [];
     }
 
     // Update current task info
@@ -419,6 +566,9 @@ export class JetpackOrchestrator extends EventEmitter {
     await this.writeAgentRegistry();
     this.startRegistryUpdates();
 
+    // Memory leak fix: Start memory monitoring
+    this.startMemoryMonitoring();
+
     // Start watching for task files
     await this.startTaskFileWatcher();
   }
@@ -535,6 +685,9 @@ export class JetpackOrchestrator extends EventEmitter {
     this.agentTasksCompleted.clear();
     this.agentStartTimes.clear();
 
+    // Memory leak fix: Clear all agent output buffers
+    this.clearAllAgentBuffers();
+
     // Clear the registry file
     await this.clearAgentRegistry();
 
@@ -639,6 +792,9 @@ export class JetpackOrchestrator extends EventEmitter {
     if (this.runtimeManager?.isRunning()) {
       await this.runtimeManager.stop('manual_stop');
     }
+
+    // Memory leak fix: Stop memory monitoring
+    this.stopMemoryMonitoring();
 
     // Stop file watcher
     this.stopTaskFileWatcher();
