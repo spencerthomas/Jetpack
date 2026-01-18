@@ -1,6 +1,6 @@
 {
   "name": "@jetpack-agent/mcp-mail-adapter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Inter-agent pub/sub messaging and file leasing for Jetpack",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

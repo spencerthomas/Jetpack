@@ -1,6 +1,6 @@
 {
   "name": "@jetpack-agent/orchestrator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Multi-agent orchestration engine for Jetpack swarm development",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

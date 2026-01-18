@@ -1,6 +1,6 @@
 {
   "name": "@jetpack-agent/cass-adapter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "SQLite-based persistent agent memory for Jetpack (CASS - Claude Agent Storage System)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

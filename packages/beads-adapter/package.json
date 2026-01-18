@@ -1,6 +1,6 @@
 {
   "name": "@jetpack-agent/beads-adapter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Git-backed task management adapter for Jetpack (Steve Yegge's Beads system)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

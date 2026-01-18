@@ -1,6 +1,6 @@
 {
   "name": "@jetpack-agent/quality-adapter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Quality metrics tracking and regression detection for Jetpack",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
