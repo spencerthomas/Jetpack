@@ -170,6 +170,7 @@ CREATE TABLE memories (
   content TEXT NOT NULL,
   importance REAL NOT NULL DEFAULT 0.5,
   metadata TEXT, -- JSON
+  has_embedding INTEGER DEFAULT 0, -- 1 if embedding stored in Vectorize
   created_at INTEGER NOT NULL,
   last_accessed INTEGER NOT NULL,
   access_count INTEGER DEFAULT 0
@@ -177,6 +178,8 @@ CREATE TABLE memories (
 
 CREATE INDEX idx_memories_type ON memories(type);
 CREATE INDEX idx_memories_importance ON memories(importance);
+CREATE INDEX idx_memories_created_at ON memories(created_at);
+CREATE INDEX idx_memories_last_accessed ON memories(last_accessed);
 ```
 
 ### Vectorize Index
@@ -240,21 +243,64 @@ export class LeaseDO {
 }
 ```
 
+## Implementation Status
+
+### Packages Created
+
+| Package | Class | Backend | Status |
+|---------|-------|---------|--------|
+| `@jetpack-agent/shared` | `ITaskStore`, `IMailBus`, `IMemoryStore` | Interfaces | ✅ Complete |
+| `@jetpack-agent/beads-adapter` | `BeadsAdapter` | Local SQLite | ✅ Implements ITaskStore |
+| `@jetpack-agent/mcp-mail-adapter` | `MCPMailAdapter` | Local file-based | ✅ Implements IMailBus |
+| `@jetpack-agent/cass-adapter` | `CASSAdapter` | Local SQLite | ✅ Implements IMemoryStore |
+| `@jetpack-agent/cf-beads-adapter` | `CloudflareTaskStore` | Cloudflare D1 | ✅ Complete |
+| `@jetpack-agent/cf-mail-adapter` | `CloudflareMailBus` | Durable Objects | ✅ Complete |
+| `@jetpack-agent/cf-cass-adapter` | `CloudflareMemoryStore` | D1 + Vectorize | ✅ Complete |
+
+### Usage Examples
+
+```typescript
+// Local mode (default)
+import { BeadsAdapter } from '@jetpack-agent/beads-adapter';
+import { MCPMailAdapter } from '@jetpack-agent/mcp-mail-adapter';
+import { CASSAdapter } from '@jetpack-agent/cass-adapter';
+
+const taskStore = new BeadsAdapter({ dbPath: '.beads/beads.db' });
+const mailBus = new MCPMailAdapter({ agentId: 'agent-1', mailDir: '.mail' });
+const memoryStore = new CASSAdapter({ dbPath: '.cass/memories.db' });
+
+// Edge mode (Cloudflare Workers)
+import { CloudflareTaskStore } from '@jetpack-agent/cf-beads-adapter';
+import { CloudflareMailBus } from '@jetpack-agent/cf-mail-adapter';
+import { CloudflareMemoryStore } from '@jetpack-agent/cf-cass-adapter';
+
+const taskStore = new CloudflareTaskStore({ db: env.D1_DATABASE });
+const mailBus = new CloudflareMailBus({
+  agentId: 'agent-1',
+  mailboxDO: env.MAILBOX_DO,
+  leaseDO: env.LEASE_DO,
+});
+const memoryStore = new CloudflareMemoryStore({
+  db: env.D1_DATABASE,
+  vectorize: env.VECTORIZE_INDEX,
+});
+```
+
 ## Migration Strategy
 
-### Phase 1: Interface Abstraction
-1. Define abstract interfaces for all adapters
-2. Refactor existing adapters to implement interfaces
-3. Update JetpackOrchestrator to use interfaces
-4. Tests pass with local adapters
+### Phase 1: Interface Abstraction ✅ COMPLETE
+1. ✅ Define abstract interfaces for all adapters
+2. ✅ Refactor existing adapters to implement interfaces
+3. ✅ Update shared package exports
+4. ✅ Tests pass with local adapters
 
-### Phase 2: Cloudflare Adapters
-1. Create cf-beads-adapter package
-2. Create cf-mail-adapter package
-3. Create cf-cass-adapter package
-4. Deploy Worker + D1 + Durable Objects
+### Phase 2: Cloudflare Adapters ✅ COMPLETE
+1. ✅ Create cf-beads-adapter package (CloudflareTaskStore)
+2. ✅ Create cf-mail-adapter package (CloudflareMailBus, MailboxDurableObject, LeaseDurableObject)
+3. ✅ Create cf-cass-adapter package (CloudflareMemoryStore)
+4. ⏳ Deploy Worker + D1 + Durable Objects
 
-### Phase 3: Hybrid Mode
+### Phase 3: Hybrid Mode (Next)
 1. Add configuration for adapter selection
 2. Support mixed mode (some local, some cloud)
 3. Add sync between local and cloud states
