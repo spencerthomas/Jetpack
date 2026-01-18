@@ -175,6 +175,41 @@ const jetpack = new JetpackOrchestrator({
 });
 ```
 
+### Runtime Modes & Settings
+
+Jetpack supports four runtime modes for autonomous long-running operation:
+
+```typescript
+// packages/shared/src/types/settings.ts
+const RuntimeSettings = {
+  mode: 'infinite' | 'idle-pause' | 'objective-based' | 'iteration-limit',
+  maxIterations: 100,           // For iteration-limit mode
+  idleTimeoutMs: 300000,        // For idle-pause mode (5 min)
+  objective: 'Complete auth',   // For objective-based mode
+  objectiveCheckIntervalMs: 60000,
+};
+
+const AgentSettings = {
+  workPollingIntervalMs: 30000,  // BUG-5 fix: poll every 30s
+  timeoutMultiplier: 2.0,        // BUG-6 fix: 2x estimated time
+  minTimeoutMs: 300000,          // 5 min minimum
+  maxTimeoutMs: 7200000,         // 2 hour maximum
+  gracefulShutdownMs: 30000,     // BUG-7 fix: 30s graceful shutdown
+};
+```
+
+**Usage:**
+```bash
+# Configure via settings UI
+open http://localhost:3002/settings
+
+# Or programmatically
+const jetpack = new JetpackOrchestrator({
+  runtimeSettings: { mode: 'infinite' },
+  agentSettings: { workPollingIntervalMs: 15000 },
+});
+```
+
 ### Dynamic Skills Marketplace
 
 Skills are auto-detected from the codebase and agents can acquire skills at runtime:

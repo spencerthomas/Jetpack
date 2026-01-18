@@ -226,6 +226,29 @@ jetpack demo --agents 5
 jetpack supervise "Build user authentication" --agents 5
 ```
 
+### Runtime Modes
+
+Jetpack supports four runtime modes for autonomous operation:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `infinite` | Never stops, runs continuously | Long-running dev environments |
+| `idle-pause` | Pauses when no work, resumes on new tasks | Interactive development |
+| `objective-based` | Runs until objective achieved (LLM-evaluated) | Goal-oriented sprints |
+| `iteration-limit` | Stops after N iterations (default: 100) | Bounded execution |
+
+Configure via settings UI at http://localhost:3002/settings or programmatically:
+
+```typescript
+const jetpack = new JetpackOrchestrator({
+  runtimeSettings: {
+    mode: 'objective-based',
+    objective: 'Complete the authentication system with tests',
+    objectiveCheckIntervalMs: 60000,
+  },
+});
+```
+
 ---
 
 ## 🔗 Claude Code Integration (MCP Server)
@@ -1214,6 +1237,15 @@ const jetpack = new JetpackOrchestrator({
 - [x] **Semantic Search for CASS** - Vector embedding-based memory retrieval
 - [x] **Quality Metrics Integration** - Regression detection and quality snapshots
 - [x] **Message Acknowledgment** - Reliable delivery tracking for messages
+- [x] **Long-Running Autonomous Modes** - Infinite, idle-pause, objective-based, iteration-limit
+- [x] **Periodic Work Polling** - Agents poll every 30s to catch missed events (BUG-5 fix)
+- [x] **Dynamic Timeout Calculation** - 2x estimated time for complex tasks (BUG-6 fix)
+- [x] **Three-Stage Graceful Shutdown** - SIGINT → SIGTERM → SIGKILL (BUG-7 fix)
+- [x] **Browser Validator** - Playwright-based validation for UI tasks
+- [x] **TDD-Biased Agent Instructions** - Test-first guidance in prompts
+- [x] **Ollama LLM Support** - Local models via Ollama
+- [x] **Interactive Config Wizard** - Guided `jetpack init` setup
+- [x] **File Watching** - Drop `.md` files in `.beads/tasks/` to create tasks
 
 ### 🔜 Planned
 
@@ -1226,6 +1258,45 @@ const jetpack = new JetpackOrchestrator({
 - [ ] Cloud-hosted agent farm
 - [ ] GitHub Issues / Linear integration
 - [ ] Agent performance metrics and leaderboards
+
+## 🏆 Stress Test Showcase
+
+### Node Banana Multi-Agent Sprint (Jan 17, 2026)
+
+**Setup:**
+- 10 agents working in parallel
+- Node Banana visual workflow editor (Next.js, React Flow, Konva.js)
+- Tasks: Build 7 new node types, template gallery, undo/redo system
+
+**Results:**
+| Metric | Value |
+|--------|-------|
+| Tasks completed | 9/9 (100%) |
+| Failures | 0 |
+| Runtime | 1 hour |
+| Code generated | ~8,159 lines |
+| New files | 11 |
+
+**Tasks Completed:**
+| Task | Agent | Duration |
+|------|-------|----------|
+| Workflow Template Gallery | agent-7c8a80f7 | 10m |
+| Color Palette Extraction | agent-6ff3b3bd | 17m |
+| Undo/Redo System | agent-7c8a80f7 | 18m |
+| Batch Variations Node | agent-fd88f466 | 19m |
+| Loop/Iterator Node | agent-30f89159 | 19m |
+| Image Filter Effects | agent-eeddacd8 | 19m |
+| Image Comparison Node | agent-b4d76485 | 20m |
+| Conditional Branch Node | agent-7c8a80f7 | 20m |
+| Mask/Inpainting Node | agent-52904c0e | 23m |
+
+**Key Observations:**
+- File locking prevented conflicts between parallel agents
+- Dynamic timeout calculation allowed complex tasks to complete
+- Periodic work polling caught all tasks (no missed events)
+- Graceful shutdown preserved progress on termination
+
+---
 
 ## 📄 License
 
