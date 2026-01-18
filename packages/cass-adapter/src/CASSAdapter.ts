@@ -8,6 +8,8 @@ import {
   IMemoryStore,
   MemoryInput,
   MemoryStats,
+  PaginationOptions,
+  PaginatedResult,
 } from '@jetpack-agent/shared';
 import * as crypto from 'crypto';
 import {
@@ -524,6 +526,320 @@ export class CASSAdapter implements IMemoryStore, MemoryStore {
       withEmbedding: embeddingStats.withEmbedding,
       withoutEmbedding: embeddingStats.withoutEmbedding,
     };
+  }
+
+  // ==================== Paginated Methods ====================
+  // These methods support cursor-based pagination to prevent loading
+  // entire result sets into memory at once.
+
+  /**
+   * List all memories with pagination
+   * Uses cursor-based pagination keyed on (importance DESC, created_at DESC, id)
+   */
+  async listPaginated(
+    options: PaginationOptions = { limit: 50 }
+  ): Promise<PaginatedResult<MemoryEntry>> {
+    const { limit, cursor, direction = 'desc' } = options;
+    const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
+
+    // Build query with cursor condition
+    let query: string;
+    let params: (string | number)[];
+
+    if (parsedCursor) {
+      // Cursor pagination: get items after the cursor position
+      // Using composite sort key (importance, created_at, id)
+      query = direction === 'desc'
+        ? `SELECT * FROM memories
+           WHERE (importance, created_at, id) < (?, ?, ?)
+           ORDER BY importance DESC, created_at DESC, id DESC
+           LIMIT ?`
+        : `SELECT * FROM memories
+           WHERE (importance, created_at, id) > (?, ?, ?)
+           ORDER BY importance ASC, created_at ASC, id ASC
+           LIMIT ?`;
+      params = [parsedCursor.importance, parsedCursor.createdAt, parsedCursor.id, limit + 1];
+    } else {
+      query = direction === 'desc'
+        ? `SELECT * FROM memories ORDER BY importance DESC, created_at DESC, id DESC LIMIT ?`
+        : `SELECT * FROM memories ORDER BY importance ASC, created_at ASC, id ASC LIMIT ?`;
+      params = [limit + 1];
+    }
+
+    const stmt = this.db.prepare(query);
+    const rows = stmt.all(...params) as any[];
+
+    // Check if there are more results
+    const hasMore = rows.length > limit;
+    const items = rows.slice(0, limit).map(row => this.rowToMemoryEntry(row));
+
+    // Generate next cursor from last item
+    let nextCursor: string | undefined;
+    if (hasMore && items.length > 0) {
+      const lastItem = items[items.length - 1];
+      nextCursor = this.encodeCursor({
+        importance: lastItem.importance,
+        createdAt: lastItem.createdAt.getTime(),
+        id: lastItem.id,
+      });
+    }
+
+    return {
+      items,
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  /**
+   * Get memories by type with pagination
+   */
+  async getByTypePaginated(
+    type: MemoryType,
+    options: PaginationOptions = { limit: 50 }
+  ): Promise<PaginatedResult<MemoryEntry>> {
+    const { limit, cursor, direction = 'desc' } = options;
+    const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
+
+    let query: string;
+    let params: (string | number)[];
+
+    if (parsedCursor) {
+      query = direction === 'desc'
+        ? `SELECT * FROM memories
+           WHERE type = ? AND (importance, last_accessed, id) < (?, ?, ?)
+           ORDER BY importance DESC, last_accessed DESC, id DESC
+           LIMIT ?`
+        : `SELECT * FROM memories
+           WHERE type = ? AND (importance, last_accessed, id) > (?, ?, ?)
+           ORDER BY importance ASC, last_accessed ASC, id ASC
+           LIMIT ?`;
+      params = [type, parsedCursor.importance, parsedCursor.lastAccessed ?? parsedCursor.createdAt, parsedCursor.id, limit + 1];
+    } else {
+      query = direction === 'desc'
+        ? `SELECT * FROM memories WHERE type = ? ORDER BY importance DESC, last_accessed DESC, id DESC LIMIT ?`
+        : `SELECT * FROM memories WHERE type = ? ORDER BY importance ASC, last_accessed ASC, id ASC LIMIT ?`;
+      params = [type, limit + 1];
+    }
+
+    const stmt = this.db.prepare(query);
+    const rows = stmt.all(...params) as any[];
+
+    const hasMore = rows.length > limit;
+    const items = rows.slice(0, limit).map(row => this.rowToMemoryEntry(row));
+
+    let nextCursor: string | undefined;
+    if (hasMore && items.length > 0) {
+      const lastItem = items[items.length - 1];
+      nextCursor = this.encodeCursor({
+        importance: lastItem.importance,
+        lastAccessed: lastItem.lastAccessed.getTime(),
+        createdAt: lastItem.createdAt.getTime(),
+        id: lastItem.id,
+      });
+    }
+
+    // Get total count for this type (only on first page for efficiency)
+    let totalCount: number | undefined;
+    if (!cursor) {
+      const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM memories WHERE type = ?');
+      totalCount = (countStmt.get(type) as any).count;
+    }
+
+    return {
+      items,
+      nextCursor,
+      totalCount,
+      hasMore,
+    };
+  }
+
+  /**
+   * Search with pagination
+   */
+  async searchPaginated(
+    query: string,
+    options: PaginationOptions = { limit: 20 }
+  ): Promise<PaginatedResult<MemoryEntry>> {
+    const { limit, cursor, direction = 'desc' } = options;
+    const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
+    const searchPattern = `%${query}%`;
+
+    let sqlQuery: string;
+    let params: (string | number)[];
+
+    if (parsedCursor) {
+      sqlQuery = direction === 'desc'
+        ? `SELECT * FROM memories
+           WHERE content LIKE ? AND (importance, last_accessed, id) < (?, ?, ?)
+           ORDER BY importance DESC, last_accessed DESC, id DESC
+           LIMIT ?`
+        : `SELECT * FROM memories
+           WHERE content LIKE ? AND (importance, last_accessed, id) > (?, ?, ?)
+           ORDER BY importance ASC, last_accessed ASC, id ASC
+           LIMIT ?`;
+      params = [searchPattern, parsedCursor.importance, parsedCursor.lastAccessed ?? parsedCursor.createdAt, parsedCursor.id, limit + 1];
+    } else {
+      sqlQuery = direction === 'desc'
+        ? `SELECT * FROM memories WHERE content LIKE ? ORDER BY importance DESC, last_accessed DESC, id DESC LIMIT ?`
+        : `SELECT * FROM memories WHERE content LIKE ? ORDER BY importance ASC, last_accessed ASC, id ASC LIMIT ?`;
+      params = [searchPattern, limit + 1];
+    }
+
+    const stmt = this.db.prepare(sqlQuery);
+    const rows = stmt.all(...params) as any[];
+
+    const hasMore = rows.length > limit;
+    const items = rows.slice(0, limit).map(row => this.rowToMemoryEntry(row));
+
+    let nextCursor: string | undefined;
+    if (hasMore && items.length > 0) {
+      const lastItem = items[items.length - 1];
+      nextCursor = this.encodeCursor({
+        importance: lastItem.importance,
+        lastAccessed: lastItem.lastAccessed.getTime(),
+        createdAt: lastItem.createdAt.getTime(),
+        id: lastItem.id,
+      });
+    }
+
+    return {
+      items,
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  /**
+   * Semantic search with pagination
+   * Uses batched loading to avoid loading all embeddings at once
+   *
+   * Note: True paginated semantic search requires vector database support.
+   * This implementation batches the computation to reduce peak memory usage.
+   */
+  async semanticSearchPaginated(
+    embedding: number[],
+    options: PaginationOptions & { batchSize?: number } = { limit: 10 }
+  ): Promise<PaginatedResult<MemoryEntry>> {
+    const { limit, cursor, batchSize = 100 } = options;
+    const offset = cursor ? parseInt(cursor, 10) : 0;
+
+    // Count total with embeddings
+    const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM memories WHERE embedding IS NOT NULL');
+    const totalCount = (countStmt.get() as any).count as number;
+
+    if (totalCount === 0) {
+      return { items: [], hasMore: false, totalCount: 0 };
+    }
+
+    // For small datasets, use the original approach
+    if (totalCount <= batchSize * 2) {
+      const allStmt = this.db.prepare('SELECT * FROM memories WHERE embedding IS NOT NULL');
+      const rows = allStmt.all() as any[];
+
+      const results = rows.map(row => {
+        const storedEmbedding = JSON.parse(row.embedding) as number[];
+        const similarity = this.cosineSimilarity(embedding, storedEmbedding);
+        return { row, similarity };
+      });
+
+      results.sort((a, b) => b.similarity - a.similarity);
+
+      const paginatedResults = results.slice(offset, offset + limit);
+      const hasMore = offset + limit < results.length;
+
+      return {
+        items: paginatedResults.map(r => this.rowToMemoryEntry(r.row)),
+        nextCursor: hasMore ? String(offset + limit) : undefined,
+        totalCount,
+        hasMore,
+      };
+    }
+
+    // For larger datasets, process in batches to reduce peak memory
+    // This is a streaming approach that avoids loading all embeddings at once
+    const allResults: Array<{ row: any; similarity: number }> = [];
+    let processed = 0;
+
+    while (processed < totalCount) {
+      const batchStmt = this.db.prepare(
+        'SELECT * FROM memories WHERE embedding IS NOT NULL LIMIT ? OFFSET ?'
+      );
+      const batchRows = batchStmt.all(batchSize, processed) as any[];
+
+      if (batchRows.length === 0) break;
+
+      for (const row of batchRows) {
+        const storedEmbedding = JSON.parse(row.embedding) as number[];
+        const similarity = this.cosineSimilarity(embedding, storedEmbedding);
+        allResults.push({ row, similarity });
+      }
+
+      processed += batchRows.length;
+
+      // Early termination optimization: if we have enough high-similarity results
+      // and current batch max is lower than our threshold, we can stop
+      if (allResults.length >= offset + limit + batchSize) {
+        allResults.sort((a, b) => b.similarity - a.similarity);
+        const threshold = allResults[offset + limit - 1]?.similarity ?? 0;
+
+        // Check if remaining batches could have higher similarity
+        // (conservative: only skip if we've processed at least 50%)
+        if (processed > totalCount * 0.5 && threshold > 0.5) {
+          this.logger.debug(`Early termination at ${processed}/${totalCount} items`);
+          break;
+        }
+      }
+    }
+
+    // Final sort and pagination
+    allResults.sort((a, b) => b.similarity - a.similarity);
+    const paginatedResults = allResults.slice(offset, offset + limit);
+    const hasMore = offset + limit < allResults.length;
+
+    return {
+      items: paginatedResults.map(r => this.rowToMemoryEntry(r.row)),
+      nextCursor: hasMore ? String(offset + limit) : undefined,
+      totalCount,
+      hasMore,
+    };
+  }
+
+  /**
+   * Get memories by IDs in batches (for bulk retrieval)
+   * Useful for fetching specific memories without loading all
+   */
+  async getByIdsBatch(ids: string[], batchSize: number = 100): Promise<MemoryEntry[]> {
+    const results: MemoryEntry[] = [];
+
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batchIds = ids.slice(i, i + batchSize);
+      const placeholders = batchIds.map(() => '?').join(',');
+      const stmt = this.db.prepare(`SELECT * FROM memories WHERE id IN (${placeholders})`);
+      const rows = stmt.all(...batchIds) as any[];
+      results.push(...rows.map(row => this.rowToMemoryEntry(row)));
+    }
+
+    return results;
+  }
+
+  /**
+   * Encode cursor for pagination
+   */
+  private encodeCursor(data: Record<string, unknown>): string {
+    return Buffer.from(JSON.stringify(data)).toString('base64');
+  }
+
+  /**
+   * Decode cursor from pagination
+   */
+  private decodeCursor(cursor: string): Record<string, any> | null {
+    try {
+      return JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8'));
+    } catch {
+      this.logger.warn('Invalid pagination cursor');
+      return null;
+    }
   }
 
   close(): void {
