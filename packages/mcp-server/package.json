@@ -1,5 +1,5 @@
 {
-  "name": "@jetpack/mcp-server",
+  "name": "@jetpack-agent/mcp-server",
   "version": "0.1.0",
   "description": "MCP server for Claude Code integration with Jetpack",
   "type": "module",
@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@jetpack/shared": "workspace:*",
+    "@jetpack-agent/shared": "workspace:*",
     "zod": "^3.24.4"
   },
   "devDependencies": {

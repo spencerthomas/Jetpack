@@ -1,5 +1,5 @@
 {
-  "name": "@jetpack/browser-validator",
+  "name": "@jetpack-agent/browser-validator",
   "version": "0.1.0",
   "description": "Browser-based validation for UI tasks using headless browser automation",
   "main": "dist/index.js",
@@ -37,7 +37,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/shared": "workspace:*",
+    "@jetpack-agent/shared": "workspace:*",
     "playwright": "^1.40.0",
     "zod": "^3.22.4"
   },

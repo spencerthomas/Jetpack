@@ -1,5 +1,5 @@
 {
-  "name": "@jetpack/mcp-mail-adapter",
+  "name": "@jetpack-agent/mcp-mail-adapter",
   "version": "0.1.0",
   "description": "Inter-agent pub/sub messaging and file leasing for Jetpack",
   "main": "dist/index.js",
@@ -37,7 +37,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/shared": "workspace:*",
+    "@jetpack-agent/shared": "workspace:*",
     "better-sqlite3": "^11.8.1",
     "eventemitter3": "^5.0.1",
     "zod": "^3.24.1"

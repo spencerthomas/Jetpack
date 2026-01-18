@@ -1,5 +1,5 @@
 {
-  "name": "@jetpack/orchestrator",
+  "name": "@jetpack-agent/orchestrator",
   "version": "0.1.0",
   "description": "Multi-agent orchestration engine for Jetpack swarm development",
   "main": "dist/index.js",
@@ -37,12 +37,12 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/shared": "workspace:*",
-    "@jetpack/beads-adapter": "workspace:*",
-    "@jetpack/mcp-mail-adapter": "workspace:*",
-    "@jetpack/cass-adapter": "workspace:*",
-    "@jetpack/supervisor": "workspace:*",
-    "@jetpack/quality-adapter": "workspace:*",
+    "@jetpack-agent/shared": "workspace:*",
+    "@jetpack-agent/beads-adapter": "workspace:*",
+    "@jetpack-agent/mcp-mail-adapter": "workspace:*",
+    "@jetpack-agent/cass-adapter": "workspace:*",
+    "@jetpack-agent/supervisor": "workspace:*",
+    "@jetpack-agent/quality-adapter": "workspace:*",
     "zod": "^3.24.1"
   },
   "devDependencies": {

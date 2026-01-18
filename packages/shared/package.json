@@ -1,5 +1,5 @@
 {
-  "name": "@jetpack/shared",
+  "name": "@jetpack-agent/shared",
   "version": "0.1.0",
   "description": "Shared types and utilities for Jetpack multi-agent orchestration",
   "main": "dist/index.js",

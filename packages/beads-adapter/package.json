@@ -1,5 +1,5 @@
 {
-  "name": "@jetpack/beads-adapter",
+  "name": "@jetpack-agent/beads-adapter",
   "version": "0.1.0",
   "description": "Git-backed task management adapter for Jetpack (Steve Yegge's Beads system)",
   "main": "dist/index.js",
@@ -36,7 +36,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@jetpack/shared": "workspace:*",
+    "@jetpack-agent/shared": "workspace:*",
     "simple-git": "^3.27.0",
     "zod": "^3.24.1"
   },
