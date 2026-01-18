@@ -11,6 +11,9 @@ export * from './types/plan';
 export * from './types/execution';
 export * from './types/skill';
 
+// Adapter Interfaces (for hybrid Cloudflare architecture)
+export * from './adapters';
+
 // Services
 export * from './services/SkillRegistry';
 

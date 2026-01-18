@@ -1,0 +1,7 @@
+/**
+ * Adapter interfaces for hybrid Cloudflare architecture
+ *
+ * @see docs/HYBRID_ARCHITECTURE.md
+ */
+
+export * from './interfaces';
