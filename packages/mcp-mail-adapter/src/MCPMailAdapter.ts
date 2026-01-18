@@ -10,11 +10,17 @@ import {
   generateMessageId,
   IMailBus,
   LeaseStatus,
+  ExpiringSet,
+  createMessageDeduplicationSet,
 } from '@jetpack-agent/shared';
 
 export interface MCPMailConfig {
   mailDir: string;
   agentId: string;
+  /** TTL for processed broadcast tracking in ms (default: 24 hours) */
+  broadcastTtlMs?: number;
+  /** Max processed broadcasts to track (default: 10,000) */
+  maxProcessedBroadcasts?: number;
 }
 
 interface FileLease {
@@ -43,7 +49,7 @@ export class MCPMailAdapter implements IMailBus, MessageBus {
   private pollInterval?: NodeJS.Timeout;
   private broadcastPollInterval?: NodeJS.Timeout;
   private leaseCleanupInterval?: NodeJS.Timeout;
-  private processedBroadcasts: Set<string> = new Set();
+  private processedBroadcasts: ExpiringSet<string>;
 
   constructor(private config: MCPMailConfig) {
     this.logger = new Logger(`MCPMail[${config.agentId}]`);
@@ -51,6 +57,15 @@ export class MCPMailAdapter implements IMailBus, MessageBus {
     this.outboxDir = path.join(config.mailDir, 'outbox');
     this.archiveDir = path.join(config.mailDir, 'archive');
     this.leasesFile = path.join(config.mailDir, 'leases.json');
+
+    // Initialize ExpiringSet for processed broadcasts with configurable TTL
+    this.processedBroadcasts = createMessageDeduplicationSet({
+      ttlMs: config.broadcastTtlMs,
+      maxEntries: config.maxProcessedBroadcasts,
+      onEvict: (evicted) => {
+        this.logger.debug(`Evicted ${evicted.length} expired broadcast IDs from memory`);
+      },
+    });
   }
 
   /**
@@ -93,6 +108,9 @@ export class MCPMailAdapter implements IMailBus, MessageBus {
       clearInterval(this.leaseCleanupInterval);
       this.leaseCleanupInterval = undefined;
     }
+
+    // Dispose of the ExpiringSet to stop its cleanup timer
+    this.processedBroadcasts.dispose();
 
     // Release all leases held by this agent
     await this.releaseAllLeases();
@@ -138,18 +156,38 @@ export class MCPMailAdapter implements IMailBus, MessageBus {
   }
 
   private async loadProcessedBroadcasts(): Promise<void> {
-    // Load IDs of broadcasts we've already processed from archive
-    // This prevents re-emitting the same broadcast messages on restart
+    // Load recent IDs of broadcasts we've already processed from archive
+    // Only load messages within the TTL window to prevent unbounded memory growth
+    const ttlMs = this.config.broadcastTtlMs ?? 24 * 60 * 60 * 1000; // Default 24h
+    const cutoffTime = Date.now() - ttlMs;
+
     try {
       const archiveFiles = await fs.readdir(this.archiveDir);
+      const recentIds: string[] = [];
+
       for (const file of archiveFiles) {
-        if (file.endsWith('.json')) {
-          // Extract message ID from filename (format: {id}.json)
-          const msgId = file.replace('.json', '');
-          this.processedBroadcasts.add(msgId);
+        if (!file.endsWith('.json')) continue;
+
+        // Check file modification time to only load recent messages
+        const filePath = path.join(this.archiveDir, file);
+        try {
+          const stat = await fs.stat(filePath);
+          if (stat.mtimeMs >= cutoffTime) {
+            // Extract message ID from filename (format: {id}.json)
+            const msgId = file.replace('.json', '');
+            recentIds.push(msgId);
+          }
+        } catch {
+          // File may have been deleted, skip it
         }
       }
-      this.logger.debug(`Loaded ${this.processedBroadcasts.size} processed broadcast IDs`);
+
+      // Bulk add all recent IDs efficiently
+      if (recentIds.length > 0) {
+        this.processedBroadcasts.addBulk(recentIds);
+      }
+
+      this.logger.debug(`Loaded ${recentIds.length} recent broadcast IDs (${archiveFiles.length} total in archive)`);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         this.logger.error('Failed to load processed broadcasts:', error);

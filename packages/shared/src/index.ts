@@ -26,3 +26,4 @@ export * from './services/SkillRegistry';
 export * from './utils/logger';
 export * from './utils/hash';
 export * from './utils/greeting';
+export * from './utils/expiring-set';
