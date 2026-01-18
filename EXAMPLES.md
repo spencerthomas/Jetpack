@@ -44,7 +44,7 @@ jetpack task --title "Add unit tests" --skills testing
 ### Complex Feature with Dependencies
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function developFeature() {
   const jetpack = new JetpackOrchestrator({
@@ -148,7 +148,7 @@ async function developFeature() {
 ### Parallel Bug Resolution
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function fixBugs() {
   const jetpack = new JetpackOrchestrator({
@@ -195,7 +195,7 @@ async function fixBugs() {
 ### Large-Scale Refactoring
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function refactorProject() {
   const jetpack = new JetpackOrchestrator({
@@ -276,9 +276,9 @@ async function refactorProject() {
 ### Creating Specialized Agents
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
-import { AgentController } from '@jetpack/orchestrator';
-import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
+import { AgentController } from '@jetpack-agent/orchestrator';
+import { MCPMailAdapter } from '@jetpack-agent/mcp-mail-adapter';
 
 async function customAgents() {
   const jetpack = new JetpackOrchestrator({
@@ -349,7 +349,7 @@ async function customAgents() {
 ### Storing and Retrieving Agent Learnings
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function memoryExample() {
   const jetpack = new JetpackOrchestrator({
@@ -400,7 +400,7 @@ async function memoryExample() {
 ### Preventing Edit Conflicts
 
 ```typescript
-import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
+import { MCPMailAdapter } from '@jetpack-agent/mcp-mail-adapter';
 
 async function fileLeasingExample() {
   const agent1Mail = new MCPMailAdapter({
@@ -448,7 +448,7 @@ async function fileLeasingExample() {
 ### Understanding Task Dependencies
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function visualizeTaskGraph() {
   const jetpack = new JetpackOrchestrator({
@@ -496,7 +496,7 @@ async function visualizeTaskGraph() {
 ### Submit High-Level Requests
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function supervisorExample() {
   const jetpack = new JetpackOrchestrator({
@@ -559,7 +559,7 @@ async function customSupervisor() {
 ### Programmatic Memory Management
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function memoryDashboardExample() {
   const jetpack = new JetpackOrchestrator({
@@ -641,7 +641,7 @@ async function reconfigureCASSExample() {
 ### Creating and Executing Plans
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function planExample() {
   const jetpack = new JetpackOrchestrator({

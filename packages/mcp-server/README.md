@@ -1,4 +1,4 @@
-# @jetpack/mcp-server
+# @jetpack-agent/mcp-server
 
 MCP (Model Context Protocol) server for Claude Code integration with Jetpack.
 

@@ -65,7 +65,7 @@ pnpm jetpack <command>
 cd apps/web && pnpm dev  # Runs on localhost:3000
 
 # Web UI with custom project directory
-JETPACK_WORK_DIR=/path/to/project pnpm --filter @jetpack/web dev
+JETPACK_WORK_DIR=/path/to/project pnpm --filter @jetpack-agent/web dev
 ```
 
 ## Architecture Overview
@@ -84,17 +84,17 @@ JetpackOrchestrator (packages/orchestrator)
 
 ### Package Dependencies
 
-- `@jetpack/shared` - Base types (Task, Agent, Message, Memory), Zod schemas, SkillRegistry
-- `@jetpack/beads-adapter` - Tasks stored in `.beads/tasks.jsonl`, optional git auto-commit
-- `@jetpack/cass-adapter` - Memory stored in `.cass/memory.db`, supports semantic search
-- `@jetpack/mcp-mail-adapter` - Messages in `.jetpack/mail/{inbox,outbox}/*.json`, file leasing
-- `@jetpack/orchestrator` - Combines adapters, manages agent pool, quality metrics
-- `@jetpack/supervisor` - LangGraph supervisor with background monitoring
-- `@jetpack/quality-adapter` - Quality snapshots, regression detection, quality gates
-- `@jetpack/cli-tui` - Ink-based terminal UI dashboard (tmux-style panes)
-- `@jetpack/mcp-server` - MCP server for Claude Code integration
-- `@jetpack/cli` - Commander-based CLI (`start`, `task`, `status`, `demo`, `mcp`)
-- `@jetpack/web` - Next.js 15 Kanban UI with React 19, dnd-kit, Tailwind
+- `@jetpack-agent/shared` - Base types (Task, Agent, Message, Memory), Zod schemas, SkillRegistry
+- `@jetpack-agent/beads-adapter` - Tasks stored in `.beads/tasks.jsonl`, optional git auto-commit
+- `@jetpack-agent/cass-adapter` - Memory stored in `.cass/memory.db`, supports semantic search
+- `@jetpack-agent/mcp-mail-adapter` - Messages in `.jetpack/mail/{inbox,outbox}/*.json`, file leasing
+- `@jetpack-agent/orchestrator` - Combines adapters, manages agent pool, quality metrics
+- `@jetpack-agent/supervisor` - LangGraph supervisor with background monitoring
+- `@jetpack-agent/quality-adapter` - Quality snapshots, regression detection, quality gates
+- `@jetpack-agent/cli-tui` - Ink-based terminal UI dashboard (tmux-style panes)
+- `@jetpack-agent/mcp-server` - MCP server for Claude Code integration
+- `@jetpack-agent/cli` - Commander-based CLI (`start`, `task`, `status`, `demo`, `mcp`)
+- `@jetpack-agent/web` - Next.js 15 Kanban UI with React 19, dnd-kit, Tailwind
 
 ### Data Flow
 
@@ -223,7 +223,7 @@ const detected = jetpack.projectSkills;  // ['typescript', 'react', 'nextjs']
 // → Agent acquires 'react' skill and proceeds
 
 // Skill registry for matching
-import { getSkillRegistry } from '@jetpack/shared';
+import { getSkillRegistry } from '@jetpack-agent/shared';
 const registry = getSkillRegistry();
 const score = registry.calculateMatchScore(agentSkills, taskSkills);
 ```
@@ -757,7 +757,7 @@ interface PlanItem {
 pnpm clean && pnpm install && pnpm build
 
 # Build specific package
-pnpm --filter @jetpack/orchestrator build
+pnpm --filter @jetpack-agent/orchestrator build
 ```
 
 ### Web UI Shows Wrong/Old Data
@@ -801,7 +801,7 @@ pnpm jetpack status -d /path/to/your/project
 JETPACK_WORK_DIR=/path/to/your/project pnpm jetpack start
 
 # For web UI development
-JETPACK_WORK_DIR=/path/to/your/project pnpm --filter @jetpack/web dev
+JETPACK_WORK_DIR=/path/to/your/project pnpm --filter @jetpack-agent/web dev
 ```
 
 **Option 3: cd to the directory first**
@@ -855,7 +855,7 @@ Failed tasks are released back to `ready` status so any available agent can retr
 pnpm test
 
 # Run tests for specific package
-pnpm --filter @jetpack/beads-adapter test
+pnpm --filter @jetpack-agent/beads-adapter test
 
 # Run with coverage
 pnpm test -- --coverage

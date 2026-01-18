@@ -114,7 +114,7 @@ Jetpack has a layered architecture with three core storage adapters and an optio
 
 ```bash
 # Install globally
-npm install -g @jetpack/cli
+npm install -g @jetpack-agent/cli
 
 # Now use from anywhere
 jetpack start --agents 3
@@ -905,7 +905,7 @@ jetpack status
 ### TypeScript Example
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 const jetpack = new JetpackOrchestrator({
   workDir: process.cwd(),
@@ -1035,7 +1035,7 @@ export class CustomAdapter {
 Update the orchestrator to use your adapter:
 
 ```typescript
-import { CustomAdapter } from '@jetpack/custom-adapter';
+import { CustomAdapter } from '@jetpack-agent/custom-adapter';
 
 // In JetpackOrchestrator
 const custom = new CustomAdapter(config);

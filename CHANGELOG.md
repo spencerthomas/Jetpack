@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BUG-7 Fix**: Three-stage graceful shutdown (SIGINT -> SIGTERM -> SIGKILL)
 
 #### New Packages
-- **@jetpack/browser-validator** - Playwright-based browser validation for UI tasks
+- **@jetpack-agent/browser-validator** - Playwright-based browser validation for UI tasks
   - Automatic UI task detection based on skills and keywords
   - Extract validation checks from task descriptions
   - Screenshot capture and console error detection
@@ -89,8 +89,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 12. Message Acknowledgment - reliable delivery tracking
 
 #### New Packages
-- **@jetpack/quality-adapter** - Quality snapshots and regression detection
-- **@jetpack/cli-tui** - Ink-based terminal UI dashboard
+- **@jetpack-agent/quality-adapter** - Quality snapshots and regression detection
+- **@jetpack-agent/cli-tui** - Ink-based terminal UI dashboard
 
 #### Web UI Features
 - Plan management with create, execute, template workflows

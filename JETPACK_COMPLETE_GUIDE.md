@@ -147,7 +147,7 @@ Click "New Task" in the Kanban board.
 
 ```bash
 # Install globally
-npm install -g @jetpack/cli
+npm install -g @jetpack-agent/cli
 
 # Use from anywhere
 jetpack start --agents 3
@@ -1475,7 +1475,7 @@ jetpack status
 ## Feature Development with Dependencies
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function developFeature() {
   const jetpack = new JetpackOrchestrator({
@@ -1560,7 +1560,7 @@ async function developFeature() {
 ## File Leasing for Concurrent Safety
 
 ```typescript
-import { MCPMailAdapter } from '@jetpack/mcp-mail-adapter';
+import { MCPMailAdapter } from '@jetpack-agent/mcp-mail-adapter';
 
 async function fileLeasingExample() {
   const agent1Mail = new MCPMailAdapter({
@@ -1602,7 +1602,7 @@ async function fileLeasingExample() {
 ## Using the Memory System
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function memoryExample() {
   const jetpack = new JetpackOrchestrator({
@@ -1651,7 +1651,7 @@ async function memoryExample() {
 ## Using the Supervisor
 
 ```typescript
-import { JetpackOrchestrator } from '@jetpack/orchestrator';
+import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
 
 async function supervisorExample() {
   const jetpack = new JetpackOrchestrator({
@@ -1690,7 +1690,7 @@ async function supervisorExample() {
 pnpm clean && pnpm install && pnpm build
 
 # Build specific package
-pnpm --filter @jetpack/orchestrator build
+pnpm --filter @jetpack-agent/orchestrator build
 ```
 
 ## Web UI Shows Wrong/Old Data
@@ -1797,7 +1797,7 @@ pnpm jetpack <command>
 cd apps/web && pnpm dev  # Runs on localhost:3000
 
 # Web UI with custom project directory
-JETPACK_WORK_DIR=/path/to/project pnpm --filter @jetpack/web dev
+JETPACK_WORK_DIR=/path/to/project pnpm --filter @jetpack-agent/web dev
 ```
 
 ## Key Files to Know
@@ -1821,7 +1821,7 @@ class CustomAdapter {
 }
 
 // In JetpackOrchestrator
-import { CustomAdapter } from '@jetpack/custom-adapter';
+import { CustomAdapter } from '@jetpack-agent/custom-adapter';
 
 const custom = new CustomAdapter(config);
 await custom.initialize();
