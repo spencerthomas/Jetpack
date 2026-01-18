@@ -5,6 +5,7 @@ export * from './PlanStore';
 export * from './PlanParser';
 export * from './RuntimeManager';
 export * from './prompts/agent-system';
+export * from './gracefulShutdown';
 
 // Re-export supervisor types for convenience
 export { SupervisorAgent, SupervisorResult, LLMProviderConfigInput } from '@jetpack-agent/supervisor';

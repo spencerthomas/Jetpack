@@ -20,6 +20,7 @@ const messageTypeIcons: Record<MessageType, React.ReactNode> = {
   'task.retry_scheduled': <Activity className="w-4 h-4" />,
   'task.progress': <Activity className="w-4 h-4" />,
   'task.available': <Bell className="w-4 h-4" />,
+  'task.interrupted': <AlertTriangle className="w-4 h-4" />, // BUG-7: Graceful shutdown
   'agent.started': <Activity className="w-4 h-4" />,
   'agent.stopped': <Activity className="w-4 h-4" />,
   'agent.error': <AlertTriangle className="w-4 h-4" />,
@@ -41,6 +42,7 @@ const messageTypeColors: Record<MessageType, string> = {
   'task.retry_scheduled': 'bg-orange-100 text-orange-700',
   'task.progress': 'bg-cyan-100 text-cyan-700',
   'task.available': 'bg-blue-100 text-blue-700',
+  'task.interrupted': 'bg-amber-100 text-amber-700', // BUG-7: Graceful shutdown
   'agent.started': 'bg-green-100 text-green-700',
   'agent.stopped': 'bg-gray-100 text-gray-700',
   'agent.error': 'bg-red-100 text-red-700',

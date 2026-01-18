@@ -528,4 +528,123 @@ describe('MCPMailAdapter', () => {
       expect(unacked.map(m => m.id)).toContain('outbox-unack-1');
     });
   });
+
+  describe('listener management (BUG-1)', () => {
+    beforeEach(async () => {
+      await adapter.initialize();
+    });
+
+    it('should track listener counts correctly', async () => {
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+      const handler3 = vi.fn();
+
+      // Initially no listeners
+      expect(adapter.getListenerCount()).toBe(0);
+
+      // Add listeners
+      adapter.subscribe('task.created', handler1);
+      adapter.subscribe('task.created', handler2);
+      adapter.subscribe('task.assigned', handler3);
+
+      // Should have 3 listeners total
+      expect(adapter.getListenerCount()).toBe(3);
+
+      // Check detailed counts
+      const counts = adapter.getListenerCounts();
+      expect(counts['task.created']).toBe(2);
+      expect(counts['task.assigned']).toBe(1);
+    });
+
+    it('should remove listeners correctly with unsubscribe', async () => {
+      const handler = vi.fn();
+
+      adapter.subscribe('task.created', handler);
+      expect(adapter.getListenerCount()).toBe(1);
+
+      adapter.unsubscribe('task.created', handler);
+      expect(adapter.getListenerCount()).toBe(0);
+    });
+
+    it('should remove all listeners on shutdown', async () => {
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+
+      adapter.subscribe('task.created', handler1);
+      adapter.subscribe('task.assigned', handler2);
+      expect(adapter.getListenerCount()).toBe(2);
+
+      await adapter.shutdown();
+      expect(adapter.getListenerCount()).toBe(0);
+    });
+
+    it('should handle multiple agents subscribing without memory leak', async () => {
+      // Simulate multiple agents each subscribing to multiple events
+      const adapters: MCPMailAdapter[] = [];
+      const handlers: Array<() => void> = [];
+
+      for (let i = 0; i < 10; i++) {
+        const agentAdapter = new MCPMailAdapter({
+          mailDir: TEST_MAIL_DIR,
+          agentId: `agent-${i}`,
+        });
+        await agentAdapter.initialize();
+
+        // Each agent subscribes to 3 event types (like AgentController does)
+        const handler1 = vi.fn();
+        const handler2 = vi.fn();
+        const handler3 = vi.fn();
+        agentAdapter.subscribe('task.created', handler1);
+        agentAdapter.subscribe('task.updated', handler2);
+        agentAdapter.subscribe('task.assigned', handler3);
+
+        expect(agentAdapter.getListenerCount()).toBe(3);
+
+        adapters.push(agentAdapter);
+        handlers.push(handler1, handler2, handler3);
+      }
+
+      // Shutdown all adapters
+      for (const agentAdapter of adapters) {
+        await agentAdapter.shutdown();
+        expect(agentAdapter.getListenerCount()).toBe(0);
+      }
+    });
+
+    it('should clear processed broadcasts set on shutdown', async () => {
+      // Create another adapter that will receive broadcasts
+      const adapter2 = new MCPMailAdapter({
+        mailDir: TEST_MAIL_DIR,
+        agentId: 'test-agent-2',
+      });
+      await adapter2.initialize();
+
+      // Publish a broadcast
+      await adapter.publish({
+        id: 'cleanup-test-1',
+        type: 'task.created',
+        from: TEST_AGENT_ID,
+        payload: { title: 'Test' },
+        timestamp: new Date(),
+      });
+
+      // Wait for processing
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      // Shutdown clears internal state
+      await adapter2.shutdown();
+
+      // Create new adapter with same ID - should not have old broadcast tracked
+      const adapter3 = new MCPMailAdapter({
+        mailDir: TEST_MAIL_DIR,
+        agentId: 'test-agent-2',
+      });
+      await adapter3.initialize();
+
+      // Listener count should be 0 (fresh start)
+      expect(adapter3.getListenerCount()).toBe(0);
+
+      await adapter3.shutdown();
+    });
+  });
 });

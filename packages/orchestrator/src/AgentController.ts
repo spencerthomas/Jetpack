@@ -51,6 +51,15 @@ export interface AgentControllerConfig {
   workPollingIntervalMs?: number;
   /** Quality check settings (default: check build and tests) */
   qualitySettings?: Partial<QualitySettings>;
+  // BUG-6 FIX: Configurable per-task timeout settings
+  /** Multiplier for task.estimatedMinutes to calculate timeout (default: 2.0) */
+  timeoutMultiplier?: number;
+  /** Minimum timeout in ms regardless of estimate (default: 5 minutes) */
+  minTimeoutMs?: number;
+  /** Maximum timeout in ms regardless of estimate (default: 2 hours) */
+  maxTimeoutMs?: number;
+  /** Time to wait after SIGTERM before sending SIGKILL (default: 30 seconds) */
+  gracefulShutdownMs?: number;
 }
 
 /**
@@ -92,8 +101,14 @@ export class AgentController {
     this.workDir = config.workDir;
 
     // Create executor with TUI mode if enabled
+    // BUG-6 FIX: Pass timeout settings to executor for per-task timeout calculation
     this.executor = new ClaudeCodeExecutor(config.workDir, {
       emitOutputEvents: config.enableTuiMode ?? false,
+      // BUG-6 FIX: Configurable per-task timeout settings
+      timeoutMultiplier: config.timeoutMultiplier,
+      minTimeoutMs: config.minTimeoutMs,
+      maxTimeoutMs: config.maxTimeoutMs,
+      gracefulShutdownMs: config.gracefulShutdownMs,
     });
 
     // Forward executor output events to config callback
@@ -843,6 +858,134 @@ export class AgentController {
 
   getStats(): AgentStats {
     return { ...this.stats };
+  }
+
+  // ============================================================================
+  // BUG-7 FIX: Graceful Shutdown and State Saving
+  // ============================================================================
+
+  /**
+   * BUG-7 FIX: Save agent state before exit.
+   * This is called during graceful shutdown to preserve work in progress.
+   *
+   * State saved includes:
+   * - Current task progress (if any)
+   * - Agent statistics
+   * - Any in-progress work context
+   */
+  async saveStateBeforeExit(): Promise<void> {
+    this.logger.info('Saving agent state before exit...');
+
+    // If we have a current task, save its progress
+    if (this.currentTask) {
+      const taskId = this.currentTask.id;
+      const elapsedMs = this.currentTaskStartTime
+        ? Date.now() - this.currentTaskStartTime.getTime()
+        : 0;
+
+      this.logger.info(
+        `Agent ${this.agent.name} was working on task ${taskId} (phase: ${this.currentPhase}, elapsed: ${Math.round(elapsedMs / 1000)}s)`
+      );
+
+      // Store learning about interrupted work
+      try {
+        await this.cass.store({
+          type: 'agent_learning',
+          content: `Task "${this.currentTask.title}" was interrupted during ${this.currentPhase} phase after ${Math.round(elapsedMs / 1000)}s. Agent received shutdown signal.`,
+          importance: 0.7, // Important context for resumption
+          metadata: {
+            taskId: taskId,
+            agentId: this.agent.id,
+            agentName: this.agent.name,
+            phase: this.currentPhase,
+            elapsedMs,
+            interruptedAt: new Date().toISOString(),
+            reason: 'graceful_shutdown',
+          },
+        });
+        this.logger.debug(`Stored shutdown context for task ${taskId}`);
+      } catch (err) {
+        this.logger.error('Failed to store shutdown context:', err);
+      }
+
+      // Release the task back to ready state so another agent can pick it up
+      // This ensures work isn't lost if we're shut down mid-task
+      try {
+        await this.beads.updateTask(taskId, {
+          status: 'ready',
+          assignedAgent: undefined,
+          lastError: `Agent ${this.agent.name} received shutdown signal during ${this.currentPhase} phase`,
+          lastAttemptAt: new Date(),
+        });
+        this.logger.info(`Released task ${taskId} back to ready state`);
+      } catch (err) {
+        this.logger.error('Failed to release task:', err);
+      }
+
+      // Publish interruption message
+      try {
+        await this.mail.publish({
+          id: '',
+          type: 'task.interrupted',
+          from: this.agent.id,
+          payload: {
+            taskId,
+            taskTitle: this.currentTask.title,
+            agentName: this.agent.name,
+            agentId: this.agent.id,
+            phase: this.currentPhase,
+            elapsedMs,
+            reason: 'graceful_shutdown',
+          },
+          timestamp: new Date(),
+        });
+      } catch (err) {
+        this.logger.error('Failed to publish task.interrupted:', err);
+      }
+    }
+
+    // Store final agent statistics
+    try {
+      await this.cass.store({
+        type: 'agent_learning',
+        content: `Agent ${this.agent.name} shutdown - completed ${this.stats.tasksCompleted} tasks, failed ${this.stats.tasksFailed} tasks, avg completion time ${this.stats.tasksCompleted > 0 ? Math.round(this.stats.totalCompletionMs / this.stats.tasksCompleted / 1000) : 0}s`,
+        importance: 0.5,
+        metadata: {
+          agentId: this.agent.id,
+          agentName: this.agent.name,
+          tasksCompleted: this.stats.tasksCompleted,
+          tasksFailed: this.stats.tasksFailed,
+          avgCompletionMs: this.stats.tasksCompleted > 0
+            ? Math.round(this.stats.totalCompletionMs / this.stats.tasksCompleted)
+            : 0,
+          shutdownAt: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      this.logger.error('Failed to store agent statistics:', err);
+    }
+
+    this.logger.info('Agent state saved');
+  }
+
+  /**
+   * BUG-7 FIX: Graceful stop with state saving.
+   * This method first saves state, then performs cleanup.
+   */
+  async gracefulStop(): Promise<void> {
+    this.logger.info(`Gracefully stopping agent ${this.agent.name}`);
+
+    // First, abort any running execution gracefully
+    if (this.executor.isExecuting()) {
+      this.logger.info('Aborting current execution...');
+      this.executor.abort(); // This uses the 3-stage termination
+    }
+
+    // Save state before cleanup
+    await this.saveStateBeforeExit();
+
+    // Now perform standard stop
+    await this.stop();
   }
 
   // ============================================================================

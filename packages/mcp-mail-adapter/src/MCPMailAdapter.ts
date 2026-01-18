@@ -83,16 +83,26 @@ export class MCPMailAdapter implements IMailBus, MessageBus {
   async shutdown(): Promise<void> {
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
+      this.pollInterval = undefined;
     }
     if (this.broadcastPollInterval) {
       clearInterval(this.broadcastPollInterval);
+      this.broadcastPollInterval = undefined;
     }
     if (this.leaseCleanupInterval) {
       clearInterval(this.leaseCleanupInterval);
+      this.leaseCleanupInterval = undefined;
     }
 
     // Release all leases held by this agent
     await this.releaseAllLeases();
+
+    // BUG-1 FIX: Remove all event listeners to prevent memory leaks
+    // This is important when agents are stopped and restarted
+    this.emitter.removeAllListeners();
+
+    // Clear processed broadcasts set to free memory
+    this.processedBroadcasts.clear();
 
     this.logger.info('MCP Mail adapter shut down');
   }
@@ -202,6 +212,28 @@ export class MCPMailAdapter implements IMailBus, MessageBus {
 
   unsubscribe(type: MessageType, handler: (msg: Message) => void | Promise<void>): void {
     this.emitter.off(type, handler);
+    this.logger.debug(`Unsubscribed from message type: ${type}`);
+  }
+
+  /**
+   * BUG-1 FIX: Get the number of listeners for debugging memory leaks
+   * Returns the total count of all event listeners on this adapter
+   */
+  getListenerCount(): number {
+    return this.emitter.eventNames().reduce((count, event) => {
+      return count + this.emitter.listenerCount(event);
+    }, 0);
+  }
+
+  /**
+   * BUG-1 FIX: Get detailed listener counts by event type for debugging
+   */
+  getListenerCounts(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    for (const event of this.emitter.eventNames()) {
+      counts[event as string] = this.emitter.listenerCount(event);
+    }
+    return counts;
   }
 
   /**

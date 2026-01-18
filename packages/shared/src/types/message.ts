@@ -10,6 +10,7 @@ export const MessageTypeSchema = z.enum([
   'task.retry_scheduled',
   'task.progress',      // NEW: Detailed progress updates during execution
   'task.available',     // Supervisor notification of unassigned tasks
+  'task.interrupted',   // BUG-7: Task interrupted during graceful shutdown
   'agent.started',
   'agent.stopped',
   'agent.error',

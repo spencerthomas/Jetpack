@@ -5,6 +5,11 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { EventEmitter } from 'events';
 
+// BUG-1 FIX: Increase default max listeners to prevent MaxListenersExceededWarning
+// With multiple agents (each with 3 subscriptions) plus orchestrator events,
+// the default of 10 is easily exceeded. 50 supports up to ~15 agents comfortably.
+EventEmitter.defaultMaxListeners = 50;
+
 const execFileAsync = promisify(execFile);
 import {
   Task,
@@ -100,6 +105,20 @@ export interface JetpackConfig {
     checkTests?: boolean;
     checkLint?: boolean;
     detectRegressions?: boolean;
+  };
+  // BUG-6 FIX: Configurable per-task timeout settings
+  /** Agent timeout settings for task execution */
+  agentSettings?: {
+    /** Multiplier for task.estimatedMinutes to calculate timeout (default: 2.0) */
+    timeoutMultiplier?: number;
+    /** Minimum timeout in ms regardless of estimate (default: 5 minutes) */
+    minTimeoutMs?: number;
+    /** Maximum timeout in ms regardless of estimate (default: 2 hours) */
+    maxTimeoutMs?: number;
+    /** Time to wait after SIGTERM before sending SIGKILL (default: 30 seconds) */
+    gracefulShutdownMs?: number;
+    /** Interval for periodic work polling in ms (default: 30 seconds) */
+    workPollingIntervalMs?: number;
   };
 }
 
@@ -539,6 +558,12 @@ export class JetpackOrchestrator extends EventEmitter {
           : undefined,
         // Quality check settings (which checks to run)
         qualitySettings: this.config.qualitySettings,
+        // BUG-6 FIX: Pass configurable timeout settings to agents
+        workPollingIntervalMs: this.config.agentSettings?.workPollingIntervalMs,
+        timeoutMultiplier: this.config.agentSettings?.timeoutMultiplier,
+        minTimeoutMs: this.config.agentSettings?.minTimeoutMs,
+        maxTimeoutMs: this.config.agentSettings?.maxTimeoutMs,
+        gracefulShutdownMs: this.config.agentSettings?.gracefulShutdownMs,
       };
       return new AgentController(agentConfig, this.beads, mail, this.cass);
     });
@@ -672,8 +697,9 @@ export class JetpackOrchestrator extends EventEmitter {
     // Stop registry updates
     this.stopRegistryUpdates();
 
+    // BUG-7 FIX: Use gracefulStop to save state before exit
     for (const agent of this.agents) {
-      await agent.stop();
+      await agent.gracefulStop();
     }
 
     for (const mail of this.agentMails.values()) {

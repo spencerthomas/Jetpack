@@ -7,9 +7,15 @@ import prompts from 'prompts';
 import { spawn, ChildProcess, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { JetpackOrchestrator } from '@jetpack-agent/orchestrator';
+import { JetpackOrchestrator, GracefulShutdownHandler } from '@jetpack-agent/orchestrator';
 import { SupervisorAgent } from '@jetpack-agent/supervisor';
-import { AgentSkill, TaskPriority, parseDurationMs, formatDuration, RuntimeLimits } from '@jetpack-agent/shared';
+import {
+  AgentSkill,
+  TaskPriority,
+  parseDurationMs,
+  formatDuration,
+  RuntimeLimits,
+} from '@jetpack-agent/shared';
 
 // Default config for new projects
 const DEFAULT_CONFIG = {
@@ -570,10 +576,12 @@ program
         }
       }, 5000); // Check every 5 seconds
 
-      // Handle graceful shutdown
-      process.on('SIGINT', async () => {
+      // BUG-7 FIX: Handle graceful shutdown for both SIGINT and SIGTERM
+      // Using GracefulShutdownHandler ensures we exit with code 0, not 143 (SIGTERM)
+      const shutdownHandler = new GracefulShutdownHandler(30000); // 30s max shutdown time
+
+      const performShutdown = async () => {
         clearInterval(statusInterval);
-        console.log(chalk.yellow('\n\nShutting down Jetpack...'));
 
         // Stop supervisor monitoring if running
         if (supervisor) {
@@ -584,17 +592,34 @@ program
           console.log(chalk.gray(`     Tasks reassigned: ${stats.reassignedTasks}`));
         }
 
-        // Kill web server if running
-        if (webServerProcess) {
+        // Kill web server if running - use 3-stage termination
+        if (webServerProcess && !webServerProcess.killed) {
           console.log(chalk.gray('  Stopping web UI...'));
-          webServerProcess.kill('SIGTERM');
+          // Stage 1: SIGINT first (allows graceful shutdown)
+          webServerProcess.kill('SIGINT');
+
+          // Wait briefly for SIGINT to work
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          // Stage 2: SIGTERM if still running
+          if (!webServerProcess.killed) {
+            webServerProcess.kill('SIGTERM');
+          }
         }
 
         console.log(chalk.gray('  Stopping agents...'));
         await jetpack.shutdown();
         console.log(chalk.green('\n✓ Jetpack shut down successfully'));
-        process.exit(0);
+      };
+
+      // Register the shutdown callback
+      shutdownHandler.onShutdown(async () => {
+        console.log(chalk.yellow('\n\nShutting down Jetpack...'));
+        await performShutdown();
       });
+
+      // Register signal handlers
+      shutdownHandler.register();
     } catch (error) {
       spinner.fail(chalk.red('Failed to start Jetpack'));
       console.error(error);
