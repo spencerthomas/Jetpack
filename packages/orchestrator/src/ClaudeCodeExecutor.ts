@@ -1,6 +1,8 @@
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
-import { Task, Logger, MemoryEntry, ExecutionOutputEvent, AgentSkill } from '@jetpack-agent/shared';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { Task, Logger, MemoryEntry, ExecutionOutputEvent, AgentSkill, formatBytes } from '@jetpack-agent/shared';
 import { buildAgentPrompt, getSkillSpecificInstructions } from './prompts/agent-system';
 
 export interface ExecutionResult {
@@ -9,6 +11,12 @@ export interface ExecutionResult {
   error?: string;
   duration: number;
   timedOut?: boolean;
+  /** True if output was truncated due to size limits */
+  outputTruncated?: boolean;
+  /** Original output size in bytes before truncation */
+  originalOutputBytes?: number;
+  /** Path to temp file if output was written to disk */
+  outputFilePath?: string;
 }
 
 export interface ExecutionContext {
@@ -36,8 +44,14 @@ export interface ExecutorConfig {
   maxTimeoutMs?: number;
   /** Enable TDD-biased system prompt (default: true) - Enhancement 6 */
   enableTddPrompt?: boolean;
-  /** Maximum output size in bytes before truncation (default: 10MB) - Memory leak fix */
-  maxOutputSize?: number;
+
+  // Memory-efficient output streaming configuration
+  /** Maximum output buffer size in bytes (default: 10MB) */
+  maxOutputBytes?: number;
+  /** Write large outputs to temp files instead of memory (default: true) */
+  writeOutputToTempFiles?: boolean;
+  /** Directory for temp output files (default: .jetpack/output) */
+  outputTempDir?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (fallback for tasks without estimates)
@@ -46,8 +60,71 @@ const DEFAULT_GRACEFUL_SHUTDOWN_MS = 30 * 1000; // 30 seconds (BUG-7 FIX: increa
 const DEFAULT_TIMEOUT_MULTIPLIER = 2.0; // Task gets 2x estimated time
 const DEFAULT_MIN_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes minimum
 const DEFAULT_MAX_TIMEOUT_MS = 120 * 60 * 1000; // 2 hours maximum
-// Memory leak fix: Maximum output size before truncation
-const DEFAULT_MAX_OUTPUT_SIZE = 10 * 1024 * 1024; // 10MB
+// Memory-efficient output streaming constants
+const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024; // 10MB max in memory
+const DEFAULT_WRITE_OUTPUT_TO_TEMP = true;
+
+/**
+ * Memory-efficient output collector that uses array-based buffering
+ * instead of string concatenation to avoid O(n²) memory growth
+ */
+class OutputCollector {
+  private chunks: Buffer[] = [];
+  private totalBytes: number = 0;
+  private truncated: boolean = false;
+  private maxBytes: number;
+
+  constructor(maxBytes: number) {
+    this.maxBytes = maxBytes;
+  }
+
+  /**
+   * Add a chunk to the buffer, discarding old data if limit exceeded
+   */
+  append(data: Buffer | string): void {
+    const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    this.totalBytes += chunk.length;
+
+    // If we're over the limit, start discarding oldest chunks
+    while (this.totalBytes > this.maxBytes && this.chunks.length > 0) {
+      const removed = this.chunks.shift()!;
+      this.totalBytes -= removed.length;
+      this.truncated = true;
+    }
+
+    this.chunks.push(chunk);
+  }
+
+  /**
+   * Get the collected output as a string
+   */
+  toString(): string {
+    return Buffer.concat(this.chunks).toString('utf-8');
+  }
+
+  /**
+   * Get total bytes currently in buffer
+   */
+  get size(): number {
+    return this.totalBytes;
+  }
+
+  /**
+   * Check if output was truncated
+   */
+  get wasTruncated(): boolean {
+    return this.truncated;
+  }
+
+  /**
+   * Clear the buffer
+   */
+  clear(): void {
+    this.chunks = [];
+    this.totalBytes = 0;
+    this.truncated = false;
+  }
+}
 
 export class ClaudeCodeExecutor extends EventEmitter {
   private logger: Logger;
@@ -66,8 +143,10 @@ export class ClaudeCodeExecutor extends EventEmitter {
   private maxTimeoutMs: number;
   // Enhancement 6: TDD-biased prompt
   private enableTddPrompt: boolean;
-  // Memory leak fix: Bounded output
-  private maxOutputSize: number;
+  // Memory-efficient output streaming
+  private maxOutputBytes: number;
+  private writeOutputToTempFiles: boolean;
+  private outputTempDir: string;
 
   constructor(workDir: string, config: ExecutorConfig = {}) {
     super();
@@ -81,8 +160,10 @@ export class ClaudeCodeExecutor extends EventEmitter {
     this.maxTimeoutMs = config.maxTimeoutMs ?? DEFAULT_MAX_TIMEOUT_MS;
     // Enhancement 6: TDD-biased prompt (enabled by default)
     this.enableTddPrompt = config.enableTddPrompt ?? true;
-    // Memory leak fix: Bounded output size
-    this.maxOutputSize = config.maxOutputSize ?? DEFAULT_MAX_OUTPUT_SIZE;
+    // Memory-efficient output streaming
+    this.maxOutputBytes = config.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+    this.writeOutputToTempFiles = config.writeOutputToTempFiles ?? DEFAULT_WRITE_OUTPUT_TO_TEMP;
+    this.outputTempDir = config.outputTempDir ?? path.join(workDir, '.jetpack', 'output');
     this.logger = new Logger('ClaudeCodeExecutor');
   }
 
@@ -155,7 +236,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
 
     try {
       // Race between execution and timeout
-      const output = await Promise.race([
+      const result = await Promise.race([
         this.runClaudeCode(prompt, workDir),
         timeoutPromise,
       ]);
@@ -168,8 +249,11 @@ export class ClaudeCodeExecutor extends EventEmitter {
 
       return {
         success: true,
-        output,
+        output: result.output,
         duration,
+        outputTruncated: result.truncated,
+        originalOutputBytes: result.originalBytes,
+        outputFilePath: result.outputFilePath,
       };
     } catch (error) {
       this.clearTimeouts();
@@ -273,10 +357,15 @@ When done, provide a brief summary of what you accomplished.
   }
 
   /**
-   * Spawn Claude Code CLI and run the prompt
+   * Spawn Claude Code CLI and run the prompt with memory-efficient output handling
    */
-  private runClaudeCode(prompt: string, workDir: string): Promise<string> {
-    return new Promise((resolve, reject) => {
+  private runClaudeCode(prompt: string, workDir: string): Promise<{
+    output: string;
+    truncated: boolean;
+    originalBytes: number;
+    outputFilePath?: string;
+  }> {
+    return new Promise(async (resolve, reject) => {
       // Use claude CLI with --print flag for non-interactive mode
       // and --dangerously-skip-permissions to allow file changes
       // Pass prompt via stdin to avoid command line length limits
@@ -305,29 +394,42 @@ When done, provide a brief summary of what you accomplished.
         this.currentProcess.stdin.end();
       }
 
-      let stdout = '';
-      let stderr = '';
-      let outputTruncated = false;
+      // Use memory-efficient output collectors instead of string concatenation
+      const stdoutCollector = new OutputCollector(this.maxOutputBytes);
+      const stderrCollector = new OutputCollector(1024 * 1024); // 1MB for stderr
+      let totalBytesReceived = 0;
+      let outputFilePath: string | undefined;
+      let outputFileHandle: fs.FileHandle | undefined;
 
-      // Memory leak fix: Helper to append with size limit
-      const appendWithLimit = (buffer: string, chunk: string, maxSize: number): string => {
-        const newBuffer = buffer + chunk;
-        if (newBuffer.length > maxSize) {
-          // Truncate from the beginning, keeping the newest output
-          const truncatePoint = newBuffer.length - maxSize;
-          if (!outputTruncated) {
-            outputTruncated = true;
-            this.logger.warn(`Output exceeded ${maxSize} bytes, truncating older content`);
-          }
-          return '[...truncated...]\n' + newBuffer.slice(truncatePoint);
+      // If writing large outputs to temp files, prepare the file
+      if (this.writeOutputToTempFiles) {
+        try {
+          await fs.mkdir(this.outputTempDir, { recursive: true });
+          const taskId = this.currentContext?.task.id || 'unknown';
+          const timestamp = Date.now();
+          outputFilePath = path.join(this.outputTempDir, `output-${taskId}-${timestamp}.log`);
+          outputFileHandle = await fs.open(outputFilePath, 'w');
+        } catch (err) {
+          this.logger.debug('Failed to open temp output file, falling back to memory-only:', err);
+          outputFilePath = undefined;
         }
-        return newBuffer;
-      };
+      }
 
-      this.currentProcess.stdout?.on('data', (data) => {
+      this.currentProcess.stdout?.on('data', async (data: Buffer) => {
         const chunk = data.toString();
-        // Memory leak fix: Bound stdout size
-        stdout = appendWithLimit(stdout, chunk, this.maxOutputSize);
+        totalBytesReceived += data.length;
+
+        // Write to temp file if enabled and file is open
+        if (outputFileHandle) {
+          try {
+            await outputFileHandle.write(data);
+          } catch (err) {
+            this.logger.debug('Failed to write to temp file:', err);
+          }
+        }
+
+        // Also keep recent output in memory (with size limits)
+        stdoutCollector.append(data);
 
         // Emit output event for TUI if enabled
         if (this.emitOutputEvents && this.currentContext) {
@@ -347,10 +449,9 @@ When done, provide a brief summary of what you accomplished.
         }
       });
 
-      this.currentProcess.stderr?.on('data', (data) => {
+      this.currentProcess.stderr?.on('data', (data: Buffer) => {
         const chunk = data.toString();
-        // Memory leak fix: Bound stderr size
-        stderr = appendWithLimit(stderr, chunk, this.maxOutputSize);
+        stderrCollector.append(data);
 
         // Emit output event for TUI if enabled
         if (this.emitOutputEvents && this.currentContext) {
@@ -370,18 +471,53 @@ When done, provide a brief summary of what you accomplished.
         }
       });
 
-      this.currentProcess.on('close', (code) => {
+      this.currentProcess.on('close', async (code) => {
         this.currentProcess = undefined;
 
+        // Close temp file if open
+        if (outputFileHandle) {
+          try {
+            await outputFileHandle.close();
+          } catch (err) {
+            this.logger.debug('Failed to close temp file:', err);
+          }
+        }
+
+        const stdout = stdoutCollector.toString();
+        const stderr = stderrCollector.toString();
+
+        // Log if output was truncated
+        if (stdoutCollector.wasTruncated) {
+          this.logger.warn(
+            `Output truncated: received ${formatBytes(totalBytesReceived)}, ` +
+            `kept ${formatBytes(stdoutCollector.size)} in memory`
+          );
+        }
+
         if (code === 0) {
-          resolve(stdout);
+          resolve({
+            output: stdout,
+            truncated: stdoutCollector.wasTruncated,
+            originalBytes: totalBytesReceived,
+            outputFilePath: stdoutCollector.wasTruncated ? outputFilePath : undefined,
+          });
         } else {
           reject(new Error(`Claude Code exited with code ${code}: ${stderr || stdout}`));
         }
       });
 
-      this.currentProcess.on('error', (error) => {
+      this.currentProcess.on('error', async (error) => {
         this.currentProcess = undefined;
+
+        // Close temp file if open
+        if (outputFileHandle) {
+          try {
+            await outputFileHandle.close();
+          } catch {
+            // Ignore close errors on failure path
+          }
+        }
+
         reject(new Error(`Failed to spawn Claude Code: ${error.message}`));
       });
     });
