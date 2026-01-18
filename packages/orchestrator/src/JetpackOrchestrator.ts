@@ -44,6 +44,7 @@ import {
 } from '@jetpack-agent/shared';
 import { RuntimeManager } from './RuntimeManager';
 import { MemoryMonitor } from './MemoryMonitor';
+import { ConcurrencyLimiter } from './ConcurrencyLimiter';
 
 // Simple frontmatter parser
 interface TaskFrontmatter {
@@ -206,6 +207,8 @@ export class JetpackOrchestrator extends EventEmitter {
   private _tasksPausedForMemory: boolean = false;
   /** Environment configuration loaded from .env and process.env */
   private _envConfig: EnvironmentConfig;
+  /** Concurrency limiter for controlling task execution */
+  private concurrencyLimiter?: ConcurrencyLimiter;
 
   constructor(private config: JetpackConfig) {
     super();
@@ -689,6 +692,28 @@ export class JetpackOrchestrator extends EventEmitter {
       this.logger.info('Memory monitor initialized');
     }
 
+    // Initialize Concurrency Limiter (always enabled)
+    this.concurrencyLimiter = new ConcurrencyLimiter({
+      config: this.config.memoryConfig?.concurrency,
+    });
+
+    // Connect MemoryMonitor to ConcurrencyLimiter for dynamic throttling
+    if (this.memoryMonitor && this.concurrencyLimiter) {
+      this.memoryMonitor.on('throttle_started', () => {
+        this.concurrencyLimiter?.startThrottle();
+      });
+      this.memoryMonitor.on('throttle_stopped', () => {
+        this.concurrencyLimiter?.stopThrottle();
+      });
+      this.memoryMonitor.on('tasks_paused', () => {
+        this.concurrencyLimiter?.pauseTaskAcquisition();
+      });
+      this.memoryMonitor.on('tasks_resumed', () => {
+        this.concurrencyLimiter?.resumeTaskAcquisition();
+      });
+    }
+
+    this.logger.info('Concurrency limiter initialized');
     this.logger.info('Jetpack orchestrator initialized');
   }
 
@@ -1030,6 +1055,12 @@ export class JetpackOrchestrator extends EventEmitter {
       this.logger.info('Memory monitor stopped');
     }
 
+    // Shutdown Concurrency Limiter (cancels waiting requests)
+    if (this.concurrencyLimiter) {
+      this.concurrencyLimiter.shutdown();
+      this.logger.info('Concurrency limiter shutdown');
+    }
+
     // Stop RuntimeManager if running
     if (this.runtimeManager?.isRunning()) {
       await this.runtimeManager.stop('manual_stop');
@@ -1157,6 +1188,20 @@ export class JetpackOrchestrator extends EventEmitter {
    */
   getMemorySeverity(): MemorySeverity | null {
     return this.memoryMonitor?.getSeverity() || null;
+  }
+
+  /**
+   * Get the concurrency limiter instance
+   */
+  getConcurrencyLimiter(): ConcurrencyLimiter | undefined {
+    return this.concurrencyLimiter;
+  }
+
+  /**
+   * Get current concurrency status
+   */
+  getConcurrencyStatus(): ReturnType<ConcurrencyLimiter['getStatus']> | null {
+    return this.concurrencyLimiter?.getStatus() || null;
   }
 
   /**

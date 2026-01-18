@@ -5,6 +5,7 @@ export * from './PlanStore';
 export * from './PlanParser';
 export * from './RuntimeManager';
 export * from './MemoryMonitor';
+export * from './ConcurrencyLimiter';
 export * from './prompts/agent-system';
 export * from './gracefulShutdown';
 export * from './metrics';
