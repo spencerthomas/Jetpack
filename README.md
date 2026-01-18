@@ -110,21 +110,46 @@ Jetpack has a layered architecture with three core storage adapters and an optio
 
 ### Installation
 
-**Option 1: Install from npm (recommended)**
+**Option 1: Install everything (recommended)**
 
 ```bash
-# Install globally
+# Install the complete package
+npm install jetpack-agent
+
+# Use in your code
+import { JetpackOrchestrator, BeadsAdapter, CASSAdapter } from 'jetpack-agent';
+```
+
+**Option 2: Install CLI globally**
+
+```bash
+# Install the CLI tool
 npm install -g @jetpack-agent/cli
 
 # Now use from anywhere
 jetpack start --agents 3
+jetpack init
+jetpack status
 ```
 
-**Option 2: Build from source**
+**Option 3: Install specific packages**
+
+```bash
+# Install only what you need
+npm install @jetpack-agent/orchestrator    # Core orchestration
+npm install @jetpack-agent/shared          # Types & utilities
+npm install @jetpack-agent/supervisor      # LangGraph supervisor
+npm install @jetpack-agent/beads-adapter   # Task management
+npm install @jetpack-agent/cass-adapter    # Memory system
+npm install @jetpack-agent/mcp-mail-adapter # Messaging
+npm install @jetpack-agent/mcp-server      # Claude Code MCP integration
+```
+
+**Option 4: Build from source**
 
 ```bash
 # Clone the repository
-git clone https://github.com/spencerthomas/Jetpack.git
+git clone https://github.com/agent-jetpack/Jetpack.git
 cd Jetpack
 
 # Install dependencies
