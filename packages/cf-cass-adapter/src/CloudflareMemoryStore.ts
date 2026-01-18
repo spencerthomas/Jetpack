@@ -136,25 +136,8 @@ export class CloudflareMemoryStore implements IMemoryStore {
   }
 
   async initialize(): Promise<void> {
-    // Create tables if they don't exist
-    await this.db.exec(`
-      CREATE TABLE IF NOT EXISTS memories (
-        id TEXT PRIMARY KEY,
-        type TEXT NOT NULL,
-        content TEXT NOT NULL,
-        metadata TEXT,
-        importance REAL DEFAULT 0.5,
-        has_embedding INTEGER DEFAULT 0,
-        created_at INTEGER NOT NULL,
-        last_accessed INTEGER NOT NULL,
-        access_count INTEGER DEFAULT 0
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
-      CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance);
-      CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at);
-      CREATE INDEX IF NOT EXISTS idx_memories_last_accessed ON memories(last_accessed);
-    `);
+    // Tables are created via D1 migrations (see worker-api/migrations/)
+    // No-op for runtime initialization
   }
 
   close(): void {

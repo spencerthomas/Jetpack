@@ -88,38 +88,8 @@ export class CloudflareTaskStore implements ITaskStore {
   }
 
   async initialize(): Promise<void> {
-    // Create tables if they don't exist
-    await this.db.exec(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT,
-        status TEXT NOT NULL DEFAULT 'pending',
-        priority TEXT NOT NULL DEFAULT 'medium',
-        dependencies TEXT,
-        blockers TEXT,
-        required_skills TEXT,
-        estimated_minutes INTEGER,
-        actual_minutes INTEGER,
-        tags TEXT,
-        retry_count INTEGER DEFAULT 0,
-        max_retries INTEGER DEFAULT 2,
-        branch TEXT,
-        origin_branch TEXT,
-        target_branches TEXT,
-        assigned_agent TEXT,
-        last_error TEXT,
-        failure_type TEXT,
-        last_attempt_at INTEGER,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        completed_at INTEGER
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-      CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(assigned_agent);
-      CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
-    `);
+    // Tables are created via D1 migrations (see worker-api/migrations/)
+    // No-op for runtime initialization
   }
 
   async close(): Promise<void> {

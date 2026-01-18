@@ -1,13 +1,13 @@
 name = "jetpack-api"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # D1 Database bindings
 [[d1_databases]]
 binding = "DB"
 database_name = "jetpack-db"
-database_id = "REPLACE_WITH_DATABASE_ID"
+database_id = "b1a99e96-4ea0-48e1-8f33-b67dab7bc002"
 
 # Vectorize index for semantic search
 [[vectorize]]

@@ -146,6 +146,24 @@ app.get('/api/tasks', async (c) => {
   return c.json(tasks);
 });
 
+// Get ready tasks (must be before :id route)
+app.get('/api/tasks/ready', async (c) => {
+  const store = new CloudflareTaskStore({ db: c.env.DB as unknown as import('@jetpack-agent/cf-beads-adapter').D1Database });
+  await store.initialize();
+
+  const tasks = await store.getReadyTasks();
+  return c.json(tasks);
+});
+
+// Get task stats (must be before :id route)
+app.get('/api/tasks/stats', async (c) => {
+  const store = new CloudflareTaskStore({ db: c.env.DB as unknown as import('@jetpack-agent/cf-beads-adapter').D1Database });
+  await store.initialize();
+
+  const stats = await store.getStats();
+  return c.json(stats);
+});
+
 // Get task
 app.get('/api/tasks/:id', async (c) => {
   const store = new CloudflareTaskStore({ db: c.env.DB as unknown as import('@jetpack-agent/cf-beads-adapter').D1Database });
@@ -210,24 +228,6 @@ app.post('/api/tasks/:id/release', async (c) => {
     return c.json({ error: 'Task not found' }, 404);
   }
   return c.json({ released: true });
-});
-
-// Get ready tasks
-app.get('/api/tasks/ready', async (c) => {
-  const store = new CloudflareTaskStore({ db: c.env.DB as unknown as import('@jetpack-agent/cf-beads-adapter').D1Database });
-  await store.initialize();
-
-  const tasks = await store.getReadyTasks();
-  return c.json(tasks);
-});
-
-// Get task stats
-app.get('/api/tasks/stats', async (c) => {
-  const store = new CloudflareTaskStore({ db: c.env.DB as unknown as import('@jetpack-agent/cf-beads-adapter').D1Database });
-  await store.initialize();
-
-  const stats = await store.getStats();
-  return c.json(stats);
 });
 
 // ============================================================================
@@ -350,6 +350,35 @@ app.post('/api/memory', async (c) => {
   return c.json({ id }, 201);
 });
 
+// Get memory stats (must be before :id route)
+app.get('/api/memory/stats', async (c) => {
+  const store = new CloudflareMemoryStore({
+    db: c.env.DB as unknown as import('@jetpack-agent/cf-cass-adapter').D1Database,
+    vectorize: c.env.VECTORIZE as unknown as import('@jetpack-agent/cf-cass-adapter').VectorizeIndex,
+  });
+  await store.initialize();
+
+  const stats = await store.getStats();
+  return c.json(stats);
+});
+
+// Get memories by type (must be before :id route)
+app.get('/api/memory/type/:type', async (c) => {
+  const store = new CloudflareMemoryStore({
+    db: c.env.DB as unknown as import('@jetpack-agent/cf-cass-adapter').D1Database,
+    vectorize: c.env.VECTORIZE as unknown as import('@jetpack-agent/cf-cass-adapter').VectorizeIndex,
+  });
+  await store.initialize();
+
+  const limit = c.req.query('limit');
+  const results = await store.getByType(
+    c.req.param('type') as import('@jetpack-agent/shared').MemoryType,
+    limit ? parseInt(limit, 10) : undefined
+  );
+
+  return c.json(results);
+});
+
 // Get memory
 app.get('/api/memory/:id', async (c) => {
   const store = new CloudflareMemoryStore({
@@ -433,35 +462,6 @@ app.post('/api/memory/compact', async (c) => {
     : await store.adaptiveCompact();
 
   return c.json({ removed });
-});
-
-// Get memory stats
-app.get('/api/memory/stats', async (c) => {
-  const store = new CloudflareMemoryStore({
-    db: c.env.DB as unknown as import('@jetpack-agent/cf-cass-adapter').D1Database,
-    vectorize: c.env.VECTORIZE as unknown as import('@jetpack-agent/cf-cass-adapter').VectorizeIndex,
-  });
-  await store.initialize();
-
-  const stats = await store.getStats();
-  return c.json(stats);
-});
-
-// Get memories by type
-app.get('/api/memory/type/:type', async (c) => {
-  const store = new CloudflareMemoryStore({
-    db: c.env.DB as unknown as import('@jetpack-agent/cf-cass-adapter').D1Database,
-    vectorize: c.env.VECTORIZE as unknown as import('@jetpack-agent/cf-cass-adapter').VectorizeIndex,
-  });
-  await store.initialize();
-
-  const limit = c.req.query('limit');
-  const results = await store.getByType(
-    c.req.param('type') as import('@jetpack-agent/shared').MemoryType,
-    limit ? parseInt(limit, 10) : undefined
-  );
-
-  return c.json(results);
 });
 
 // Backfill embeddings
