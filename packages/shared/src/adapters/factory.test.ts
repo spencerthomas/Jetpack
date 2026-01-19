@@ -181,8 +181,8 @@ describe('isAdapterModeSupported', () => {
     expect(isAdapterModeSupported('hybrid')).toBe(true);
   });
 
-  it('should return false for edge mode', () => {
-    expect(isAdapterModeSupported('edge')).toBe(false);
+  it('should return true for edge mode (now supported via HTTP adapters)', () => {
+    expect(isAdapterModeSupported('edge')).toBe(true);
   });
 });
 
@@ -253,7 +253,7 @@ describe('createAdapters', () => {
     });
   });
 
-  it('should throw for cloudflare task adapter', () => {
+  it('should create HttpTaskStore for cloudflare task adapter', () => {
     const config: HybridAdapterConfig = {
       mode: 'hybrid',
       cloudflare: {
@@ -270,12 +270,17 @@ describe('createAdapters', () => {
     const options = createMockOptions();
     const factories = createMockFactories();
 
-    expect(() => createAdapters(config, options, factories)).toThrow(
-      CloudflareAdaptersNotImplementedError
-    );
+    const bundle = createAdapters(config, options, factories);
+    expect(bundle.taskStore).toBeDefined();
+    expect(bundle.mode).toBe('hybrid');
+    // Local factories should still be called for mail and memory
+    expect(factories.createMailBus).toHaveBeenCalled();
+    expect(factories.createMemoryStore).toHaveBeenCalled();
+    // Task store factory should NOT be called (HttpTaskStore used instead)
+    expect(factories.createTaskStore).not.toHaveBeenCalled();
   });
 
-  it('should throw for cloudflare mail adapter', () => {
+  it('should create HttpMailBus for cloudflare mail adapter', () => {
     const config: HybridAdapterConfig = {
       mode: 'hybrid',
       cloudflare: {
@@ -292,12 +297,17 @@ describe('createAdapters', () => {
     const options = createMockOptions();
     const factories = createMockFactories();
 
-    expect(() => createAdapters(config, options, factories)).toThrow(
-      CloudflareAdaptersNotImplementedError
-    );
+    const bundle = createAdapters(config, options, factories);
+    expect(bundle.mailBus).toBeDefined();
+    expect(bundle.mode).toBe('hybrid');
+    // Local factories should still be called for tasks and memory
+    expect(factories.createTaskStore).toHaveBeenCalled();
+    expect(factories.createMemoryStore).toHaveBeenCalled();
+    // Mail factory should NOT be called (HttpMailBus used instead)
+    expect(factories.createMailBus).not.toHaveBeenCalled();
   });
 
-  it('should throw for cloudflare memory adapter', () => {
+  it('should create HttpMemoryStore for cloudflare memory adapter', () => {
     const config: HybridAdapterConfig = {
       mode: 'hybrid',
       cloudflare: {
@@ -314,12 +324,17 @@ describe('createAdapters', () => {
     const options = createMockOptions();
     const factories = createMockFactories();
 
-    expect(() => createAdapters(config, options, factories)).toThrow(
-      CloudflareAdaptersNotImplementedError
-    );
+    const bundle = createAdapters(config, options, factories);
+    expect(bundle.memoryStore).toBeDefined();
+    expect(bundle.mode).toBe('hybrid');
+    // Local factories should still be called for tasks and mail
+    expect(factories.createTaskStore).toHaveBeenCalled();
+    expect(factories.createMailBus).toHaveBeenCalled();
+    // Memory factory should NOT be called (HttpMemoryStore used instead)
+    expect(factories.createMemoryStore).not.toHaveBeenCalled();
   });
 
-  it('should throw for edge mode (all cloudflare)', () => {
+  it('should create all HTTP adapters for edge mode', () => {
     const config: HybridAdapterConfig = {
       mode: 'edge',
       cloudflare: {
@@ -331,8 +346,14 @@ describe('createAdapters', () => {
     const options = createMockOptions();
     const factories = createMockFactories();
 
-    expect(() => createAdapters(config, options, factories)).toThrow(
-      CloudflareAdaptersNotImplementedError
-    );
+    const bundle = createAdapters(config, options, factories);
+    expect(bundle.taskStore).toBeDefined();
+    expect(bundle.mailBus).toBeDefined();
+    expect(bundle.memoryStore).toBeDefined();
+    expect(bundle.mode).toBe('edge');
+    // No local factories should be called
+    expect(factories.createTaskStore).not.toHaveBeenCalled();
+    expect(factories.createMailBus).not.toHaveBeenCalled();
+    expect(factories.createMemoryStore).not.toHaveBeenCalled();
   });
 });

@@ -250,6 +250,8 @@ export class LeaseDO {
 | Package | Class | Backend | Status |
 |---------|-------|---------|--------|
 | `@jetpack-agent/shared` | `ITaskStore`, `IMailBus`, `IMemoryStore` | Interfaces | ✅ Complete |
+| `@jetpack-agent/shared` | `HttpTaskStore`, `HttpMailBus`, `HttpMemoryStore` | HTTP Client | ✅ Complete |
+| `@jetpack-agent/shared` | `createAdapters` factory | Mode-based creation | ✅ Complete |
 | `@jetpack-agent/beads-adapter` | `BeadsAdapter` | Local SQLite | ✅ Implements ITaskStore |
 | `@jetpack-agent/mcp-mail-adapter` | `MCPMailAdapter` | Local file-based | ✅ Implements IMailBus |
 | `@jetpack-agent/cass-adapter` | `CASSAdapter` | Local SQLite | ✅ Implements IMemoryStore |
@@ -301,11 +303,13 @@ const memoryStore = new CloudflareMemoryStore({
 3. ✅ Create cf-cass-adapter package (CloudflareMemoryStore)
 4. ⏳ Deploy Worker + D1 + Durable Objects
 
-### Phase 3: Hybrid Mode (Next)
-1. Add configuration for adapter selection
-2. Support mixed mode (some local, some cloud)
-3. Add sync between local and cloud states
-4. Implement conflict resolution
+### Phase 3: Hybrid Mode (In Progress)
+1. ✅ Add configuration for adapter selection (HybridModeSettings in settings.ts)
+2. ✅ Support mixed mode (some local, some cloud) - createAdapters factory
+3. ✅ HTTP client adapters (HttpTaskStore, HttpMailBus, HttpMemoryStore)
+4. ⏳ Integrate factory into JetpackOrchestrator
+5. ⏳ Add sync between local and cloud states
+6. ⏳ Implement conflict resolution
 
 ### Phase 4: Full Edge Mode
 1. All state on Cloudflare

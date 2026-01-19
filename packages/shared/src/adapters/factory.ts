@@ -11,6 +11,7 @@
  */
 
 import { HybridAdapterConfig, ITaskStore, IMailBus, IMemoryStore } from './interfaces';
+import { HttpTaskStore, HttpMailBus, HttpMemoryStore, HttpAdapterConfig } from './http-adapters';
 
 /**
  * Adapter mode - determines which backend adapters to use
@@ -184,7 +185,7 @@ export function isAdapterModeSupported(mode: AdapterMode): boolean {
     case 'hybrid':
       return true;
     case 'edge':
-      return false;
+      return true; // Now supported via HTTP adapters
     default:
       return false;
   }
@@ -284,9 +285,23 @@ export function createAdapters(
   const mailAdapterType = getAdapterType(config, 'mail');
   const memoryAdapterType = getAdapterType(config, 'memory');
 
+  // Build HTTP config if needed for cloudflare adapters
+  const httpConfig: HttpAdapterConfig | null =
+    config.cloudflare?.workerUrl && config.cloudflare?.apiToken
+      ? {
+          workerUrl: config.cloudflare.workerUrl,
+          apiToken: config.cloudflare.apiToken,
+        }
+      : null;
+
   let taskStore: ITaskStore;
   if (taskAdapterType === 'cloudflare') {
-    throw new CloudflareAdaptersNotImplementedError('task store');
+    if (!httpConfig) {
+      throw new AdapterConfigurationError(
+        'Cloudflare task store requires workerUrl and apiToken in cloudflare config'
+      );
+    }
+    taskStore = new HttpTaskStore(httpConfig);
   } else {
     taskStore = factories.createTaskStore({
       beadsDir: workDir + '/.beads',
@@ -297,7 +312,12 @@ export function createAdapters(
 
   let mailBus: IMailBus;
   if (mailAdapterType === 'cloudflare') {
-    throw new CloudflareAdaptersNotImplementedError('mail bus');
+    if (!httpConfig) {
+      throw new AdapterConfigurationError(
+        'Cloudflare mail bus requires workerUrl and apiToken in cloudflare config'
+      );
+    }
+    mailBus = new HttpMailBus({ ...httpConfig, agentId });
   } else {
     mailBus = factories.createMailBus({
       mailDir: workDir + '/.jetpack/mail',
@@ -307,7 +327,12 @@ export function createAdapters(
 
   let memoryStore: IMemoryStore;
   if (memoryAdapterType === 'cloudflare') {
-    throw new CloudflareAdaptersNotImplementedError('memory store');
+    if (!httpConfig) {
+      throw new AdapterConfigurationError(
+        'Cloudflare memory store requires workerUrl and apiToken in cloudflare config'
+      );
+    }
+    memoryStore = new HttpMemoryStore(httpConfig);
   } else {
     memoryStore = factories.createMemoryStore({
       cassDir: workDir + '/.cass',
