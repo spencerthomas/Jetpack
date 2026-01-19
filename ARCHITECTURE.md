@@ -159,40 +159,76 @@ All: Session Search (learn from history)
 - **Bug Scanner**: CLI wrapper
 - **Search**: Meilisearch or Typesense
 
-## File Structure
+## File Structure (Jan 2026)
 
 ```
 jetpack/
 ├── packages/
-│   ├── orchestrator/       # Core coordination engine
-│   ├── beads-adapter/      # Beads integration
-│   ├── cass-adapter/       # CASS integration
-│   ├── mcp-mail-adapter/   # MCP Mail integration
-│   ├── ntm-adapter/        # Named Tmux Manager
-│   ├── scanner-adapter/    # Bug Scanner integration
-│   ├── slb-adapter/        # Simultaneous Launch Button
-│   ├── search-adapter/     # Session search integration
-│   └── agent-farm/         # Claude Code Agent Farm
+│   ├── orchestrator/       # Core coordination engine (JetpackOrchestrator)
+│   ├── shared/             # Types, utilities, adapter interfaces
+│   ├── supervisor/         # LangGraph supervisor (Planner → Monitor)
+│   │
+│   │── # Local Adapters
+│   ├── beads-adapter/      # SQLite task storage (ITaskStore)
+│   ├── cass-adapter/       # SQLite memory with embeddings (IMemoryStore)
+│   ├── mcp-mail-adapter/   # File-based pub/sub (IMailBus)
+│   │
+│   │── # Cloudflare Adapters (Hybrid/Edge Mode)
+│   ├── cf-beads-adapter/   # D1 task storage (CloudflareTaskStore)
+│   ├── cf-cass-adapter/    # D1 + Vectorize memory (CloudflareMemoryStore)
+│   ├── cf-mail-adapter/    # Durable Objects messaging (CloudflareMailBus)
+│   ├── worker-api/         # Hono-based Cloudflare Worker API gateway
+│   │
+│   │── # Quality & Validation
+│   ├── quality-adapter/    # Quality metrics and regression detection
+│   ├── browser-validator/  # Browser-based UI validation
+│   │
+│   │── # UI & CLI
+│   ├── cli-tui/            # Terminal UI components (Ink/React)
+│   ├── mcp-server/         # MCP server for external tool integration
+│   └── jetpack-agent/      # Core agent implementation
+│
 ├── apps/
-│   ├── cli/               # Jetpack CLI
-│   ├── web/               # Web dashboard (Beads Viewer + Farm UI)
-│   └── api/               # REST/GraphQL API server
-├── libs/
-│   ├── shared/            # Common utilities
-│   ├── types/             # TypeScript definitions
-│   └── protocols/         # Communication protocols
-├── tools/
-│   ├── beads/             # Beads submodule/vendored
-│   ├── cass/              # CASS submodule
-│   ├── mcp-mail/          # MCP Mail submodule
-│   ├── ntm/               # NTM submodule
-│   ├── scanner/           # Bug Scanner submodule
-│   ├── slb/               # SLB submodule
-│   └── search/            # Search submodule
-├── .beads/                # Beads task storage
-├── .cass/                 # CASS memory storage
-└── docker-compose.yml     # Full stack deployment
+│   ├── cli/               # Jetpack CLI entry point
+│   └── web/               # Next.js web dashboard
+│
+├── .beads/                # Local task storage (SQLite + JSONL)
+├── .cass/                 # Local memory storage (SQLite)
+├── .jetpack/              # Runtime state (agents.json, mail/)
+└── docs/                  # Documentation
+    ├── HYBRID_ARCHITECTURE.md  # Cloudflare hybrid architecture
+    └── JETPACK_COMPLETE_GUIDE.md  # Full user guide
 ```
+
+## Hybrid Cloudflare Architecture
+
+Jetpack supports three execution modes:
+
+| Mode | State Storage | Execution | Use Case |
+|------|---------------|-----------|----------|
+| `local` | SQLite (BeadsAdapter, CASSAdapter) | Local | Single machine |
+| `hybrid` | Cloudflare (D1, Vectorize, DO) | Local | Shared state, local exec |
+| `edge` | Cloudflare (all) | Worker | Full serverless |
+
+```bash
+# Local mode (default)
+JETPACK_MODE=local jetpack start
+
+# Hybrid mode - state on Cloudflare, execution local
+JETPACK_MODE=hybrid \
+CLOUDFLARE_API_URL=https://jetpack-api.your-account.workers.dev \
+CLOUDFLARE_API_TOKEN=xxx \
+jetpack start
+```
+
+### HTTP Client Adapters
+
+For hybrid/edge modes, the CLI uses HTTP adapters:
+- `HttpTaskStore` - Calls Worker API for task CRUD
+- `HttpMailBus` - HTTP publish + WebSocket subscriptions
+- `HttpMemoryStore` - Calls Worker API for memory/search
+
+See `docs/HYBRID_ARCHITECTURE.md` for full details.
 
 ## Key Features
 
@@ -226,7 +262,7 @@ jetpack/
 ### Phase 1: Foundation ✅
 - [x] Monorepo setup (pnpm workspaces)
 - [x] Core orchestrator skeleton
-- [x] Beads adapter (task CRUD with JSONL storage)
+- [x] Beads adapter (task CRUD with SQLite + JSONL storage)
 - [x] MCP Mail adapter (pub/sub messaging)
 
 ### Phase 2: Agent Coordination ✅
@@ -240,6 +276,8 @@ jetpack/
 - [x] File leasing for concurrent safety
 - [x] Error recovery and task retry
 - [x] Heartbeat monitoring
+- [x] Graceful shutdown with state persistence
+- [x] Memory leak prevention (bounded buffers)
 
 ### Phase 4: Intelligence & UI ✅
 - [x] LangGraph Supervisor (Planner → Assigner → Monitor → Coordinator)
@@ -247,12 +285,25 @@ jetpack/
 - [x] Memory dashboard with stats and actions
 - [x] Agent lifecycle visualization
 - [x] Plan management and templates
+- [x] TUI dashboard (cli-tui package)
 
-### Phase 5: Polish & Deploy (In Progress)
+### Phase 5: Hybrid Cloudflare ✅
+- [x] Cloudflare adapters (cf-beads, cf-cass, cf-mail)
+- [x] Worker API gateway (Hono + D1 + Durable Objects)
+- [x] HTTP client adapters for hybrid mode
+- [x] Adapter factory with mode selection
+- [x] Orchestrator integration (adapterMode)
+
+### Phase 6: Quality & Validation ✅
+- [x] Quality adapter (metrics, regressions)
+- [x] Browser validator (UI testing)
+- [x] Runtime manager (limits, end states)
+
+### Phase 7: Future
 - [ ] Docker compose setup
-- [ ] End-to-end testing
-- [x] Documentation
-- [x] Example workflows
+- [ ] Multi-repository support
+- [ ] Real-time WebSocket updates
+- [ ] Cloud-hosted agent farm
 
 ## Usage Example
 
@@ -293,16 +344,23 @@ jetpack view --task bd-a1b2
 
 ## Future Enhancements
 
-- [x] Memory system dashboard ✅
-- [x] Plan management UI ✅
-- [x] LangGraph supervisor visualization ✅
-- [x] Dark mode with cyan accent ✅
-- [x] Agent spawning UI with harness selection ✅
-- [x] Hierarchical task tree view ✅
+### Completed (Jan 2026)
+- [x] Memory system dashboard
+- [x] Plan management UI
+- [x] LangGraph supervisor visualization
+- [x] Dark mode with cyan accent
+- [x] Agent spawning UI with harness selection
+- [x] Hierarchical task tree view
+- [x] Hybrid Cloudflare architecture
+- [x] Quality metrics and regression detection
+- [x] TUI dashboard for terminal
+- [x] Graceful shutdown with state persistence
+- [x] Memory monitoring and cleanup
+
+### Planned
 - [ ] Multi-repository support
-- [ ] Cloud-hosted agent farm
+- [ ] Cloud-hosted agent farm (full edge mode)
 - [ ] Custom agent personas and specializations
 - [ ] Integration with GitHub Issues, Jira, Linear
-- [ ] Real-time collaboration features
+- [ ] Real-time collaboration via WebSocket
 - [ ] Agent performance metrics and leaderboards
-- [ ] WebSocket for instant UI updates
