@@ -24,6 +24,8 @@ export const MemoryEntrySchema = z.object({
   createdAt: z.date(),
   lastAccessed: z.date(),
   accessCount: z.number().default(0),
+  // Sync version for incremental synchronization
+  syncVersion: z.number().optional(),          // Monotonic version for change tracking
 });
 
 export type MemoryEntry = z.infer<typeof MemoryEntrySchema>;

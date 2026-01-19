@@ -118,6 +118,8 @@ export const PlanSchema = z.object({
   // Branch tagging for multi-branch projects
   branch: z.string().optional(),               // Current branch when plan was created
   targetBranches: z.array(z.string()).optional(),  // Branches this plan applies to
+  // Sync version for incremental synchronization
+  syncVersion: z.number().optional(),          // Monotonic version for change tracking
 });
 
 export interface Plan {
@@ -140,6 +142,8 @@ export interface Plan {
   // Branch tagging for multi-branch projects
   branch?: string;
   targetBranches?: string[];
+  // Sync version for incremental synchronization
+  syncVersion?: number;          // Monotonic version for change tracking
 }
 
 // Progress event for real-time updates

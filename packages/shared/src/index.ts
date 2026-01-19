@@ -17,6 +17,9 @@ export * from './adapters';
 // Services
 export * from './services/SkillRegistry';
 
+// Sync
+export * from './sync';
+
 // Utilities
 export * from './utils/logger';
 export * from './utils/hash';

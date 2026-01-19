@@ -46,6 +46,8 @@ export const TaskSchema = z.object({
   branch: z.string().optional(),               // Current branch (e.g., "feature/auth")
   originBranch: z.string().optional(),         // Branch where task was created
   targetBranches: z.array(z.string()).optional().default([]),  // Branches this task applies to
+  // Sync version for incremental synchronization
+  syncVersion: z.number().optional(),          // Monotonic version for change tracking
 });
 
 export type Task = z.infer<typeof TaskSchema>;

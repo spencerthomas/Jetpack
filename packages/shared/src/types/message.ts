@@ -35,6 +35,8 @@ export const MessageSchema = z.object({
   ackRequired: z.boolean().optional(), // Whether ack is required
   ackedAt: z.date().optional(), // When it was acknowledged
   ackedBy: z.string().optional(), // Agent ID that acknowledged
+  // Sync version for incremental synchronization
+  syncVersion: z.number().optional(), // Monotonic version for change tracking
 });
 
 export type Message = z.infer<typeof MessageSchema>;
