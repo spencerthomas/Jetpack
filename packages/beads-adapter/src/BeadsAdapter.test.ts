@@ -395,7 +395,7 @@ describe('BeadsAdapter', () => {
     });
 
     it('should calculate average completion time', async () => {
-      const stats = await adapter.getStats();
+      const stats = await adapter.getExtendedStats();
       expect(stats.avgCompletionTime).toBe(45); // (30 + 60) / 2
     });
   });

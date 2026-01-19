@@ -17,8 +17,9 @@ export * from './adapters';
 // Services
 export * from './services/SkillRegistry';
 
-// Sync
-export * from './sync';
+// Sync - NOT exported from main barrel to avoid Node.js EventEmitter dependency in CF Workers
+// Import sync modules directly: import { StateSync } from '@jetpack-agent/shared/sync'
+// export * from './sync';
 
 // Utilities
 export * from './utils/logger';
