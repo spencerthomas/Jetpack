@@ -303,13 +303,13 @@ const memoryStore = new CloudflareMemoryStore({
 3. ✅ Create cf-cass-adapter package (CloudflareMemoryStore)
 4. ⏳ Deploy Worker + D1 + Durable Objects
 
-### Phase 3: Hybrid Mode (In Progress)
+### Phase 3: Hybrid Mode ✅ COMPLETE
 1. ✅ Add configuration for adapter selection (HybridModeSettings in settings.ts)
 2. ✅ Support mixed mode (some local, some cloud) - createAdapters factory
 3. ✅ HTTP client adapters (HttpTaskStore, HttpMailBus, HttpMemoryStore)
-4. ⏳ Integrate factory into JetpackOrchestrator
-5. ⏳ Add sync between local and cloud states
-6. ⏳ Implement conflict resolution
+4. ✅ Integrate factory into JetpackOrchestrator (adapterMode, getTaskStore, getMemoryStore)
+5. ⏳ Add sync between local and cloud states (Future)
+6. ⏳ Implement conflict resolution (Future)
 
 ### Phase 4: Full Edge Mode
 1. All state on Cloudflare

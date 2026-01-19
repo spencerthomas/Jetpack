@@ -32,6 +32,11 @@ import {
   HybridMode,
   EnvironmentConfig,
   loadEnvironmentConfig,
+  ITaskStore,
+  IMemoryStore,
+  createAdapters,
+  HybridAdapterConfig,
+  AdapterMode,
 } from '@jetpack-agent/shared';
 import { RuntimeManager } from './RuntimeManager';
 
@@ -159,6 +164,12 @@ export class JetpackOrchestrator extends EventEmitter {
   private logger: Logger;
   private beads!: BeadsAdapter;
   private cass!: CASSAdapter;
+  /** Task store (may be local BeadsAdapter or HTTP adapter in hybrid mode) */
+  private taskStore!: ITaskStore;
+  /** Memory store (may be local CASSAdapter or HTTP adapter in hybrid mode) */
+  private memoryStore!: IMemoryStore;
+  /** Current adapter mode */
+  private _adapterMode: AdapterMode = 'local';
   private agents: AgentController[] = [];
   private agentMails: Map<string, MCPMailAdapter> = new Map();
   private workDir: string;
@@ -224,6 +235,27 @@ export class JetpackOrchestrator extends EventEmitter {
    */
   get tuiMode(): boolean {
     return this._tuiMode;
+  }
+
+  /**
+   * Get the current adapter mode (local, hybrid, or edge)
+   */
+  get adapterMode(): AdapterMode {
+    return this._adapterMode;
+  }
+
+  /**
+   * Get the task store interface (works for any adapter mode)
+   */
+  getTaskStore(): ITaskStore {
+    return this.taskStore;
+  }
+
+  /**
+   * Get the memory store interface (works for any adapter mode)
+   */
+  getMemoryStore(): IMemoryStore {
+    return this.memoryStore;
   }
 
   /**
@@ -476,23 +508,97 @@ export class JetpackOrchestrator extends EventEmitter {
       this.logger.info(`Detected project skills: ${this._projectSkills.join(', ')}`);
     }
 
-    // Initialize Beads adapter
-    const beadsConfig: BeadsAdapterConfig = {
-      beadsDir,
-      autoCommit: true,
-      gitEnabled: true,
-    };
-    this.beads = new BeadsAdapter(beadsConfig);
-    await this.beads.initialize();
+    // Determine adapter mode from config
+    const hybridMode = this.config.hybridSettings?.mode || 'local';
+    this._adapterMode = hybridMode;
 
-    // Initialize CASS memory
-    const cassConfig: CASSConfig = {
-      cassDir,
-      compactionThreshold: 0.3,
-      maxEntries: 10000,
+    // Build hybrid adapter config
+    const hybridConfig: HybridAdapterConfig = {
+      mode: hybridMode,
+      cloudflare: hybridMode !== 'local' && this.config.hybridSettings?.cloudflareUrl ? {
+        workerUrl: this.config.hybridSettings.cloudflareUrl,
+        apiToken: this.config.hybridSettings.apiToken || '',
+        accountId: '',
+      } : undefined,
     };
-    this.cass = new CASSAdapter(cassConfig);
-    await this.cass.initialize();
+
+    // Create adapters using factory (supports local, hybrid, and edge modes)
+    if (hybridMode !== 'local' && hybridConfig.cloudflare) {
+      this.logger.info(`Initializing adapters in ${hybridMode} mode`);
+
+      // Use adapter factory for hybrid/edge modes
+      const bundle = createAdapters(
+        hybridConfig,
+        {
+          workDir: this.workDir,
+          agentId: 'orchestrator',
+        },
+        {
+          // Factory functions for local adapters (used when adapter type is 'local')
+          createTaskStore: (config) => {
+            const adapter = new BeadsAdapter({
+              beadsDir: config.beadsDir,
+              autoCommit: config.autoCommit,
+              gitEnabled: config.gitEnabled,
+            });
+            return adapter;
+          },
+          createMailBus: (config) => {
+            const adapter = new MCPMailAdapter({
+              mailDir: config.mailDir,
+              agentId: config.agentId,
+            });
+            return adapter;
+          },
+          createMemoryStore: (config) => {
+            const adapter = new CASSAdapter({
+              cassDir: config.cassDir,
+              compactionThreshold: config.compactionThreshold,
+              maxEntries: config.maxEntries,
+              autoGenerateEmbeddings: config.autoGenerateEmbeddings,
+            });
+            return adapter;
+          },
+        }
+      );
+
+      this.taskStore = bundle.taskStore;
+      this.memoryStore = bundle.memoryStore;
+      await this.taskStore.initialize();
+      await this.memoryStore.initialize();
+
+      // For compatibility, also set beads/cass if they're local adapters
+      if (bundle.mode === 'local' || bundle.mode === 'hybrid') {
+        // In hybrid mode, we might have local adapters - cast if appropriate
+        this.beads = this.taskStore as BeadsAdapter;
+        this.cass = this.memoryStore as CASSAdapter;
+      }
+
+      this.logger.info(`Adapters initialized in ${bundle.mode} mode`);
+    } else {
+      // Local mode - use direct adapter creation (original behavior)
+      this.logger.info('Initializing adapters in local mode');
+
+      // Initialize Beads adapter
+      const beadsConfig: BeadsAdapterConfig = {
+        beadsDir,
+        autoCommit: true,
+        gitEnabled: true,
+      };
+      this.beads = new BeadsAdapter(beadsConfig);
+      await this.beads.initialize();
+      this.taskStore = this.beads;
+
+      // Initialize CASS memory
+      const cassConfig: CASSConfig = {
+        cassDir,
+        compactionThreshold: 0.3,
+        maxEntries: 10000,
+      };
+      this.cass = new CASSAdapter(cassConfig);
+      await this.cass.initialize();
+      this.memoryStore = this.cass;
+    }
 
     // Initialize RuntimeManager if limits are configured
     if (this.config.runtimeLimits) {
