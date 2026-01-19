@@ -5,7 +5,7 @@ import * as path from 'path';
 import {
   MemoryConfig,
   MemoryConfigSchema,
-  MemoryStats,
+  HeapStats,
   MemorySeverity,
   MemoryEvent,
   MemoryAction,
@@ -20,7 +20,7 @@ export interface MemoryMonitorConfig {
   /** Memory configuration (uses defaults if not provided) */
   memoryConfig?: Partial<MemoryConfig>;
   /** Callback when severity level changes */
-  onSeverityChange?: (from: MemorySeverity, to: MemorySeverity, stats: MemoryStats) => void;
+  onSeverityChange?: (from: MemorySeverity, to: MemorySeverity, stats: HeapStats) => void;
   /** Callback when tasks should be paused */
   onPauseTasks?: () => void;
   /** Callback when tasks can be resumed */
@@ -116,7 +116,7 @@ export class MemoryMonitor extends EventEmitter {
   /**
    * Get current memory statistics
    */
-  getStats(): MemoryStats {
+  getStats(): HeapStats {
     const mem = process.memoryUsage();
     return {
       heapUsed: mem.heapUsed,
@@ -244,7 +244,7 @@ export class MemoryMonitor extends EventEmitter {
   /**
    * Handle a severity level change
    */
-  private handleSeverityChange(from: MemorySeverity, to: MemorySeverity, stats: MemoryStats): void {
+  private handleSeverityChange(from: MemorySeverity, to: MemorySeverity, stats: HeapStats): void {
     const isEscalating = this.severityLevel(to) > this.severityLevel(from);
 
     if (isEscalating) {
@@ -271,7 +271,7 @@ export class MemoryMonitor extends EventEmitter {
   /**
    * Handle state transitions for throttling and pausing
    */
-  private handleStateTransitions(_from: MemorySeverity, to: MemorySeverity, stats: MemoryStats): void {
+  private handleStateTransitions(_from: MemorySeverity, to: MemorySeverity, stats: HeapStats): void {
     const toLevel = this.severityLevel(to);
 
     // Throttling: starts at elevated, stops below elevated
@@ -310,7 +310,7 @@ export class MemoryMonitor extends EventEmitter {
   /**
    * Execute actions based on current severity
    */
-  private executeActions(severity: MemorySeverity, stats: MemoryStats): void {
+  private executeActions(severity: MemorySeverity, stats: HeapStats): void {
     const actions = this.getActionsForSeverity(severity);
 
     for (const action of actions) {
@@ -339,7 +339,7 @@ export class MemoryMonitor extends EventEmitter {
   /**
    * Execute a single action
    */
-  private executeAction(action: MemoryAction, severity: MemorySeverity, stats: MemoryStats): void {
+  private executeAction(action: MemoryAction, severity: MemorySeverity, stats: HeapStats): void {
     switch (action) {
       case 'log':
         this.logger.warn(`Memory ${severity}: ${formatBytes(stats.heapUsed)} heap used`);
@@ -443,7 +443,7 @@ export class MemoryMonitor extends EventEmitter {
    * Get a summary of current memory status
    */
   getSummary(): {
-    stats: MemoryStats;
+    stats: HeapStats;
     severity: MemorySeverity;
     isThrottling: boolean;
     isPaused: boolean;

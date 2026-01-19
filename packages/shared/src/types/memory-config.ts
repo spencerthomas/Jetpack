@@ -157,7 +157,7 @@ export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
 /**
  * Memory statistics snapshot
  */
-export const MemoryStatsSchema = z.object({
+export const HeapStatsSchema = z.object({
   /** Heap used in bytes */
   heapUsed: z.number().int().min(0),
 
@@ -179,20 +179,20 @@ export const MemoryStatsSchema = z.object({
   /** Timestamp of this snapshot */
   timestamp: z.date(),
 });
-export type MemoryStats = z.infer<typeof MemoryStatsSchema>;
+export type HeapStats = z.infer<typeof HeapStatsSchema>;
 
 /**
  * Events emitted by MemoryMonitor
  */
 export type MemoryEvent =
-  | { type: 'severity_changed'; from: MemorySeverity; to: MemorySeverity; stats: MemoryStats }
-  | { type: 'gc_triggered'; stats: MemoryStats; reason: string }
-  | { type: 'throttle_started'; stats: MemoryStats }
-  | { type: 'throttle_stopped'; stats: MemoryStats }
-  | { type: 'tasks_paused'; stats: MemoryStats }
-  | { type: 'tasks_resumed'; stats: MemoryStats }
-  | { type: 'emergency_shutdown'; stats: MemoryStats }
-  | { type: 'heap_dump_created'; path: string; stats: MemoryStats };
+  | { type: 'severity_changed'; from: MemorySeverity; to: MemorySeverity; stats: HeapStats }
+  | { type: 'gc_triggered'; stats: HeapStats; reason: string }
+  | { type: 'throttle_started'; stats: HeapStats }
+  | { type: 'throttle_stopped'; stats: HeapStats }
+  | { type: 'tasks_paused'; stats: HeapStats }
+  | { type: 'tasks_resumed'; stats: HeapStats }
+  | { type: 'emergency_shutdown'; stats: HeapStats }
+  | { type: 'heap_dump_created'; path: string; stats: HeapStats };
 
 /**
  * Default memory configuration for quick initialization

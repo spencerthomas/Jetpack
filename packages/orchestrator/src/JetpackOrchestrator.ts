@@ -39,7 +39,7 @@ import {
   AdapterMode,
   MemoryConfig,
   MemoryEvent,
-  MemoryStats,
+  HeapStats,
   MemorySeverity,
 } from '@jetpack-agent/shared';
 import { RuntimeManager } from './RuntimeManager';
@@ -209,6 +209,10 @@ export class JetpackOrchestrator extends EventEmitter {
   private _envConfig: EnvironmentConfig;
   /** Concurrency limiter for controlling task execution */
   private concurrencyLimiter?: ConcurrencyLimiter;
+  /** Memory leak fix: Memory monitoring interval */
+  private memoryMonitorInterval?: NodeJS.Timeout;
+  /** Memory leak fix: Track last heap warning time to avoid spam */
+  private lastMemoryWarningTime: number = 0;
 
   constructor(private config: JetpackConfig) {
     super();
@@ -1175,7 +1179,7 @@ export class JetpackOrchestrator extends EventEmitter {
   /**
    * Get current memory stats (if memory monitoring is enabled)
    */
-  getMemoryStats(): MemoryStats | null {
+  getHeapStats(): HeapStats | null {
     return this.memoryMonitor?.getStats() || null;
   }
 
