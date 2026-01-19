@@ -1,4 +1,8 @@
-# Jetpack: Complete Getting Started Guide
+# Jetpack: Getting Started Guide
+
+> **Quick Start** - Get up and running in 5 minutes
+>
+> For comprehensive documentation, see [docs/JETPACK_COMPLETE_GUIDE.md](docs/JETPACK_COMPLETE_GUIDE.md)
 
 ## What is Jetpack?
 
@@ -373,5 +377,7 @@ jetpack start
 ## Next Steps
 
 1. Try the demo: `jetpack demo --agents 5`
-2. Read the full [README](README.md) for advanced features
+2. Read the [Complete Reference Guide](docs/JETPACK_COMPLETE_GUIDE.md) for detailed documentation
 3. Explore the web UI at http://localhost:3002
+4. See [ARCHITECTURE.md](ARCHITECTURE.md) for system design details
+5. Check [docs/HYBRID_ARCHITECTURE.md](docs/HYBRID_ARCHITECTURE.md) for Cloudflare hybrid mode

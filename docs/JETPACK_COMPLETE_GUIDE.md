@@ -3,7 +3,13 @@
 > The Definitive Reference for the Multi-Agent Swarm Development Stack
 
 **Version:** 1.0
-**Last Updated:** January 2025
+**Last Updated:** January 2026
+
+> **Quick Start:** For a faster introduction, see [GUIDE.md](../GUIDE.md) in the project root.
+>
+> **Architecture:** For system design details, see [ARCHITECTURE.md](../ARCHITECTURE.md).
+>
+> **Hybrid Mode:** For Cloudflare hybrid architecture, see [HYBRID_ARCHITECTURE.md](./HYBRID_ARCHITECTURE.md).
 
 ---
 
@@ -1857,19 +1863,21 @@ await custom.initialize();
 - [x] **Inbox Redesign** - 3-panel layout with threads and categories
 - [x] **Hierarchical Tasks** - Tree view with Epic/Task/Sub-task/Leaf types
 - [x] **Claude Code MCP Integration** - Bidirectional sync with web UI
+- [x] **Hybrid Cloudflare Architecture** - D1, Vectorize, Durable Objects adapters
+- [x] **Quality Adapter** - Metrics and regression detection
+- [x] **Memory Leak Prevention** - Bounded buffers, graceful shutdown
+- [x] **HTTP Client Adapters** - For hybrid mode state management
 
 ## In Progress / Planned
 
-- [ ] Integration with Named Tmux Manager for command orchestration
-- [ ] Ultimate Bug Scanner adapter for quality gates
+- [ ] Full edge mode deployment (Workers-only execution)
 - [ ] WebSocket support for instant UI updates
 - [ ] Task dependency graph visualization
 - [ ] Session Search for learning from history
-- [ ] Simultaneous Launch Button for safe multi-command execution
 - [ ] Cloud-hosted agent farm
 - [ ] GitHub Issues / Linear integration
 - [ ] Agent performance metrics and leaderboards
-- [ ] Mobile responsive design improvements
+- [ ] Real-time collaboration via WebSocket
 
 ## Success Metrics
 
@@ -1908,4 +1916,4 @@ This project integrates and builds upon amazing open-source work:
 
 **Built with love for the multi-agent development future**
 
-*Last Updated: January 2025*
+*Last Updated: January 2026*
