@@ -455,8 +455,33 @@ export interface TursoConfig {
   authToken: string;
 }
 
+/**
+ * Config for TursoNativeDataLayer with full Turso features
+ */
+export interface TursoNativeConfigOptions {
+  /** Turso database URL (libsql://...) */
+  url: string;
+  /** Auth token for database access */
+  authToken: string;
+  /** Enable local SQLite replica that syncs with cloud */
+  enableEmbeddedReplica?: boolean;
+  /** Path for local replica database */
+  localReplicaPath?: string;
+  /** Sync interval in seconds (0 = manual sync only) */
+  syncIntervalSeconds?: number;
+  /** Organization identifier (for multi-tenancy) */
+  organization?: string;
+  /** Workspace/project identifier */
+  workspaceId?: string;
+  /** Turso Platform API token (for branching/multi-tenancy) */
+  platformApiToken?: string;
+  /** Embedding dimensions (default: 1536 for OpenAI) */
+  embeddingDimensions?: number;
+}
+
 export interface DataLayerConfig {
-  type: 'sqlite' | 'turso';
+  type: 'sqlite' | 'turso' | 'turso-native';
   sqlite?: SQLiteConfig;
   turso?: TursoConfig;
+  tursoNative?: TursoNativeConfigOptions;
 }

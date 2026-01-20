@@ -37,6 +37,7 @@ export type {
   SwarmStatus,
   SQLiteConfig,
   TursoConfig,
+  TursoNativeConfigOptions,
   DataLayerConfig,
 } from './types.js';
 
@@ -76,11 +77,47 @@ export type { DataLayerErrorCode } from './DataLayer.js';
 export { SQLiteDataLayer } from './SQLiteDataLayer.js';
 export { TursoDataLayer } from './TursoDataLayer.js';
 
+// Turso-Native (Full Turso Features)
+export { TursoNativeDataLayer } from './turso-native/index.js';
+export type {
+  MemoryOperations,
+  BranchOperations,
+  SyncOperations,
+} from './turso-native/index.js';
+export {
+  createWorkspace,
+  deleteWorkspace,
+  listWorkspaces,
+} from './turso-native/index.js';
+export type {
+  TursoNativeConfig,
+  Memory,
+  MemoryCreate,
+  MemoryFilter,
+  MemoryType,
+  VectorSearchOptions,
+  VectorSearchResult,
+  Branch,
+  BranchCreate,
+  BranchMergeResult,
+  BranchStatus,
+  SyncMetadata,
+  SyncResult,
+  SyncStatus,
+  Workspace,
+  WorkspaceCreate,
+  WorkspaceSettings,
+  BatchOperation,
+  BatchResult,
+} from './turso-native/index.js';
+export { TURSO_NATIVE_SCHEMA } from './turso-native/index.js';
+
 // Factory function
 import type { DataLayerConfig } from './types.js';
 import type { DataLayer } from './DataLayer.js';
 import { SQLiteDataLayer } from './SQLiteDataLayer.js';
 import { TursoDataLayer } from './TursoDataLayer.js';
+import { TursoNativeDataLayer as TursoNativeDataLayerClass } from './turso-native/TursoNativeDataLayer.js';
 
 /**
  * Create a DataLayer instance based on configuration.
@@ -93,12 +130,26 @@ import { TursoDataLayer } from './TursoDataLayer.js';
  * });
  *
  * @example
- * // Cloud Turso
+ * // Cloud Turso (basic)
  * const db = await createDataLayer({
  *   type: 'turso',
  *   turso: {
  *     url: 'libsql://my-db.turso.io',
  *     authToken: process.env.TURSO_AUTH_TOKEN!
+ *   }
+ * });
+ *
+ * @example
+ * // Turso Native (full features: vectors, branching, offline sync)
+ * const db = await createDataLayer({
+ *   type: 'turso-native',
+ *   tursoNative: {
+ *     url: 'libsql://my-db.turso.io',
+ *     authToken: process.env.TURSO_AUTH_TOKEN!,
+ *     enableEmbeddedReplica: true,
+ *     localReplicaPath: '.turso/local.db',
+ *     organization: 'my-org',
+ *     workspaceId: 'my-workspace',
  *   }
  * });
  */
@@ -115,6 +166,11 @@ export async function createDataLayer(config: DataLayerConfig): Promise<DataLaye
       throw new Error('Turso configuration required when type is "turso"');
     }
     dataLayer = new TursoDataLayer(config.turso);
+  } else if (config.type === 'turso-native') {
+    if (!config.tursoNative) {
+      throw new Error('TursoNative configuration required when type is "turso-native"');
+    }
+    dataLayer = new TursoNativeDataLayerClass(config.tursoNative);
   } else {
     throw new Error(`Unknown data layer type: ${config.type}`);
   }
@@ -156,4 +212,45 @@ export async function createCloudDataLayer(url: string, authToken: string): Prom
     type: 'turso',
     turso: { url, authToken },
   });
+}
+
+/**
+ * Create a Turso-Native DataLayer with full Turso features.
+ *
+ * This is the recommended approach for production use, providing:
+ * - Native vector search (replaces CASS)
+ * - Embedded replicas for offline-first operation
+ * - Database branching for task versioning
+ * - Multi-tenancy workspace support
+ * - Better concurrency with batch operations
+ *
+ * @param url Turso database URL (e.g., libsql://my-db.turso.io)
+ * @param authToken Turso authentication token
+ * @param options Additional configuration options
+ */
+export async function createTursoNativeDataLayer(
+  url: string,
+  authToken: string,
+  options?: {
+    /** Enable offline-first with local replica */
+    enableEmbeddedReplica?: boolean;
+    /** Path for local replica database */
+    localReplicaPath?: string;
+    /** Sync interval in seconds */
+    syncIntervalSeconds?: number;
+    /** Organization for multi-tenancy */
+    organization?: string;
+    /** Workspace ID for multi-tenancy */
+    workspaceId?: string;
+    /** Platform API token for branching/workspace operations */
+    platformApiToken?: string;
+  }
+): Promise<TursoNativeDataLayerClass> {
+  const dataLayer = new TursoNativeDataLayerClass({
+    url,
+    authToken,
+    ...options,
+  });
+  await dataLayer.initialize();
+  return dataLayer;
 }
