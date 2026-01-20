@@ -32,22 +32,27 @@ pnpm dev
 
 ```bash
 # Initialize swarm database
-swarm init [path]
+pnpm swarm init [path]
 
 # Start coordinator with agents
-swarm start                    # Start with 3 agents (default)
-swarm start -a 5               # Start with 5 agents
-swarm start --mock             # Use mock adapters (no Claude needed)
-swarm start -d /path/to/project
+pnpm swarm start                    # Start with 3 agents (default)
+pnpm swarm start -a 5               # Start with 5 agents
+pnpm swarm start --mock             # Use mock adapters (no Claude needed)
+pnpm swarm start -d /path/to/project
+
+# Start web UI dashboard (localhost:3000)
+pnpm swarm web                      # Point to current directory
+pnpm swarm web -d /path/to/project  # Point to specific project
+pnpm swarm web -p 3001              # Custom port
 
 # Create tasks
-swarm task -t "Task title"
-swarm task -t "Title" -p high -s "typescript,react"
+pnpm swarm task -t "Task title"
+pnpm swarm task -t "Title" -p high -s "typescript,react"
 
 # View status
-swarm status
-swarm agents
-swarm tasks
+pnpm swarm status
+pnpm swarm agents
+pnpm swarm tasks
 ```
 
 ## Architecture
@@ -95,6 +100,7 @@ swarm tasks
 | `@jetpack-agent/quality` | Quality metrics collection and regression detection |
 | `@jetpack-agent/dashboard` | Dashboard data provider and observability |
 | `@jetpack-agent/swarm-cli` | Command-line interface for swarm operations |
+| `@jetpack-agent/web` | Next.js 15 web UI dashboard (apps/web) |
 
 ### Package Dependencies
 

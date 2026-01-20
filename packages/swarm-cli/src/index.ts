@@ -40,9 +40,11 @@ program
   Commands:
     init [path]           Initialize swarm database
     start                 Start coordinator and agents
+    web                   Start web UI dashboard (localhost:3000)
     task                  Create a new task
+    tasks                 List tasks
     status                Show swarm status
-    agents                List and manage agents
+    agents                List registered agents
 
   This CLI uses the new swarm v2 architecture with:
     • SQLite-based coordination (Turso-ready for cloud)
@@ -425,6 +427,72 @@ program
       console.error(error);
       process.exit(1);
     }
+  });
+
+// ============================================================================
+// WEB COMMAND
+// ============================================================================
+
+program
+  .command('web')
+  .description('Start the web UI dashboard')
+  .option('-p, --port <port>', 'Port to run on', '3000')
+  .option('--dir <path>', 'Working directory (project with .jetpack/)', process.cwd())
+  .action(async (options) => {
+    const workDir = path.resolve(options.dir);
+    const port = options.port;
+
+    console.log(chalk.bold.cyan('\n🌐 Jetpack Web UI\n'));
+    console.log(chalk.gray(`Working directory: ${workDir}`));
+    console.log(chalk.gray(`Port: ${port}\n`));
+
+    // Check if .jetpack directory exists
+    const jetpackDir = path.join(workDir, '.jetpack');
+    if (!fs.existsSync(jetpackDir)) {
+      console.log(chalk.yellow('Note: .jetpack directory not found. Run `swarm init` first or create tasks.'));
+      console.log('');
+    }
+
+    // Find the web app location (relative to CLI)
+    const webAppPath = path.resolve(__dirname, '../../..', 'apps/web');
+
+    if (!fs.existsSync(webAppPath)) {
+      console.error(chalk.red('Web app not found. Please build the project first: pnpm build'));
+      process.exit(1);
+    }
+
+    console.log(chalk.cyan(`Starting web UI at http://localhost:${port}\n`));
+    console.log(chalk.gray('Press Ctrl+C to stop.\n'));
+
+    // Use spawn to start Next.js
+    const { spawn } = await import('child_process');
+
+    const env = {
+      ...process.env,
+      JETPACK_WORK_DIR: workDir,
+      PORT: port,
+    };
+
+    const child = spawn('pnpm', ['dev'], {
+      cwd: webAppPath,
+      env,
+      stdio: 'inherit',
+      shell: true,
+    });
+
+    child.on('error', (err) => {
+      console.error(chalk.red('Failed to start web UI:'), err);
+      process.exit(1);
+    });
+
+    const shutdown = () => {
+      console.log(chalk.yellow('\nShutting down web UI...'));
+      child.kill('SIGTERM');
+      process.exit(0);
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
   });
 
 // ============================================================================
