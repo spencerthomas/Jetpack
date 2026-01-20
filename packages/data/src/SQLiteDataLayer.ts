@@ -1,7 +1,5 @@
 import Database from 'better-sqlite3';
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { SCHEMA_SQL } from './schema.js';
 import type {
   DataLayer,
   TaskOperations,
@@ -208,13 +206,8 @@ export class SQLiteDataLayer implements DataLayer {
   }
 
   async initialize(): Promise<void> {
-    // Load and execute schema
-    const __dirname = dirname(fileURLToPath(import.meta.url));
-    const schemaPath = join(__dirname, 'schema.sql');
-    const schema = readFileSync(schemaPath, 'utf-8');
-
-    // Execute schema (SQLite handles IF NOT EXISTS)
-    this.db.exec(schema);
+    // Execute embedded schema (SQLite handles IF NOT EXISTS)
+    this.db.exec(SCHEMA_SQL);
   }
 
   async close(): Promise<void> {

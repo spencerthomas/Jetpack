@@ -1,0 +1,594 @@
+{
+  "summary": {
+    "total": 277,
+    "completed": 75,
+    "failed": 31,
+    "ready": 161,
+    "inProgress": 10
+  },
+  "completedTasks": [
+    {
+      "id": "E9-T1",
+      "title": "Pipeline Analytics Service",
+      "completedAt": "2026-01-18T18:55:00.780Z"
+    },
+    {
+      "id": "E10-T2",
+      "title": "AUS Integration Stub",
+      "completedAt": "2026-01-18T18:52:14.809Z"
+    },
+    {
+      "id": "E10-T3",
+      "title": "Credit Integration Stub",
+      "completedAt": "2026-01-18T18:56:55.673Z"
+    },
+    {
+      "id": "VALIDATE-1",
+      "title": "Build and Type Check Validation"
+    },
+    {
+      "id": "VALIDATE-3",
+      "title": "Database Seed Verification",
+      "completedAt": "2026-01-18T18:53:16.862Z"
+    },
+    {
+      "id": "UI-TYPE-1",
+      "title": "UI Component Type Safety Fixes",
+      "completedAt": "2026-01-18T18:54:11.903Z"
+    },
+    {
+      "id": "API-ROUTES-1",
+      "title": "API Route Completion Check",
+      "completedAt": "2026-01-18T18:53:28.942Z"
+    },
+    {
+      "id": "WORKFLOW-1",
+      "title": "Workflow Engine Integration Verification",
+      "completedAt": "2026-01-18T18:52:31.618Z"
+    },
+    {
+      "id": "DOCS-1",
+      "title": "API Documentation Generation",
+      "completedAt": "2026-01-18T18:54:43.658Z"
+    },
+    {
+      "id": "PERF-1",
+      "title": "Performance Optimization Audit",
+      "completedAt": "2026-01-18T19:06:32.194Z"
+    },
+    {
+      "id": "SECURITY-1",
+      "title": "Security Review - Input Validation",
+      "completedAt": "2026-01-18T19:08:58.419Z"
+    },
+    {
+      "id": "ERROR-1",
+      "title": "Error Handling Standardization",
+      "completedAt": "2026-01-18T19:10:23.124Z"
+    },
+    {
+      "id": "CACHE-1",
+      "title": "Caching Strategy Implementation",
+      "completedAt": "2026-01-18T19:09:09.789Z"
+    },
+    {
+      "id": "LOGGING-1",
+      "title": "Structured Logging Implementation",
+      "completedAt": "2026-01-18T19:09:09.932Z"
+    },
+    {
+      "id": "NOTIFICATIONS-1",
+      "title": "Notification Service Stub",
+      "completedAt": "2026-01-18T19:07:24.868Z"
+    },
+    {
+      "id": "BORROWER-PORTAL-1",
+      "title": "Borrower Portal API Routes",
+      "completedAt": "2026-01-18T19:12:15.063Z"
+    },
+    {
+      "id": "PRICING-1",
+      "title": "Pricing Engine Stub",
+      "completedAt": "2026-01-18T19:07:09.505Z"
+    },
+    {
+      "id": "TEMPLATE-1",
+      "title": "Document Template System",
+      "completedAt": "2026-01-18T19:25:21.992Z"
+    },
+    {
+      "id": "CALCULATOR-1",
+      "title": "Mortgage Calculator Utilities",
+      "completedAt": "2026-01-18T19:21:47.981Z"
+    },
+    {
+      "id": "BORROWER-2",
+      "title": "Borrower Employment Verification",
+      "completedAt": "2026-01-19T02:26:24.328Z"
+    },
+    {
+      "id": "BORROWER-3",
+      "title": "Borrower Asset Verification",
+      "completedAt": "2026-01-19T02:26:24.328Z"
+    },
+    {
+      "id": "CLOSING-1",
+      "title": "Closing Coordinator Service",
+      "completedAt": "2026-01-18T19:33:13.283Z"
+    },
+    {
+      "id": "POSTCLOSE-1",
+      "title": "Post-Close Audit Service",
+      "completedAt": "2026-01-19T02:36:20.021Z"
+    },
+    {
+      "id": "INVESTOR-1",
+      "title": "Investor/Delivery Service",
+      "completedAt": "2026-01-19T02:49:30.000Z"
+    },
+    {
+      "id": "ESCROW-1",
+      "title": "Escrow Analysis Service",
+      "completedAt": "2026-01-19T02:21:20.197Z"
+    },
+    {
+      "id": "INSURANCE-1",
+      "title": "Hazard/Flood Insurance Service",
+      "completedAt": "2026-01-19T02:26:54.934Z"
+    },
+    {
+      "id": "PROCESSOR-DASHBOARD-1",
+      "title": "Processor Dashboard API",
+      "completedAt": "2026-01-19T03:10:00.000Z"
+    },
+    {
+      "id": "UW-DASHBOARD-1",
+      "title": "Underwriter Dashboard API",
+      "completedAt": "2026-01-19T03:18:00.000Z"
+    },
+    {
+      "id": "ADMIN-USERS-1",
+      "title": "Admin User Management API",
+      "completedAt": "2026-01-19T03:27:00.000Z"
+    },
+    {
+      "id": "DOC-OCR-1",
+      "title": "Document OCR Service Stub",
+      "completedAt": "2026-01-19T06:24:50.466Z"
+    },
+    {
+      "id": "REALTIME-1",
+      "title": "Real-time Event Service",
+      "completedAt": "2026-01-19T06:26:06.833Z"
+    },
+    {
+      "id": "TEST-WORKFLOW-1",
+      "title": "Workflow Integration Tests",
+      "completedAt": "2026-01-19T01:34:46.795Z"
+    },
+    {
+      "id": "TEST-DISCLOSURE-1",
+      "title": "Disclosure Compliance Tests",
+      "completedAt": "2026-01-19T01:27:08.727Z"
+    },
+    {
+      "id": "TEST-AUTH-1",
+      "title": "Authentication/Authorization Tests",
+      "completedAt": "2026-01-19T01:31:45.999Z"
+    },
+    {
+      "id": "VALIDATE-BUILD-2",
+      "title": "Build Validation After Changes",
+      "completedAt": "2026-01-19T01:29:55.420Z"
+    },
+    {
+      "id": "DOCS-README-1",
+      "title": "Update Project README",
+      "completedAt": "2026-01-19T02:52:26.241Z"
+    },
+    {
+      "id": "MI-1",
+      "title": "Mortgage Insurance Service",
+      "completedAt": "2026-01-19T02:51:13.925Z"
+    },
+    {
+      "id": "FEES-1",
+      "title": "Fee Calculation Engine",
+      "completedAt": "2026-01-19T01:24:37.969Z"
+    },
+    {
+      "id": "INCOME-1",
+      "title": "Income Calculator Service",
+      "completedAt": "2026-01-19T01:26:18.618Z"
+    },
+    {
+      "id": "DTI-1",
+      "title": "DTI Analysis Service",
+      "completedAt": "2026-01-19T01:26:25.196Z"
+    },
+    {
+      "id": "PRODUCT-1",
+      "title": "Loan Product Engine",
+      "completedAt": "2026-01-19T01:23:11.044Z"
+    },
+    {
+      "id": "GUIDELINE-1",
+      "title": "Guideline Validation Engine",
+      "completedAt": "2026-01-19T01:27:20.479Z"
+    },
+    {
+      "id": "LOCK-1",
+      "title": "Rate Lock Management",
+      "completedAt": "2026-01-19T01:25:03.611Z"
+    },
+    {
+      "id": "ECOA-1",
+      "title": "ECOA/Fair Lending Checks",
+      "completedAt": "2026-01-19T01:28:43.106Z"
+    },
+    {
+      "id": "UI-LOAN-DETAIL-1",
+      "title": "Loan Detail Page Layout",
+      "completedAt": "2026-01-19T01:34:18.299Z"
+    },
+    {
+      "id": "VALIDATION-CREDIT-1",
+      "title": "Credit Validation Rules",
+      "completedAt": "2026-01-19T01:29:14.577Z"
+    },
+    {
+      "id": "WORKFLOW-ADVERSE-1",
+      "title": "Adverse Action Workflow",
+      "completedAt": "2026-01-19T01:31:36.210Z"
+    },
+    {
+      "id": "DOCS-CHECKLIST-1",
+      "title": "Dynamic Document Checklist",
+      "completedAt": "2026-01-19T01:31:46.108Z"
+    },
+    {
+      "id": "MARKETING-AUTOMATION-1",
+      "title": "Marketing Automation Integration",
+      "completedAt": "2026-01-19T02:50:39.583Z"
+    },
+    {
+      "id": "ANALYTICS-PREDICTIVE-1",
+      "title": "Predictive Analytics Framework",
+      "completedAt": "2026-01-19T03:33:00.000Z"
+    },
+    {
+      "id": "ANALYTICS-BENCHMARKING-1",
+      "title": "Benchmarking Analytics",
+      "completedAt": "2026-01-19T02:33:43.317Z"
+    },
+    {
+      "id": "TEST-INTEGRATION-AUS-1",
+      "title": "AUS Integration Tests",
+      "completedAt": "2026-01-19T06:18:57.495Z"
+    },
+    {
+      "id": "TEST-INTEGRATION-DOCS-1",
+      "title": "Document Service Tests",
+      "completedAt": "2026-01-19T06:22:13.350Z"
+    },
+    {
+      "id": "DOCS-USER-GUIDE-1",
+      "title": "User Guide Documentation",
+      "completedAt": "2026-01-19T03:30:00.000Z"
+    },
+    {
+      "id": "DOCS-ADMIN-GUIDE-1",
+      "title": "Admin Guide Documentation",
+      "completedAt": "2026-01-19T06:19:32.000Z"
+    },
+    {
+      "id": "OFFLINE-SUPPORT-1",
+      "title": "Offline Support Framework",
+      "completedAt": "2026-01-19T06:22:59.000Z"
+    },
+    {
+      "id": "EXPORT-PDF-1",
+      "title": "PDF Export Service",
+      "completedAt": "2026-01-19T06:20:43.000Z"
+    },
+    {
+      "id": "EXPORT-EXCEL-1",
+      "title": "Excel Export Service",
+      "completedAt": "2026-01-19T06:21:57.000Z"
+    },
+    {
+      "id": "CLEANUP-DEPRECATED-1",
+      "title": "Remove Deprecated Code",
+      "completedAt": "2026-01-19T06:24:38.000Z"
+    },
+    {
+      "id": "CODE-FORMATTING-1",
+      "title": "Code Formatting Standardization",
+      "completedAt": "2026-01-19T02:41:16.000Z"
+    },
+    {
+      "id": "SPLIT-LOAN-1",
+      "title": "Loan Split Functionality",
+      "completedAt": "2026-01-19T03:43:00.000Z"
+    },
+    {
+      "id": "QUICK-ACTIONS-1",
+      "title": "Quick Action System",
+      "completedAt": "2026-01-19T02:44:04.000Z"
+    },
+    {
+      "id": "BOOKMARKS-1",
+      "title": "Loan Bookmarking",
+      "completedAt": "2026-01-19T02:33:19.000Z"
+    },
+    {
+      "id": "RECENT-ITEMS-1",
+      "title": "Recent Items Tracking",
+      "completedAt": "2026-01-19T03:39:30.000Z"
+    },
+    {
+      "id": "PRESENCE-INDICATOR-1",
+      "title": "User Presence Indicator",
+      "completedAt": "2026-01-19T02:49:54.000Z"
+    },
+    {
+      "id": "GFE-HUD1-LEGACY-1",
+      "title": "GFE/HUD-1 Legacy Support",
+      "completedAt": "2026-01-19T06:22:47.000Z"
+    },
+    {
+      "id": "QUALITY-POSTCLOSE-1",
+      "title": "Post-Close QC Review",
+      "completedAt": "2026-01-19T03:09:00.000Z"
+    },
+    {
+      "id": "REPURCHASE-MGMT-1",
+      "title": "Repurchase Request Management",
+      "completedAt": "2026-01-19T02:22:14.738Z"
+    },
+    {
+      "id": "EARLY-PAYMENT-1",
+      "title": "Early Payment Default Tracking",
+      "completedAt": "2026-01-19T03:38:00.000Z"
+    },
+    {
+      "id": "VENDOR-MGMT-1",
+      "title": "Vendor Management System",
+      "completedAt": "2026-01-19T03:41:00.000Z"
+    },
+    {
+      "id": "ORDER-TRACKING-1",
+      "title": "Service Order Tracking",
+      "completedAt": "2026-01-19T03:35:00.000Z"
+    },
+    {
+      "id": "FEE-COLLECTION-1",
+      "title": "Fee Collection Tracking",
+      "completedAt": "2026-01-19T02:22:14.738Z"
+    },
+    {
+      "id": "LICENSING-CHECK-1",
+      "title": "Licensing Compliance Check",
+      "completedAt": "2026-01-19T02:22:14.738Z"
+    },
+    {
+      "id": "TRAINING-TRACKER-1",
+      "title": "Compliance Training Tracker",
+      "completedAt": "2026-01-19T02:22:14.738Z"
+    },
+    {
+      "id": "FINAL-VALIDATION-1",
+      "title": "Final Build Validation",
+      "completedAt": "2026-01-19T01:26:58.558Z"
+    }
+  ],
+  "failedTasks": [
+    {
+      "id": "E5-T3",
+      "title": "HMDA Data Collection Service",
+      "retryCount": 2
+    },
+    {
+      "id": "VALIDATE-2",
+      "title": "Test Suite Expansion",
+      "retryCount": 2
+    },
+    {
+      "id": "QUEUE-1",
+      "title": "Background Job Queue",
+      "retryCount": 2
+    },
+    {
+      "id": "AUDIT-2",
+      "title": "Audit Trail Enhancement",
+      "retryCount": 2
+    },
+    {
+      "id": "RATE-LIMIT-1",
+      "title": "API Rate Limiting",
+      "retryCount": 2
+    },
+    {
+      "id": "COMPLIANCE-CHECK-1",
+      "title": "Compliance Check Engine",
+      "retryCount": 2
+    },
+    {
+      "id": "APPRAISAL-1",
+      "title": "Appraisal Management Service",
+      "retryCount": 2
+    },
+    {
+      "id": "TITLE-1",
+      "title": "Title Service Integration",
+      "retryCount": 2
+    },
+    {
+      "id": "FUNDING-1",
+      "title": "Funding Control Service",
+      "retryCount": 2
+    },
+    {
+      "id": "VALIDATE-TEST-2",
+      "title": "Run Full Test Suite",
+      "retryCount": 4
+    },
+    {
+      "id": "UI-LOAN-LIST-1",
+      "title": "Loan List View Component",
+      "retryCount": 2
+    },
+    {
+      "id": "UI-BORROWER-FORM-1",
+      "title": "Borrower Information Form",
+      "retryCount": 2
+    },
+    {
+      "id": "UI-LOAN-TERMS-1",
+      "title": "Loan Terms and Product Form",
+      "retryCount": 4
+    },
+    {
+      "id": "UI-CONDITIONS-1",
+      "title": "Conditions Management UI",
+      "retryCount": 2
+    },
+    {
+      "id": "API-LOAN-SEARCH-1",
+      "title": "Advanced Loan Search API",
+      "retryCount": 4
+    },
+    {
+      "id": "VALIDATION-INCOME-1",
+      "title": "Income Validation Rules",
+      "retryCount": 2
+    },
+    {
+      "id": "VALIDATION-ASSETS-1",
+      "title": "Asset Validation Rules",
+      "retryCount": 2
+    },
+    {
+      "id": "TEST-E2E-LOAN-1",
+      "title": "E2E Loan Creation Flow",
+      "retryCount": 2
+    },
+    {
+      "id": "TEST-E2E-UW-1",
+      "title": "E2E Underwriting Flow",
+      "retryCount": 2
+    },
+    {
+      "id": "TEST-UNIT-CALC-1",
+      "title": "Unit Tests for Calculations",
+      "retryCount": 4
+    },
+    {
+      "id": "TEST-UNIT-WORKFLOW-1",
+      "title": "Unit Tests for Workflow Engine",
+      "retryCount": 4
+    },
+    {
+      "id": "INVESTOR-DELIVERY-1",
+      "title": "Investor Delivery Package",
+      "retryCount": 4
+    },
+    {
+      "id": "COMPLIANCE-QM-1",
+      "title": "Qualified Mortgage Rules",
+      "retryCount": 4
+    },
+    {
+      "id": "ERROR-RECOVERY-1",
+      "title": "Error Recovery Strategies",
+      "retryCount": 2
+    },
+    {
+      "id": "PERF-QUERY-OPT-1",
+      "title": "Database Query Optimization",
+      "retryCount": 2
+    },
+    {
+      "id": "SECURITY-AUDIT-LOG-1",
+      "title": "Security Audit Logging",
+      "retryCount": 2
+    },
+    {
+      "id": "SECURITY-SESSION-1",
+      "title": "Session Security Hardening",
+      "retryCount": 4
+    },
+    {
+      "id": "SECURITY-ENCRYPTION-1",
+      "title": "Data Encryption at Rest",
+      "retryCount": 4
+    },
+    {
+      "id": "FHA-SPECIFIC-1",
+      "title": "FHA Loan Specific Rules",
+      "retryCount": 4
+    },
+    {
+      "id": "VA-SPECIFIC-1",
+      "title": "VA Loan Specific Rules",
+      "retryCount": 3
+    },
+    {
+      "id": "IMPORT-FANNIE-1",
+      "title": "Fannie Mae DU Import",
+      "retryCount": 2
+    }
+  ],
+  "inProgressTasks": [
+    {
+      "id": "IMPORT-FREDDIE-1",
+      "title": "Freddie Mac LPA Import",
+      "assignedAgent": "codex-d488dae7"
+    },
+    {
+      "id": "IDENTITY-VERIFY-1",
+      "title": "Identity Verification Integration",
+      "assignedAgent": "codex-6592a0a3"
+    },
+    {
+      "id": "ESIGN-INTEGRATION-1",
+      "title": "eSign Platform Integration",
+      "assignedAgent": "codex-6fa19bc1"
+    },
+    {
+      "id": "REPORT-PIPELINE-1",
+      "title": "Pipeline Report Generation",
+      "assignedAgent": "codex-10ac6f21"
+    },
+    {
+      "id": "REPORT-PRODUCTION-1",
+      "title": "Production Report Generation",
+      "assignedAgent": "codex-8a8e317d"
+    },
+    {
+      "id": "REPORT-COMPLIANCE-1",
+      "title": "Compliance Report Generation",
+      "assignedAgent": "agent-6ff3b3bd"
+    },
+    {
+      "id": "TEST-COMPLIANCE-TRID-1",
+      "title": "TRID Compliance Tests",
+      "assignedAgent": "agent-b4d76485"
+    },
+    {
+      "id": "TEST-COMPLIANCE-HMDA-1",
+      "title": "HMDA Reporting Tests",
+      "assignedAgent": "codex-d53515e7"
+    },
+    {
+      "id": "TEST-API-AUTH-1",
+      "title": "Authentication API Tests",
+      "assignedAgent": "agent-30f89159"
+    },
+    {
+      "id": "TYPE-SAFETY-1",
+      "title": "TypeScript Strict Mode",
+      "assignedAgent": "agent-c3544aa1"
+    }
+  ]
+}

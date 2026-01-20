@@ -1,0 +1,36 @@
+{
+  "name": "@jetpack-agent/dashboard",
+  "version": "0.1.0",
+  "description": "Dashboard data provider and observability for Jetpack Swarm",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --dts --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@jetpack-agent/data": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.9"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

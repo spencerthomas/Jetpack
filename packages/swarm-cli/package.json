@@ -1,0 +1,41 @@
+{
+  "name": "@jetpack-agent/swarm-cli",
+  "version": "0.1.0",
+  "description": "CLI for Jetpack Swarm v2 - decentralized multi-agent orchestration",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "swarm": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@jetpack-agent/data": "workspace:*",
+    "@jetpack-agent/agent-harness": "workspace:*",
+    "@jetpack-agent/coordinator": "workspace:*",
+    "commander": "^13.1.0",
+    "chalk": "^5.4.1",
+    "ora": "^8.2.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.8.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
