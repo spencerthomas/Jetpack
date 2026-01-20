@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #ededed;
+  --background: #0a0a0a;
+  --accent: rgb(79, 255, 238);
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Status colors */
+.status-pending { color: #6b7280; }
+.status-ready { color: #3b82f6; }
+.status-claimed { color: #eab308; }
+.status-in_progress { color: var(--accent); }
+.status-completed { color: #22c55e; }
+.status-failed { color: #ef4444; }
+.status-blocked { color: #f97316; }
+
+/* Priority colors */
+.priority-low { color: #6b7280; }
+.priority-medium { color: #3b82f6; }
+.priority-high { color: #eab308; }
+.priority-critical { color: #ef4444; }
+
+/* Agent status */
+.agent-idle { color: #22c55e; }
+.agent-busy { color: #eab308; }
+.agent-error { color: #ef4444; }
+.agent-offline { color: #6b7280; }
+
+/* Card styles */
+.card {
+  @apply bg-zinc-900 border border-zinc-800 rounded-lg p-4;
+}
+
+.card-hover {
+  @apply hover:border-zinc-700 transition-colors;
+}
