@@ -1279,8 +1279,10 @@ class TursoTaskOperations implements TaskOperations {
       args.push(filter.assignedAgent);
     }
     if (filter?.skills && filter.skills.length > 0) {
+      // Include tasks with no required skills (any agent can claim them)
+      // OR tasks where required_skills contains at least one of agent's skills
       const skillConditions = filter.skills.map(() => 'required_skills LIKE ?');
-      conditions.push(`(${skillConditions.join(' OR ')})`);
+      conditions.push(`(required_skills = '[]' OR ${skillConditions.join(' OR ')})`);
       filter.skills.forEach(skill => args.push(`%"${skill}"%`));
     }
     if (filter?.branch) {

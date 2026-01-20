@@ -70,6 +70,9 @@ export type CoordinatorEvent =
   | { type: 'agent_crashed'; agentId: string; error: string }
   | { type: 'agent_recovered'; agentId: string }
   | { type: 'task_distributed'; taskId: string; agentId: string }
+  | { type: 'task_claimed'; taskId: string; agentId: string }
+  | { type: 'task_completed'; taskId: string; agentId: string }
+  | { type: 'task_failed'; taskId: string; agentId: string; error?: string }
   | { type: 'task_orphaned'; taskId: string; previousAgent: string }
   | { type: 'task_requeued'; taskId: string; reason: string }
   | { type: 'health_check'; healthyAgents: number; totalAgents: number }

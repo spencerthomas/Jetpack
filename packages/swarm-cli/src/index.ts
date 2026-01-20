@@ -8,6 +8,11 @@ import { createMockAdapter, createClaudeCodeAdapter } from '@jetpack-agent/agent
 import { SwarmCoordinator, type CoordinatorEvent } from '@jetpack-agent/coordinator';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// ES module compatibility for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const program = new Command();
 
@@ -108,7 +113,7 @@ program
   .command('start')
   .description('Start Jetpack: web UI + coordinator + agents (all-in-one)')
   .option('-a, --agents <number>', 'Number of agents to spawn', '3')
-  .option('-d, --dir <path>', 'Working directory', process.cwd())
+  .option('-d, --dir <path>', 'Working directory', process.env.JETPACK_WORK_DIR || process.cwd())
   .option('-p, --port <port>', 'Web UI port', '3000')
   .option('--no-web', 'Skip starting the web UI')
   .option('--no-browser', 'Don\'t auto-open browser')
@@ -311,10 +316,10 @@ program
   .command('task')
   .description('Create a new task')
   .requiredOption('-t, --title <title>', 'Task title')
-  .option('-d, --description <description>', 'Task description')
+  .option('--desc <description>', 'Task description')
   .option('-p, --priority <priority>', 'Priority (low, medium, high, critical)', 'medium')
   .option('-s, --skills <skills>', 'Required skills (comma-separated)')
-  .option('--dir <path>', 'Working directory', process.cwd())
+  .option('--dir <path>', 'Working directory', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (options) => {
     const spinner = ora('Creating task...').start();
 
@@ -328,7 +333,7 @@ program
 
       const task = await dataLayer.tasks.create({
         title: options.title,
-        description: options.description,
+        description: options.desc,
         priority: options.priority as any,
         requiredSkills: skills,
       });
@@ -359,7 +364,7 @@ program
 program
   .command('status')
   .description('Show swarm status')
-  .option('--dir <path>', 'Working directory', process.cwd())
+  .option('--dir <path>', 'Working directory', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (options) => {
     const spinner = ora('Loading status...').start();
 
@@ -406,7 +411,7 @@ program
 program
   .command('agents')
   .description('List registered agents')
-  .option('--dir <path>', 'Working directory', process.cwd())
+  .option('--dir <path>', 'Working directory', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (options) => {
     const spinner = ora('Loading agents...').start();
 
@@ -459,7 +464,7 @@ program
   .description('List tasks')
   .option('--status <status>', 'Filter by status')
   .option('--limit <number>', 'Max tasks to show', '20')
-  .option('--dir <path>', 'Working directory', process.cwd())
+  .option('--dir <path>', 'Working directory', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (options) => {
     const spinner = ora('Loading tasks...').start();
 
@@ -526,7 +531,7 @@ program
   .command('web')
   .description('Start the web UI dashboard')
   .option('-p, --port <port>', 'Port to run on', '3000')
-  .option('--dir <path>', 'Working directory (project with .jetpack/)', process.cwd())
+  .option('--dir <path>', 'Working directory (project with .jetpack/)', process.env.JETPACK_WORK_DIR || process.cwd())
   .action(async (options) => {
     const workDir = path.resolve(options.dir);
     const port = options.port;
@@ -607,6 +612,24 @@ function handleCoordinatorEvent(event: CoordinatorEvent) {
     case 'task_distributed':
       console.log(
         chalk.blue(`[${timestamp}] Task distributed: ${event.taskId} → ${event.agentId}`)
+      );
+      break;
+
+    case 'task_claimed':
+      console.log(
+        chalk.cyan(`[${timestamp}] Task claimed: ${event.taskId} by ${event.agentId}`)
+      );
+      break;
+
+    case 'task_completed':
+      console.log(
+        chalk.green(`[${timestamp}] Task completed: ${event.taskId} by ${event.agentId}`)
+      );
+      break;
+
+    case 'task_failed':
+      console.log(
+        chalk.red(`[${timestamp}] Task failed: ${event.taskId} by ${event.agentId}${event.error ? ` - ${event.error}` : ''}`)
       );
       break;
 

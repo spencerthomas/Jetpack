@@ -594,33 +594,45 @@ export class SwarmCoordinator {
         managed.health.currentTaskId = event.taskId ?? null;
         managed.health.taskStartedAt = new Date();
         managed.health.taskProgress = 0;
+        this.emit({ type: 'task_claimed', taskId: event.taskId!, agentId });
         break;
 
       case 'task_progress':
         managed.health.taskProgress = event.progress?.percentComplete ?? 0;
         break;
 
-      case 'task_completed':
+      case 'task_completed': {
         // Calculate duration from when task started
         if (managed.health.taskStartedAt) {
           const durationMs = Date.now() - managed.health.taskStartedAt.getTime();
           this.stats.totalTaskDurationMs += durationMs;
           this.stats.taskCount++;
         }
+        const completedTaskId = managed.health.currentTaskId;
         managed.health.currentTaskId = null;
         managed.health.taskStartedAt = null;
         managed.health.taskProgress = 0;
         managed.health.consecutiveFailures = 0;
         this.stats.completedTasks++;
+        if (completedTaskId) {
+          this.emit({ type: 'task_completed', taskId: completedTaskId, agentId });
+        }
         break;
+      }
 
-      case 'task_failed':
+      case 'task_failed': {
+        const failedTaskId = managed.health.currentTaskId;
+        const error = 'failure' in event ? (event as { failure?: { message?: string } }).failure?.message : undefined;
         managed.health.currentTaskId = null;
         managed.health.taskStartedAt = null;
         managed.health.taskProgress = 0;
         managed.health.consecutiveFailures++;
         this.stats.failedTasks++;
+        if (failedTaskId) {
+          this.emit({ type: 'task_failed', taskId: failedTaskId, agentId, error });
+        }
         break;
+      }
 
       case 'heartbeat':
         managed.health.lastHeartbeat = new Date();
