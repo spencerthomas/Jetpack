@@ -33,23 +33,24 @@ function formatDuration(ms: number): string {
 }
 
 program
-  .name('swarm')
+  .name('jetpack')
   .description(`
-  Jetpack Swarm v2 CLI - Decentralized Multi-Agent Orchestration
+  Jetpack - AI Agent Swarm for Software Development
+
+  Quick Start:
+    jetpack start           Start everything (web UI + agents)
+    jetpack start --mock    Start with mock agents (no API key needed)
 
   Commands:
-    init [path]           Initialize swarm database
-    start                 Start coordinator and agents
-    web                   Start web UI dashboard (localhost:3000)
+    start                 Start web UI + coordinator + agents (all-in-one)
     task                  Create a new task
     tasks                 List tasks
     status                Show swarm status
     agents                List registered agents
+    init [path]           Initialize database only (optional, start auto-inits)
+    web                   Start web UI only (without agents)
 
-  This CLI uses the new swarm v2 architecture with:
-    • SQLite-based coordination (Turso-ready for cloud)
-    • Model-agnostic agent harness
-    • Decentralized agent protocol
+  The dashboard opens at http://localhost:3000 by default.
   `)
   .version('0.1.0');
 
@@ -89,38 +90,119 @@ program
   });
 
 // ============================================================================
-// START COMMAND
+// START COMMAND - The main entry point that does everything
 // ============================================================================
+
+/**
+ * Open a URL in the default browser using spawn (safe, no shell injection)
+ */
+async function openBrowserSafe(url: string): Promise<void> {
+  const { spawn } = await import('child_process');
+  const openCmd = process.platform === 'darwin' ? 'open' :
+                 process.platform === 'win32' ? 'cmd' : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  spawn(openCmd, args, { detached: true, stdio: 'ignore' }).unref();
+}
 
 program
   .command('start')
-  .description('Start the swarm coordinator and agents')
+  .description('Start Jetpack: web UI + coordinator + agents (all-in-one)')
   .option('-a, --agents <number>', 'Number of agents to spawn', '3')
   .option('-d, --dir <path>', 'Working directory', process.cwd())
-  .option('--mock', 'Use mock adapters (for testing without Claude)')
+  .option('-p, --port <port>', 'Web UI port', '3000')
+  .option('--no-web', 'Skip starting the web UI')
+  .option('--no-browser', 'Don\'t auto-open browser')
+  .option('--mock', 'Force mock adapters (no Claude API needed)')
   .option('--strategy <strategy>', 'Claim strategy (first-fit, best-fit, round-robin, load-balanced)', 'best-fit')
   .action(async (options) => {
-    console.log(chalk.bold.cyan('\n🚀 Jetpack Swarm v2\n'));
+    console.log(chalk.bold.cyan('\n🚀 Jetpack\n'));
 
     const workDir = path.resolve(options.dir);
     const numAgents = parseInt(options.agents);
-    const useMock = options.mock;
+    const port = options.port;
+    const startWeb = options.web !== false;
+    const shouldOpenBrowser = options.browser !== false;
 
-    console.log(chalk.gray(`Working directory: ${workDir}`));
-    console.log(chalk.gray(`Agents: ${numAgents}`));
-    console.log(chalk.gray(`Claim strategy: ${options.strategy}`));
-    console.log(chalk.gray(`Adapter: ${useMock ? 'mock' : 'claude-code'}\n`));
+    // Auto-detect: use mock if no ANTHROPIC_API_KEY
+    const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+    const useMock = options.mock || !hasApiKey;
 
-    const spinner = ora('Initializing data layer...').start();
+    // Show configuration
+    console.log(chalk.gray(`  Working directory: ${workDir}`));
+    console.log(chalk.gray(`  Agents: ${numAgents}`));
+    if (startWeb) {
+      console.log(chalk.gray(`  Web UI: http://localhost:${port}`));
+    }
+    if (useMock && !options.mock) {
+      console.log(chalk.yellow(`  Mode: mock (set ANTHROPIC_API_KEY for Claude agents)`));
+    } else if (useMock) {
+      console.log(chalk.gray(`  Mode: mock`));
+    } else {
+      console.log(chalk.gray(`  Mode: claude-code`));
+    }
+    console.log('');
+
+    const spinner = ora('Initializing...').start();
 
     try {
+      // Auto-initialize database if needed
+      const jetpackDir = path.join(workDir, '.jetpack');
+      const isNewProject = !fs.existsSync(jetpackDir);
+      if (isNewProject) {
+        fs.mkdirSync(jetpackDir, { recursive: true });
+        spinner.text = 'Creating .jetpack directory...';
+      }
+
       // Initialize data layer
       const dbPath = getDbPath(workDir);
       const dataLayer = await createLocalDataLayer(dbPath);
-      spinner.succeed('Data layer ready');
+      spinner.succeed(isNewProject ? 'Initialized new project' : 'Data layer ready');
+
+      // Start web UI if enabled
+      let webProcess: ReturnType<typeof import('child_process').spawn> | null = null;
+      if (startWeb) {
+        spinner.start('Starting web UI...');
+
+        const webAppPath = path.resolve(__dirname, '../../..', 'apps/web');
+        if (fs.existsSync(webAppPath)) {
+          const { spawn } = await import('child_process');
+
+          webProcess = spawn('pnpm', ['dev'], {
+            cwd: webAppPath,
+            env: {
+              ...process.env,
+              JETPACK_WORK_DIR: workDir,
+              PORT: port,
+            },
+            stdio: ['ignore', 'pipe', 'pipe'],
+            shell: true,
+            detached: false,
+          });
+
+          // Wait for web server to be ready
+          await new Promise<void>((resolve) => {
+            const timeout = setTimeout(resolve, 3000); // Max 3s wait
+            webProcess!.stdout?.on('data', (data: Buffer) => {
+              if (data.toString().includes('Ready') || data.toString().includes('started')) {
+                clearTimeout(timeout);
+                resolve();
+              }
+            });
+          });
+
+          spinner.succeed(`Web UI ready at http://localhost:${port}`);
+
+          // Auto-open browser safely
+          if (shouldOpenBrowser) {
+            await openBrowserSafe(`http://localhost:${port}`);
+          }
+        } else {
+          spinner.warn('Web UI not found (run pnpm build first)');
+        }
+      }
 
       // Create coordinator
-      spinner.start('Creating coordinator...');
+      spinner.start('Starting coordinator...');
       const coordinator = new SwarmCoordinator(dataLayer, {
         workDir,
         maxAgents: numAgents + 5,
@@ -137,11 +219,11 @@ program
       spinner.start(`Spawning ${numAgents} agents...`);
 
       const skills = [
-        ['typescript', 'backend'],
         ['typescript', 'react', 'frontend'],
+        ['typescript', 'backend', 'nodejs'],
         ['python', 'backend'],
-        ['testing'],
-        ['documentation'],
+        ['testing', 'quality'],
+        ['documentation', 'markdown'],
       ];
 
       for (let i = 0; i < numAgents; i++) {
@@ -159,46 +241,53 @@ program
         });
       }
 
-      spinner.succeed(`${numAgents} agents spawned`);
+      spinner.succeed(`${numAgents} agents ready`);
 
       // Display status
       console.log(chalk.bold('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
-      console.log(chalk.bold('  🐝 Swarm Active\n'));
+      console.log(chalk.bold.green('  ✓ Jetpack is running!\n'));
 
-      const health = coordinator.getAgentHealth();
-      health.forEach((h) => {
-        console.log(chalk.gray(`  ${h.agentId}: ${chalk.green(h.status)}`));
-      });
+      if (startWeb) {
+        console.log(chalk.bold(`  🌐 Dashboard: ${chalk.cyan(`http://localhost:${port}`)}`));
+        console.log(chalk.gray('     Create tasks, monitor agents, configure settings\n'));
+      }
 
-      console.log('');
-      console.log(chalk.bold('  📝 Create Tasks'));
-      console.log(chalk.gray('     swarm task -t "Your task title"'));
-      console.log('');
+      console.log(chalk.bold('  📝 Quick Commands:'));
+      console.log(chalk.gray(`     jetpack task -t "Build a login page"`));
+      console.log(chalk.gray(`     jetpack status`));
+      console.log(chalk.gray(`     jetpack tasks\n`));
+
       console.log(chalk.bold('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
 
-      console.log(chalk.cyan('Swarm running. Press Ctrl+C to stop.\n'));
+      console.log(chalk.gray('Press Ctrl+C to stop.\n'));
 
-      // Status updates
+      // Status updates (less verbose)
       const statusInterval = setInterval(async () => {
         const stats = await coordinator.getStats();
-        if (stats.completedTasks > 0 || stats.inProgressTasks > 0) {
+        if (stats.inProgressTasks > 0) {
           console.log(
             chalk.blue(
-              `[status] ` +
-                `agents: ${stats.busyAgents}/${stats.totalAgents} busy | ` +
-                `tasks: ${stats.pendingTasks} pending, ${stats.inProgressTasks} in progress, ${stats.completedTasks} done`
+              `[${new Date().toLocaleTimeString()}] ` +
+                `${stats.busyAgents}/${stats.totalAgents} agents busy | ` +
+                `${stats.inProgressTasks} tasks running | ` +
+                `${stats.completedTasks} completed`
             )
           );
         }
-      }, 10000);
+      }, 15000);
 
       // Graceful shutdown
       const shutdown = async () => {
         clearInterval(statusInterval);
-        console.log(chalk.yellow('\n\nShutting down swarm...'));
+        console.log(chalk.yellow('\n\nShutting down...'));
+
+        if (webProcess) {
+          webProcess.kill('SIGTERM');
+        }
+
         await coordinator.stop();
         await dataLayer.close();
-        console.log(chalk.green('✓ Swarm shut down'));
+        console.log(chalk.green('✓ Jetpack stopped'));
         process.exit(0);
       };
 
@@ -208,7 +297,7 @@ program
       // Keep alive
       await new Promise(() => {});
     } catch (error) {
-      spinner.fail(chalk.red('Failed to start swarm'));
+      spinner.fail(chalk.red('Failed to start'));
       console.error(error);
       process.exit(1);
     }

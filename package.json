@@ -13,6 +13,7 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "clean": "turbo run clean && rm -rf node_modules",
+    "jetpack": "node packages/swarm-cli/dist/index.js",
     "swarm": "node packages/swarm-cli/dist/index.js",
     "publish:packages": "pnpm build && pnpm -r --filter './packages/*' publish --access public",
     "publish:cli": "pnpm build && pnpm --filter @jetpack/cli publish --access public",

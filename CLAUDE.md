@@ -28,31 +28,43 @@ pnpm --filter @jetpack-agent/coordinator test
 pnpm dev
 ```
 
+### Quick Start (Simple!)
+
+```bash
+# ONE command to start everything
+pnpm jetpack start
+
+# This does:
+# 1. Auto-initializes .jetpack/ if needed
+# 2. Starts web UI at http://localhost:3000
+# 3. Spawns 3 agents (mock mode if no ANTHROPIC_API_KEY)
+# 4. Opens browser automatically
+```
+
 ### CLI Commands
 
 ```bash
-# Initialize swarm database
-pnpm swarm init [path]
-
-# Start coordinator with agents
-pnpm swarm start                    # Start with 3 agents (default)
-pnpm swarm start -a 5               # Start with 5 agents
-pnpm swarm start --mock             # Use mock adapters (no Claude needed)
-pnpm swarm start -d /path/to/project
-
-# Start web UI dashboard (localhost:3000)
-pnpm swarm web                      # Point to current directory
-pnpm swarm web -d /path/to/project  # Point to specific project
-pnpm swarm web -p 3001              # Custom port
+# Start everything (web UI + agents + auto-init)
+pnpm jetpack start                  # Start with defaults
+pnpm jetpack start -a 5             # Start with 5 agents
+pnpm jetpack start --mock           # Force mock adapters (no API key needed)
+pnpm jetpack start -d /path/to/project  # Use a different project directory
+pnpm jetpack start -p 3001          # Custom port
+pnpm jetpack start --no-web         # Agents only, no web UI
+pnpm jetpack start --no-browser     # Don't auto-open browser
 
 # Create tasks
-pnpm swarm task -t "Task title"
-pnpm swarm task -t "Title" -p high -s "typescript,react"
+pnpm jetpack task -t "Build a login page"
+pnpm jetpack task -t "Title" -p high -s "typescript,react"
 
 # View status
-pnpm swarm status
-pnpm swarm agents
-pnpm swarm tasks
+pnpm jetpack status
+pnpm jetpack agents
+pnpm jetpack tasks
+
+# Advanced: separate commands (usually not needed)
+pnpm jetpack init [path]            # Initialize database only
+pnpm jetpack web -d /project        # Start web UI only
 ```
 
 ## Architecture
