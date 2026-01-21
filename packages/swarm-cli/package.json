@@ -25,11 +25,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@jetpack-agent/data": "workspace:*",
     "@jetpack-agent/agent-harness": "workspace:*",
     "@jetpack-agent/coordinator": "workspace:*",
-    "commander": "^13.1.0",
+    "@jetpack-agent/data": "workspace:*",
     "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "dotenv": "^17.2.3",
     "ora": "^8.2.0"
   },
   "devDependencies": {

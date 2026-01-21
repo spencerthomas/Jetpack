@@ -518,33 +518,49 @@ export class SQLiteDataLayer implements DataLayer {
           `;
           const params: unknown[] = [agentId];
 
-          if (filter?.skills && filter.skills.length > 0) {
-            // Check if task requires any of the agent's skills
-            for (const skill of filter.skills) {
-              sql += ` AND (required_skills = '[]' OR required_skills LIKE ?)`;
-              params.push(`%"${skill}"%`);
-            }
-          }
-
           if (filter?.excludeIds && filter.excludeIds.length > 0) {
             sql += ` AND id NOT IN (${filter.excludeIds.map(() => '?').join(',')})`;
             params.push(...filter.excludeIds);
           }
 
-          sql += ' ORDER BY priority_order ASC, created_at ASC LIMIT 1';
+          // Fetch candidates to filter by skills in memory
+          sql += ' ORDER BY priority_order ASC, created_at ASC LIMIT 50';
 
-          const row = db.prepare(sql).get(...params) as Record<string, unknown> | undefined;
-          if (!row) return null;
+          const rows = db.prepare(sql).all(...params) as Array<Record<string, unknown>>;
 
-          const now = new Date().toISOString();
-          db.prepare(`
-            UPDATE tasks
-            SET status = 'claimed', assigned_agent = ?, claimed_at = ?
-            WHERE id = ? AND status = 'ready'
-          `).run(agentId, now, row.id);
+          for (const row of rows) {
+            const task = rowToTask(row);
 
-          const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.id);
-          return rowToTask(updated as Record<string, unknown>);
+            // Check skills match
+            if (filter?.skills) {
+              const required = task.requiredSkills || [];
+              const hasAllSkills = required.every(req =>
+                filter.skills!.some(agentSkill => agentSkill.toLowerCase() === req.toLowerCase())
+              );
+
+              if (!hasAllSkills) continue;
+            }
+
+            // Claim the task
+            const now = new Date().toISOString();
+            const result = db.prepare(`
+              UPDATE tasks
+              SET status = 'claimed', assigned_agent = ?, claimed_at = ?
+              WHERE id = ? AND status = 'ready'
+            `).run(agentId, now, task.id);
+
+            // Double check concurrent claim didn't steal it
+            if (result.changes > 0) {
+              return {
+                ...task,
+                status: 'claimed' as Task['status'],
+                assignedAgent: agentId,
+                claimedAt: now
+              };
+            }
+          }
+
+          return null;
         })();
       },
 

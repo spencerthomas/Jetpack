@@ -8,6 +8,7 @@ import type {
   ExecutionResult,
 } from './types.js';
 import { DefaultPromptTemplate } from './types.js';
+import { TIMING, TASK } from './constants.js';
 
 /**
  * Agent Harness - wraps any model adapter to participate in the swarm
@@ -84,10 +85,10 @@ export class AgentHarness {
       },
       machine: this.config.machine
         ? {
-            id: this.config.machine.id,
-            hostname: this.config.machine.hostname,
-            pid: process.pid,
-          }
+          id: this.config.machine.id,
+          hostname: this.config.machine.hostname,
+          pid: process.pid,
+        }
         : undefined,
     });
 
@@ -95,11 +96,11 @@ export class AgentHarness {
     this.status = 'idle';
 
     // Start heartbeat
-    const heartbeatInterval = this.config.heartbeatIntervalMs ?? 30000;
+    const heartbeatInterval = this.config.heartbeatIntervalMs ?? TIMING.HEARTBEAT_INTERVAL_MS;
     this.heartbeatTimer = setInterval(() => this.sendHeartbeat(), heartbeatInterval);
 
     // Start work polling
-    const workInterval = this.config.workPollingIntervalMs ?? 10000;
+    const workInterval = this.config.workPollingIntervalMs ?? TIMING.WORK_POLLING_INTERVAL_MS;
     this.workTimer = setInterval(() => this.lookForWork(), workInterval);
 
     // Send initial heartbeat
@@ -174,9 +175,9 @@ export class AgentHarness {
         status: this.status,
         currentTask: this.currentTaskId
           ? {
-              id: this.currentTaskId,
-              progress: 0, // Would be updated during execution
-            }
+            id: this.currentTaskId,
+            progress: 0, // Would be updated during execution
+          }
           : undefined,
       });
       this.stats.lastHeartbeat = new Date();
@@ -201,9 +202,11 @@ export class AgentHarness {
       });
 
       if (task) {
+        console.log(`[Agent ${this.config.id}] Claimed task: ${task.id} (${task.title})`);
         await this.executeTask(task);
       }
     } catch (error) {
+      console.error(`[Agent ${this.config.id}] Error looking for work:`, error);
       this.emitEvent({ type: 'error', error: error as Error });
     }
   }
@@ -252,7 +255,7 @@ export class AgentHarness {
           filePath: file,
           agentId: this.config.id,
           taskId: task.id,
-          durationMs: (this.config.maxTaskMinutes ?? 60) * 60 * 1000,
+          durationMs: (this.config.maxTaskMinutes ?? TASK.DEFAULT_MAX_TASK_MINUTES) * 60 * 1000,
         });
 
         if (!acquired) {
@@ -328,7 +331,7 @@ export class AgentHarness {
       filesCreated: result.filesCreated,
       filesModified: result.filesModified,
       filesDeleted: result.filesDeleted,
-      summary: result.output.substring(0, 1000), // Truncate for storage
+      summary: result.output.substring(0, TASK.OUTPUT_TRUNCATION_LENGTH), // Truncate for storage
       learnings: result.learnings,
     };
 

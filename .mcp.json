@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "claude-cloud": {
+      "type": "http",
+      "url": "https://claude-code2.demos.build/mcp",
+      "headers": {
+        "X-Container-Id": "100015"
+      }
+    },
+    "Jetpack Local": {
+      "command": "node",
+      "args": [
+        "/Users/cam/GITHUB/Jetpack/packages/mcp-server/dist/index.js"
+      ],
+      "env": {
+        "JETPACK_WORK_DIR": "/Users/cam/GITHUB/cf-container-claude-code2"
+      }
+    },
+    "observability-server": {
+      "type": "http",
+      "url": "https://observability.mcp.cloudflare.com/mcp"
+    },
+    "exa": {
+      "type": "http",
+      "url": "https://mcp.exa.ai/mcp"
+    }
+  }
+}

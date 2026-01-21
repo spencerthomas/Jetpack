@@ -6,6 +6,7 @@ import type {
   OutputCallback,
 } from '../types.js';
 import { BaseAdapter } from './BaseAdapter.js';
+import { PROGRESS_STAGES } from '../constants.js';
 
 /**
  * Configuration for mock adapter
@@ -63,10 +64,7 @@ export class MockAdapter extends BaseAdapter {
     if (delay > 0) {
       // Emit progress updates during delay
       const progressSteps = [
-        { phase: 'analyzing' as const, percentComplete: 20, description: 'Analyzing' },
-        { phase: 'planning' as const, percentComplete: 40, description: 'Planning' },
-        { phase: 'implementing' as const, percentComplete: 60, description: 'Implementing' },
-        { phase: 'testing' as const, percentComplete: 80, description: 'Testing' },
+        ...PROGRESS_STAGES,
         { phase: 'reviewing' as const, percentComplete: 100, description: 'Complete' },
       ];
 

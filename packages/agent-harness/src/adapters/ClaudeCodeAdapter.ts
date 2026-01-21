@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import fs from 'fs';
 import type {
   ModelConfig,
   ExecutionRequest,
@@ -7,6 +8,7 @@ import type {
   OutputCallback,
 } from '../types.js';
 import { BaseAdapter } from './BaseAdapter.js';
+import { TIMING, PROGRESS_STAGES } from '../constants.js';
 
 /**
  * Configuration specific to Claude Code CLI
@@ -18,6 +20,22 @@ export interface ClaudeCodeConfig extends ModelConfig {
   flags?: string[];
   /** Skip permission prompts */
   dangerouslySkipPermissions?: boolean;
+  /** Agent for the session (--agent) */
+  agent?: string;
+  /** Timeout in milliseconds (overrides default) */
+  timeout?: number;
+  /** Path to settings file or JSON string (--settings) */
+  settings?: string;
+  /** Enable verbose output (--verbose) */
+  verbose?: boolean;
+  /** MCP configuration paths (--mcp-config) */
+  mcpConfig?: string[];
+  /** Provider configuration */
+  providerConfig?: {
+    baseUrl?: string;
+    authToken?: string;
+    apiKey?: string;
+  };
 }
 
 /**
@@ -30,15 +48,19 @@ export class ClaudeCodeAdapter extends BaseAdapter {
   private cliPath: string;
   private flags: string[];
   private dangerouslySkipPermissions: boolean;
+  declare config: ClaudeCodeConfig; // Override config type
 
   constructor(config: ClaudeCodeConfig) {
-    super({ ...config, provider: 'claude-code' });
+    super({ ...config, provider: config.providerConfig?.baseUrl ? 'claude-code-custom' : 'claude-code' });
     this.cliPath = config.cliPath ?? 'claude';
     this.flags = config.flags ?? [];
     this.dangerouslySkipPermissions = config.dangerouslySkipPermissions ?? true;
+    this.config = config;
   }
 
   async isAvailable(): Promise<boolean> {
+    this.validateCliPath(this.cliPath);
+
     return new Promise((resolve) => {
       const proc = spawn(this.cliPath, ['--version'], {
         stdio: ['ignore', 'pipe', 'ignore'],
@@ -50,18 +72,20 @@ export class ClaudeCodeAdapter extends BaseAdapter {
       });
 
       proc.on('close', (code) => {
-        resolve(code === 0 && output.includes('claude'));
+        resolve(code === 0 && output.toLowerCase().includes('claude'));
       });
 
       proc.on('error', () => {
         resolve(false);
       });
 
-      // Timeout
-      setTimeout(() => {
-        proc.kill();
-        resolve(false);
-      }, 5000);
+      // Setup timeout
+      const clearTimeoutFn = this.setupProcessTimeout(
+        proc,
+        TIMING.VERSION_CHECK_TIMEOUT_MS,
+        () => resolve(false)
+      );
+      proc.on('close', () => clearTimeoutFn());
     });
   }
 
@@ -70,12 +94,14 @@ export class ClaudeCodeAdapter extends BaseAdapter {
     onProgress?: ProgressCallback,
     onOutput?: OutputCallback
   ): Promise<ExecutionResult> {
+    this.validateCliPath(this.cliPath);
+
     const startTime = Date.now();
 
     // Build the prompt
-    const prompt = `${request.systemPrompt}
-
-${request.messages?.map((m) => `${m.role}: ${m.content}`).join('\n\n') ?? ''}`;
+    // For Claude Code, we typically want the task description and context
+    // The system prompt is often handled by the CLI itself, but we can prepend it if needed
+    const prompt = `${request.systemPrompt}\n\n${request.messages?.map((m) => `${m.role}: ${m.content}`).join('\n\n') ?? ''}`;
 
     // Build CLI arguments
     const args: string[] = ['--print'];
@@ -84,18 +110,91 @@ ${request.messages?.map((m) => `${m.role}: ${m.content}`).join('\n\n') ?? ''}`;
       args.push('--dangerously-skip-permissions');
     }
 
+    if (this.config.verbose) {
+      args.push('--verbose');
+    }
+
+    if (this.config.agent) {
+      args.push('--agent', this.config.agent);
+    }
+
+    if (this.config.settings) {
+      args.push('--settings', this.config.settings);
+    }
+
+    if (this.config.mcpConfig && this.config.mcpConfig.length > 0) {
+      args.push('--mcp-config', ...this.config.mcpConfig);
+    }
+
+    // Model override
+    if (this.config.model && this.config.model !== 'claude-cli') {
+      args.push('--model', this.config.model);
+    }
+
     args.push(...this.flags);
     args.push(prompt);
+
+    // Prepare environment variables
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+    };
+
+    // Sanitize literal empty quotes from env if present
+    if (env.ANTHROPIC_API_KEY === '""' || env.ANTHROPIC_API_KEY === "''") {
+      delete env.ANTHROPIC_API_KEY;
+    }
+
+    const logPath = `${process.cwd()}/claude_env_debug.log`;
+    try {
+      fs.appendFileSync(logPath, `--- NEW EXECUTION --- ${new Date().toISOString()}\n${JSON.stringify({
+        baseUrl: this.config.providerConfig?.baseUrl,
+        hasAuthToken: !!this.config.providerConfig?.authToken,
+        hasApiKey: !!this.config.providerConfig?.apiKey,
+        envKeyBefore: env.ANTHROPIC_API_KEY === undefined ? 'undefined' : (env.ANTHROPIC_API_KEY === '' ? 'EMPTY' : JSON.stringify(env.ANTHROPIC_API_KEY))
+      }, null, 2)}\n`);
+    } catch (e) {
+      console.error('Failed to write debug log:', e);
+    }
+
+    if (this.config.providerConfig?.baseUrl) {
+      env.ANTHROPIC_BASE_URL = this.config.providerConfig.baseUrl;
+    }
+
+    if (this.config.providerConfig?.authToken) {
+      env.ANTHROPIC_AUTH_TOKEN = this.config.providerConfig.authToken;
+    }
+
+    // Always ensure API key is handled. 
+    // If using alternative provider with auth token, API key should usually be empty string.
+    // Always ensure API key is handled. 
+    // If using alternative provider with auth token (OpenRouter), ANTHROPIC_API_KEY MUST be unset.
+    if (env.ANTHROPIC_AUTH_TOKEN) {
+      delete env.ANTHROPIC_API_KEY;
+    } else if (this.config.providerConfig?.apiKey) {
+      env.ANTHROPIC_API_KEY = this.config.providerConfig.apiKey;
+    } else if (this.config.apiKey) {
+      env.ANTHROPIC_API_KEY = this.config.apiKey;
+    }
+
+    try {
+      fs.appendFileSync(logPath, `FINAL ENV:\n${JSON.stringify({
+        ANTHROPIC_BASE_URL: env.ANTHROPIC_BASE_URL,
+        ANTHROPIC_AUTH_TOKEN: env.ANTHROPIC_AUTH_TOKEN ? 'SET' : 'MISSING',
+        ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY === undefined ? 'UNDEFINED' : (env.ANTHROPIC_API_KEY === '' ? 'EMPTY' : 'SET')
+      }, null, 2)}\n\n`);
+    } catch (e) { }
+
+    if (this.config.verbose) {
+      console.log('--- Claude Code Adapter Values ---');
+      console.log('CLI Path:', this.cliPath);
+      console.log('Args:', args.join(' '));
+    }
 
     return new Promise((resolve) => {
       const proc = spawn(this.cliPath, args, {
         cwd: request.workDir,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          // Pass through API key if set
-          ...(this.config.apiKey ? { ANTHROPIC_API_KEY: this.config.apiKey } : {}),
-        },
+        env,
       });
 
       let stdout = '';
@@ -110,29 +209,13 @@ ${request.messages?.map((m) => `${m.role}: ${m.content}`).join('\n\n') ?? ''}`;
 
         // Try to extract progress from output
         if (chunk.includes('Reading') || chunk.includes('Analyzing')) {
-          onProgress?.({
-            phase: 'analyzing',
-            percentComplete: 20,
-            description: 'Analyzing codebase',
-          });
+          onProgress?.(PROGRESS_STAGES[0]);
         } else if (chunk.includes('Planning') || chunk.includes('Thinking')) {
-          onProgress?.({
-            phase: 'planning',
-            percentComplete: 40,
-            description: 'Planning implementation',
-          });
+          onProgress?.(PROGRESS_STAGES[1]);
         } else if (chunk.includes('Writing') || chunk.includes('Creating')) {
-          onProgress?.({
-            phase: 'implementing',
-            percentComplete: 60,
-            description: 'Implementing changes',
-          });
+          onProgress?.(PROGRESS_STAGES[2]);
         } else if (chunk.includes('Testing') || chunk.includes('Running')) {
-          onProgress?.({
-            phase: 'testing',
-            percentComplete: 80,
-            description: 'Running tests',
-          });
+          onProgress?.(PROGRESS_STAGES[3]);
         }
 
         // Extract token usage if available
@@ -150,14 +233,25 @@ ${request.messages?.map((m) => `${m.role}: ${m.content}`).join('\n\n') ?? ''}`;
       });
 
       // Set up timeout
-      const timeoutMs = request.timeoutMs ?? this.config.timeoutMs ?? 30 * 60 * 1000;
-      const timeout = setTimeout(() => {
-        proc.kill('SIGTERM');
-        setTimeout(() => proc.kill('SIGKILL'), 5000);
-      }, timeoutMs);
+      const timeoutMs = request.timeoutMs ?? this.config.timeout ?? TIMING.DEFAULT_TIMEOUT_MS;
+      const clearTimeoutFn = this.setupProcessTimeout(
+        proc,
+        timeoutMs,
+        (error) => {
+          resolve({
+            success: false,
+            output: stdout,
+            filesCreated: [],
+            filesModified: [],
+            filesDeleted: [],
+            error: error.message,
+            durationMs: Date.now() - startTime,
+          });
+        }
+      );
 
       proc.on('close', (code) => {
-        clearTimeout(timeout);
+        clearTimeoutFn();
 
         const durationMs = Date.now() - startTime;
         const files = this.parseFilesFromOutput(stdout);
@@ -168,13 +262,19 @@ ${request.messages?.map((m) => `${m.role}: ${m.content}`).join('\n\n') ?? ''}`;
           !stderr.toLowerCase().includes('error') &&
           !stderr.toLowerCase().includes('failed');
 
+        if (!success) {
+          console.error(`[ClaudeAdapter] Process failed with code ${code}`);
+          console.error(`[ClaudeAdapter] STDERR:\n${stderr}`);
+          console.error(`[ClaudeAdapter] STDOUT:\n${stdout}`);
+        }
+
         resolve({
           success,
           output: stdout,
           filesCreated: files.filesCreated,
           filesModified: files.filesModified,
           filesDeleted: files.filesDeleted,
-          error: success ? undefined : stderr || `Process exited with code ${code}`,
+          error: success ? undefined : (stderr || stdout || `Process exited with code ${code}`),
           durationMs,
           tokenUsage:
             inputTokens > 0 || outputTokens > 0
@@ -184,7 +284,7 @@ ${request.messages?.map((m) => `${m.role}: ${m.content}`).join('\n\n') ?? ''}`;
       });
 
       proc.on('error', (err) => {
-        clearTimeout(timeout);
+        clearTimeoutFn();
         resolve({
           success: false,
           output: stdout,

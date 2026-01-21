@@ -27,6 +27,9 @@ export {
   AgentHarnessConfigSchema,
 } from './types.js';
 
+// Constants
+export { TIMING, TASK, PROGRESS_STEPS, PROGRESS_STAGES } from './constants.js';
+
 // Agent harness
 export { AgentHarness } from './AgentHarness.js';
 
@@ -35,11 +38,22 @@ export {
   BaseAdapter,
   ClaudeCodeAdapter,
   createClaudeCodeAdapter,
+  CodexAdapter,
+  createCodexAdapter,
+  GeminiAdapter,
+  createGeminiAdapter,
   MockAdapter,
   createMockAdapter,
+  createAdapter,
+  type AdapterConfig,
 } from './adapters/index.js';
 
-export type { ClaudeCodeConfig, MockAdapterConfig } from './adapters/index.js';
+export type {
+  ClaudeCodeConfig,
+  CodexConfig,
+  GeminiConfig,
+  MockAdapterConfig
+} from './adapters/index.js';
 
 // Factory function for creating agents
 import type { DataLayer } from '@jetpack-agent/data';
@@ -51,6 +65,11 @@ import { DefaultPromptTemplate } from './types.js';
 
 /**
  * Create an agent harness with the specified model adapter
+ *
+ * @param dataLayer - The data layer for swarm persistence
+ * @param config - Agent configuration including the model adapter
+ * @param promptTemplate - Optional custom prompt template
+ * @returns A configured AgentHarness instance
  */
 export function createAgentHarness(
   dataLayer: DataLayer,
@@ -61,7 +80,11 @@ export function createAgentHarness(
 }
 
 /**
- * Create a Claude Code agent harness
+ * Create a Claude Code agent harness with default configuration
+ *
+ * @param dataLayer - The data layer for swarm persistence
+ * @param config - Agent configuration (model type defaults to 'claude-code')
+ * @returns A configured AgentHarness instance with Claude Code adapter
  */
 export function createClaudeCodeAgent(
   dataLayer: DataLayer,
@@ -79,6 +102,10 @@ export function createClaudeCodeAgent(
 
 /**
  * Create a mock agent harness for testing
+ *
+ * @param dataLayer - The data layer for swarm persistence
+ * @param config - Agent configuration including mock adapter options
+ * @returns A configured AgentHarness instance with mock adapter
  */
 export function createMockAgent(
   dataLayer: DataLayer,

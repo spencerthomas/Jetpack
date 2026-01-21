@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
+import 'dotenv/config';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { SQLiteDataLayer, createLocalDataLayer } from '@jetpack-agent/data';
-import { createMockAdapter, createClaudeCodeAdapter } from '@jetpack-agent/agent-harness';
+import { createMockAdapter, createAdapter } from '@jetpack-agent/agent-harness';
 import { SwarmCoordinator, type CoordinatorEvent } from '@jetpack-agent/coordinator';
 import path from 'path';
 import fs from 'fs';
@@ -104,7 +105,7 @@ program
 async function openBrowserSafe(url: string): Promise<void> {
   const { spawn } = await import('child_process');
   const openCmd = process.platform === 'darwin' ? 'open' :
-                 process.platform === 'win32' ? 'cmd' : 'xdg-open';
+    process.platform === 'win32' ? 'cmd' : 'xdg-open';
   const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
   spawn(openCmd, args, { detached: true, stdio: 'ignore' }).unref();
 }
@@ -118,6 +119,10 @@ program
   .option('--no-web', 'Skip starting the web UI')
   .option('--no-browser', 'Don\'t auto-open browser')
   .option('--mock', 'Force mock adapters (no Claude API needed)')
+  .option('--agent-type <type>', 'Agent type (claude-code, codex, gemini)', 'claude-code')
+  .option('--model <model>', 'Model to use (provider-specific)')
+  .option('--provider-url <url>', 'Alternative provider base URL')
+  .option('--verbose', 'Enable verbose output')
   .option('--strategy <strategy>', 'Claim strategy (first-fit, best-fit, round-robin, load-balanced)', 'best-fit')
   .action(async (options) => {
     console.log(chalk.bold.cyan('\n🚀 Jetpack\n'));
@@ -128,8 +133,26 @@ program
     const startWeb = options.web !== false;
     const shouldOpenBrowser = options.browser !== false;
 
-    // Auto-detect: use mock if no ANTHROPIC_API_KEY
-    const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+    // Auto-detect: check for relevant API keys based on agent type
+    let hasApiKey = false;
+    let missingKeyMsg = '';
+
+    switch (options.agentType) {
+      case 'codex':
+        hasApiKey = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_BASE_URL);
+        missingKeyMsg = 'set OPENAI_API_KEY';
+        break;
+      case 'gemini':
+        hasApiKey = !!process.env.GOOGLE_API_KEY;
+        missingKeyMsg = 'set GOOGLE_API_KEY';
+        break;
+      case 'claude-code':
+      default:
+        hasApiKey = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+        missingKeyMsg = 'set ANTHROPIC_API_KEY';
+        break;
+    }
+
     const useMock = options.mock || !hasApiKey;
 
     // Show configuration
@@ -138,12 +161,21 @@ program
     if (startWeb) {
       console.log(chalk.gray(`  Web UI: http://localhost:${port}`));
     }
+
     if (useMock && !options.mock) {
-      console.log(chalk.yellow(`  Mode: mock (set ANTHROPIC_API_KEY for Claude agents)`));
+      console.log(chalk.yellow(`  Mode: mock (${missingKeyMsg} to use ${options.agentType})
+  
+  To use real agents, set one of:
+    export ANTHROPIC_API_KEY=...  (for claude-code)
+    export OPENAI_API_KEY=...     (for codex)
+    export GOOGLE_API_KEY=...     (for gemini)
+      `));
     } else if (useMock) {
-      console.log(chalk.gray(`  Mode: mock`));
+      console.log(chalk.gray(`  Mode: mock (forced)`));
     } else {
-      console.log(chalk.gray(`  Mode: claude-code`));
+      console.log(chalk.green(`  Mode: ${options.agentType}`));
+      if (options.model) console.log(chalk.gray(`  Model: ${options.model}`));
+      if (options.providerUrl) console.log(chalk.gray(`  Provider: ${options.providerUrl}`));
     }
     console.log('');
 
@@ -233,13 +265,44 @@ program
 
       for (let i = 0; i < numAgents; i++) {
         const agentSkills = skills[i % skills.length];
-        const adapter = useMock
-          ? createMockAdapter({ executionDelayMs: 1000 + Math.random() * 2000 })
-          : createClaudeCodeAdapter();
+        let adapter;
+
+        if (useMock) {
+          adapter = createMockAdapter({ executionDelayMs: 1000 + Math.random() * 2000 });
+        } else {
+          const models = options.model ? options.model.split(',') : [undefined];
+
+          const providerConfig: any = {};
+          if (options.providerUrl) {
+            providerConfig.baseUrl = options.providerUrl;
+          } else if (process.env.ANTHROPIC_BASE_URL) {
+            providerConfig.baseUrl = process.env.ANTHROPIC_BASE_URL;
+          }
+
+          if (process.env.ANTHROPIC_AUTH_TOKEN) {
+            providerConfig.authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+          }
+          if (process.env.ANTHROPIC_API_KEY &&
+            process.env.ANTHROPIC_API_KEY !== '""' &&
+            process.env.ANTHROPIC_API_KEY !== "''") {
+            providerConfig.apiKey = process.env.ANTHROPIC_API_KEY;
+          }
+
+
+          const modelForAgent = models[i % models.length];
+          // Trim whitespace from model name if present
+          const cleanModel = modelForAgent ? modelForAgent.trim() : undefined;
+
+          adapter = createAdapter(options.agentType, {
+            model: cleanModel,
+            verbose: options.verbose,
+            providerConfig: Object.keys(providerConfig).length > 0 ? providerConfig : undefined
+          });
+        }
 
         await coordinator.spawnAgent({
           name: `Agent-${i + 1}`,
-          type: useMock ? 'custom' : 'claude-code',
+          type: useMock ? 'custom' : (options.agentType as any),
           adapter,
           skills: agentSkills,
           workDir,
@@ -273,9 +336,9 @@ program
           console.log(
             chalk.blue(
               `[${new Date().toLocaleTimeString()}] ` +
-                `${stats.busyAgents}/${stats.totalAgents} agents busy | ` +
-                `${stats.inProgressTasks} tasks running | ` +
-                `${stats.completedTasks} completed`
+              `${stats.busyAgents}/${stats.totalAgents} agents busy | ` +
+              `${stats.inProgressTasks} tasks running | ` +
+              `${stats.completedTasks} completed`
             )
           );
         }
@@ -300,7 +363,7 @@ program
       process.on('SIGTERM', shutdown);
 
       // Keep alive
-      await new Promise(() => {});
+      await new Promise(() => { });
     } catch (error) {
       spinner.fail(chalk.red('Failed to start'));
       console.error(error);
